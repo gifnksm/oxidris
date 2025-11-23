@@ -1,20 +1,19 @@
-use std::{collections::VecDeque, io, sync::Once};
+use std::collections::VecDeque;
 
 use crate::{
     block::BlockKind,
     mino::{self, MinoKind, MinoShape},
-    terminal::Terminal,
 };
 
 const FIELD_WIDTH: usize = 12 + 2;
 const FIELD_HEIGHT: usize = 22 + 1;
 
-type FieldSize = [[BlockKind; FIELD_WIDTH]; FIELD_HEIGHT];
+pub(crate) type FieldSize = [[BlockKind; FIELD_WIDTH]; FIELD_HEIGHT];
 
 #[derive(Debug, Clone, Copy)]
-struct Position {
-    x: usize,
-    y: usize,
+pub(crate) struct Position {
+    pub(crate) x: usize,
+    pub(crate) y: usize,
 }
 
 impl Position {
@@ -59,7 +58,7 @@ impl Position {
     }
 }
 
-pub const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
+const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
 
 #[derive(Debug, Clone)]
 pub(crate) struct Game {
@@ -140,9 +139,29 @@ impl Game {
     pub(crate) fn score(&self) -> usize {
         self.score
     }
+
+    pub(crate) fn field(&self) -> &FieldSize {
+        &self.field
+    }
+
+    pub(crate) fn pos(&self) -> &Position {
+        &self.pos
+    }
+
+    pub(crate) fn mino(&self) -> &MinoShape {
+        &self.mino
+    }
+
+    pub(crate) fn hold(&self) -> &Option<MinoShape> {
+        &self.hold
+    }
+
+    pub(crate) fn next(&self) -> &VecDeque<MinoShape> {
+        &self.next
+    }
 }
 
-fn ghost_pos(field: &FieldSize, pos: &Position, mino: &MinoShape) -> Position {
+pub(crate) fn ghost_pos(field: &FieldSize, pos: &Position, mino: &MinoShape) -> Position {
     let mut ghost_pos = *pos;
     loop {
         let Some(new_pos) = ghost_pos.down() else {
@@ -156,102 +175,7 @@ fn ghost_pos(field: &FieldSize, pos: &Position, mino: &MinoShape) -> Position {
     ghost_pos
 }
 
-pub(crate) fn draw(
-    Game {
-        field,
-        pos,
-        mino,
-        hold,
-        next,
-        score,
-        ..
-    }: &Game,
-    term: &mut Terminal,
-) -> io::Result<()> {
-    static INIT: Once = Once::new();
-
-    INIT.call_once(|| {
-        let _ = term.clear_screen();
-        let _ = term.hide_cursor();
-    });
-
-    let mut field_buf = *field;
-
-    let ghost_pos = ghost_pos(field, pos, mino);
-    for (y, row) in mino.iter().enumerate() {
-        for (x, block) in row.iter().enumerate() {
-            if !block.is_empty() {
-                field_buf[y + ghost_pos.y][x + ghost_pos.x] = BlockKind::Ghost;
-            }
-        }
-    }
-
-    for (y, row) in mino.iter().enumerate() {
-        for (x, block) in row.iter().enumerate() {
-            if !block.is_empty() {
-                field_buf[y + pos.y][x + pos.x] = *block;
-            }
-        }
-    }
-
-    term.reset_styles()?;
-    term.move_to(1, 26)?.write("HOLD")?;
-    if let Some(hold) = hold {
-        for (y, row) in hold.iter().enumerate() {
-            term.move_to(y + 2, 26)?;
-            for &block in row {
-                let display = block.display();
-                term.set_fg(display.fg())?
-                    .set_bg(display.bg())?
-                    .write(display.symbol())?;
-            }
-        }
-    }
-
-    term.reset_styles()?;
-    term.move_to(7, 26)?.write("NEXT")?;
-    for (i, next) in next.iter().take(3).enumerate() {
-        for (y, row) in next.iter().enumerate() {
-            term.move_to(i * 4 + y + 8, 26)?;
-            for block in row {
-                let display = block.display();
-                term.set_fg(display.fg())?
-                    .set_bg(display.bg())?
-                    .write(display.symbol())?;
-            }
-        }
-    }
-
-    term.reset_styles()?;
-    term.move_to(21, 26)?.write("SCORE")?;
-    term.move_to(22, 26)?.write(format!("{score:>8}"))?;
-
-    // Display controls section together
-    term.move_to(1, 40)?.write("CONTROLS")?;
-    term.move_to(2, 40)?.write("Left/Right : Move left/right")?;
-    term.move_to(3, 40)?.write("Down       : Soft drop")?;
-    term.move_to(4, 40)?.write("Up         : Hard drop")?;
-    term.move_to(5, 40)?.write("z          : Rotate left")?;
-    term.move_to(6, 40)?.write("x          : Rotate right")?;
-    term.move_to(7, 40)?.write("Space      : Hold")?;
-    term.move_to(8, 40)?.write("q          : Quit")?;
-
-    term.move_home()?;
-    for row in &field_buf[0..FIELD_HEIGHT - 1] {
-        for &block in &row[1..FIELD_WIDTH - 1] {
-            let display = block.display();
-            term.set_fg(display.fg())?
-                .set_bg(display.bg())?
-                .write(display.symbol())?;
-        }
-        term.newline()?;
-    }
-
-    term.flush()?;
-    Ok(())
-}
-
-fn is_collision(field: &FieldSize, pos: &Position, mino: &MinoShape) -> bool {
+pub(crate) fn is_collision(field: &FieldSize, pos: &Position, mino: &MinoShape) -> bool {
     for y in 0..4 {
         for x in 0..4 {
             if y + pos.y >= FIELD_HEIGHT || x + pos.x >= FIELD_WIDTH {
@@ -410,19 +334,4 @@ fn spawn_mino(game: &mut Game) -> Result<(), ()> {
         return Err(());
     }
     Ok(())
-}
-
-pub(crate) fn gameover(game: &Game, term: &mut Terminal) -> io::Result<()> {
-    draw(game, term)?;
-    term.write("GAME OVER")?;
-    term.newline()?;
-    term.flush()?;
-    quit(term)?;
-    Ok(())
-}
-
-pub(crate) fn quit(term: &mut Terminal) -> io::Result<()> {
-    term.show_cursor()?;
-    term.flush()?;
-    std::process::exit(0);
 }

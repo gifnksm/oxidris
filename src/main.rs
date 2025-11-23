@@ -6,6 +6,7 @@ mod ga;
 mod game;
 mod mino;
 mod play;
+mod renderer;
 mod terminal;
 
 #[derive(Parser)]

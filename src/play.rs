@@ -1,4 +1,5 @@
 use std::{
+    process,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -10,13 +11,14 @@ use crate::{
     ai,
     ga::GenoSeq,
     game::{self, Game},
+    renderer,
     terminal::Terminal,
 };
 
 pub(crate) fn normal() -> ! {
     let game = Arc::new(Mutex::new(Game::new()));
     let term = Arc::new(Mutex::new(Terminal::stdout()));
-    game::draw(&game.lock().unwrap(), &mut term.lock().unwrap()).unwrap();
+    renderer::draw(&game.lock().unwrap(), &mut term.lock().unwrap()).unwrap();
 
     {
         let game = Arc::clone(&game);
@@ -30,9 +32,11 @@ pub(crate) fn normal() -> ! {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_drop(&mut game).is_err() && game::landing(&mut game).is_err() {
-                    game::gameover(&game, &mut term).unwrap();
+                    renderer::gameover(&game, &mut term).unwrap();
+                    let _ = renderer::cleanup(&mut term);
+                    process::exit(0);
                 }
-                game::draw(&game, &mut term).unwrap();
+                renderer::draw(&game, &mut term).unwrap();
             }
         });
     }
@@ -44,21 +48,21 @@ pub(crate) fn normal() -> ! {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_move_left(&mut game).is_ok() {
-                    game::draw(&game, &mut term).unwrap();
+                    renderer::draw(&game, &mut term).unwrap();
                 }
             }
             Ok(Key::Right) => {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_move_right(&mut game).is_ok() {
-                    game::draw(&game, &mut term).unwrap();
+                    renderer::draw(&game, &mut term).unwrap();
                 }
             }
             Ok(Key::Down) => {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_drop(&mut game).is_ok() {
-                    game::draw(&game, &mut term).unwrap();
+                    renderer::draw(&game, &mut term).unwrap();
                 }
             }
             Ok(Key::Up) => {
@@ -66,34 +70,37 @@ pub(crate) fn normal() -> ! {
                 let mut term = term.lock().unwrap();
                 let _ = game::try_hard_drop(&mut game);
                 if game::landing(&mut game).is_err() {
-                    let _ = game::gameover(&game, &mut term);
+                    let _ = renderer::gameover(&game, &mut term);
+                    let _ = renderer::cleanup(&mut term);
+                    process::exit(0);
                 }
-                game::draw(&game, &mut term).unwrap();
+                renderer::draw(&game, &mut term).unwrap();
             }
             Ok(Key::Char('z')) => {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_rotate_left(&mut game).is_ok() {
-                    game::draw(&game, &mut term).unwrap();
+                    renderer::draw(&game, &mut term).unwrap();
                 }
             }
             Ok(Key::Char('x')) => {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_rotate_right(&mut game).is_ok() {
-                    game::draw(&game, &mut term).unwrap();
+                    renderer::draw(&game, &mut term).unwrap();
                 }
             }
             Ok(Key::Char(' ')) => {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game::try_hold(&mut game).is_ok() {
-                    game::draw(&game, &mut term).unwrap();
+                    renderer::draw(&game, &mut term).unwrap();
                 }
             }
             Ok(Key::Char('q')) => {
                 let mut term = term.lock().unwrap();
-                game::quit(&mut term).unwrap();
+                renderer::cleanup(&mut term).unwrap();
+                process::exit(0);
             }
             _ => {}
         }
@@ -104,14 +111,16 @@ pub(crate) fn auto() -> ! {
     let _ = thread::spawn(|| {
         let mut game = Game::new();
         let mut term = Terminal::stdout();
-        game::draw(&game, &mut term).unwrap();
+        renderer::draw(&game, &mut term).unwrap();
         loop {
             let gameover;
             (game, gameover) = ai::eval(&game, &GenoSeq([100, 1, 10, 100]));
             if gameover {
-                let _ = game::gameover(&game, &mut term);
+                let _ = renderer::gameover(&game, &mut term);
+                let _ = renderer::cleanup(&mut term);
+                process::exit(0);
             }
-            game::draw(&game, &mut term).unwrap();
+            renderer::draw(&game, &mut term).unwrap();
         }
     });
 
@@ -119,7 +128,8 @@ pub(crate) fn auto() -> ! {
     let mut term = Terminal::stdout();
     loop {
         if let Ok(Key::Char('q')) = g.getch() {
-            game::quit(&mut term).unwrap();
+            renderer::cleanup(&mut term).unwrap();
+            process::exit(0);
         }
     }
 }
