@@ -144,7 +144,9 @@ impl Game {
 fn ghost_pos(field: &FieldSize, pos: &Position, mino: &MinoShape) -> Position {
     let mut ghost_pos = *pos;
     loop {
-        let Some(new_pos) = ghost_pos.down() else { break };
+        let Some(new_pos) = ghost_pos.down() else {
+            break;
+        };
         if is_collision(field, &new_pos, mino) {
             break;
         }

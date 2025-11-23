@@ -7,9 +7,9 @@ use std::{
 use getch_rs::{Getch, Key};
 
 use crate::{
+    ai,
     ga::GenoSeq,
     game::{self, Game},
-    ai,
 };
 
 pub(crate) fn normal() -> ! {

@@ -1,10 +1,10 @@
 use clap::{Parser, ValueEnum};
 
+mod ai;
 mod block;
 mod ga;
 mod game;
 mod mino;
-mod ai;
 mod play;
 
 #[derive(Parser)]

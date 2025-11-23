@@ -11,9 +11,9 @@ pub(crate) fn eval(game: &Game, weight: &GenoSeq) -> (Game, bool) {
     for mut game in next_candidates(game) {
         let _ = game::try_hard_drop(&mut game);
         let Ok(pre_line) = game::landing(&mut game) else {
-            let score = compute_score(&game, weight,true, 0);
+            let score = compute_score(&game, weight, true, 0);
             if elite.1 < score {
-                elite.0   = (game, true);
+                elite.0 = (game, true);
                 elite.1 = score;
             }
             continue;
@@ -36,7 +36,7 @@ pub(crate) fn eval(game: &Game, weight: &GenoSeq) -> (Game, bool) {
     elite.0
 }
 
-fn next_candidates(game: &Game) -> impl Iterator<Item = Game> {
+fn next_candidates(game: &Game) -> impl Iterator<Item = Game> + use<> {
     (iter::once(game.clone()).chain(hold(game))).flat_map(|game| {
         {
             iter::once(game.clone())

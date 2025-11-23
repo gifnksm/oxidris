@@ -46,7 +46,7 @@ impl Index<GenomeKind> for GenoSeq {
 
 impl Distribution<GenoSeq> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenoSeq {
-        GenoSeq(rng.gen())
+        GenoSeq(rng.r#gen())
     }
 }
 
@@ -59,7 +59,7 @@ struct Individual {
 impl Distribution<Individual> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Individual {
         Individual {
-            geno: rng.gen(),
+            geno: rng.r#gen(),
             score: 0,
         }
     }
@@ -68,7 +68,7 @@ impl Distribution<Individual> for Standard {
 pub(crate) fn learning() -> ! {
     let _ = thread::spawn(|| {
         let mut inds = rand::random::<[Individual; POPULATION]>();
-        for gen in 0..GENERATION_MAX {
+        for r#gen in 0..GENERATION_MAX {
             println!("{gen}世代目:");
             thread::scope(|s| {
                 for (i, ind) in inds.iter_mut().enumerate() {
