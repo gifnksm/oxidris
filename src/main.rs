@@ -6,6 +6,7 @@ mod ga;
 mod game;
 mod mino;
 mod play;
+mod terminal;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

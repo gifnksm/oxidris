@@ -1,8 +1,9 @@
-use std::{collections::VecDeque, sync::Once};
+use std::{collections::VecDeque, io, sync::Once};
 
 use crate::{
     block::BlockKind,
     mino::{self, MinoKind, MinoShape},
+    terminal::Terminal,
 };
 
 const FIELD_WIDTH: usize = 12 + 2;
@@ -165,10 +166,13 @@ pub(crate) fn draw(
         score,
         ..
     }: &Game,
-) {
+    term: &mut Terminal,
+) -> io::Result<()> {
     static INIT: Once = Once::new();
+
     INIT.call_once(|| {
-        println!("\x1b[2J\x1b[H\x1b[?25l"); // 画面クリア
+        let _ = term.clear_screen();
+        let _ = term.hide_cursor();
     });
 
     let mut field_buf = *field;
@@ -190,48 +194,61 @@ pub(crate) fn draw(
         }
     }
 
-    println!("\x1b[2;26H\x1b[0mHOLD"); // カーソルをホールド位置に移動
+    term.reset_styles()?;
+    term.move_to(1, 26)?.write("HOLD")?;
     if let Some(hold) = hold {
         for (y, row) in hold.iter().enumerate() {
-            print!("\x1b[{};26H", y + 3); // カーソルを移動
+            term.move_to(y + 2, 26)?;
             for &block in row {
-                print!("{}", block.color());
+                let display = block.display();
+                term.set_fg(display.fg())?
+                    .set_bg(display.bg())?
+                    .write(display.symbol())?;
             }
-            println!();
         }
     }
 
-    println!("\x1b[8;26H\x1b[0mNEXT"); // カーソルをネクスト位置に移動
+    term.reset_styles()?;
+    term.move_to(7, 26)?.write("NEXT")?;
     for (i, next) in next.iter().take(3).enumerate() {
         for (y, row) in next.iter().enumerate() {
-            print!("\x1b[{};26H", i * 4 + y + 9); // カーソルを移動
+            term.move_to(i * 4 + y + 8, 26)?;
             for block in row {
-                print!("{}", block.color());
+                let display = block.display();
+                term.set_fg(display.fg())?
+                    .set_bg(display.bg())?
+                    .write(display.symbol())?;
             }
-            println!();
         }
     }
 
-    println!("\x1b[22;26H\x1b[0mSCORE"); // カーソルをスコア位置に移動
-    println!("\x1b[23;26H\x1b[0m{score:>8}");
+    term.reset_styles()?;
+    term.move_to(21, 26)?.write("SCORE")?;
+    term.move_to(22, 26)?.write(format!("{score:>8}"))?;
 
     // Display controls section together
-    println!("\x1b[2;40H\x1b[0mCONTROLS");
-    println!("\x1b[3;40H\x1b[0mLeft/Right : Move left/right");
-    println!("\x1b[4;40H\x1b[0mDown       : Soft drop");
-    println!("\x1b[5;40H\x1b[0mUp         : Hard drop");
-    println!("\x1b[6;40H\x1b[0mz          : Rotate left");
-    println!("\x1b[7;40H\x1b[0mx          : Rotate right");
-    println!("\x1b[8;40H\x1b[0mSpace      : Hold");
-    println!("\x1b[9;40H\x1b[0mq          : Quit");
+    term.move_to(1, 40)?.write("CONTROLS")?;
+    term.move_to(2, 40)?.write("Left/Right : Move left/right")?;
+    term.move_to(3, 40)?.write("Down       : Soft drop")?;
+    term.move_to(4, 40)?.write("Up         : Hard drop")?;
+    term.move_to(5, 40)?.write("z          : Rotate left")?;
+    term.move_to(6, 40)?.write("x          : Rotate right")?;
+    term.move_to(7, 40)?.write("Space      : Hold")?;
+    term.move_to(8, 40)?.write("q          : Quit")?;
 
-    println!("\x1b[H"); // カーソルを先頭に移動
+    term.move_home()?;
     for row in &field_buf[0..FIELD_HEIGHT - 1] {
         for &block in &row[1..FIELD_WIDTH - 1] {
-            print!("{}", block.color());
+            let display = block.display();
+            term.set_fg(display.fg())?
+                .set_bg(display.bg())?
+                .write(display.symbol())?;
         }
-        println!();
+        term.newline()?;
     }
+
+    term.flush()?;
+    Ok(())
 }
 
 fn is_collision(field: &FieldSize, pos: &Position, mino: &MinoShape) -> bool {
@@ -395,13 +412,17 @@ fn spawn_mino(game: &mut Game) -> Result<(), ()> {
     Ok(())
 }
 
-pub(crate) fn gameover(game: &Game) -> ! {
-    draw(game);
-    println!("GAME OVER");
-    quit();
+pub(crate) fn gameover(game: &Game, term: &mut Terminal) -> io::Result<()> {
+    draw(game, term)?;
+    term.write("GAME OVER")?;
+    term.newline()?;
+    term.flush()?;
+    quit(term)?;
+    Ok(())
 }
 
-pub(crate) fn quit() -> ! {
-    println!("\x1b[?25h"); // カーソルを再表示
+pub(crate) fn quit(term: &mut Terminal) -> io::Result<()> {
+    term.show_cursor()?;
+    term.flush()?;
     std::process::exit(0);
 }

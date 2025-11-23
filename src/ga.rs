@@ -1,15 +1,12 @@
 use std::{
     ops::{Index, RangeInclusive},
-    thread,
+    process, thread,
 };
 
 use getch_rs::{Getch, Key};
 use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
 
-use crate::{
-    ai,
-    game::{self, Game},
-};
+use crate::{ai, game::Game};
 
 const POPULATION: usize = 20;
 const GENERATION_MAX: usize = 20;
@@ -65,7 +62,7 @@ impl Distribution<Individual> for StandardUniform {
     }
 }
 
-pub(crate) fn learning() -> ! {
+pub(crate) fn learning() {
     let _ = thread::spawn(|| {
         let mut inds = rand::random::<[Individual; POPULATION]>();
         for r#gen in 0..GENERATION_MAX {
@@ -92,13 +89,13 @@ pub(crate) fn learning() -> ! {
                 .zip(next_genos)
                 .for_each(|(g, n)| *g = n);
         }
-        game::quit();
+        process::exit(0);
     });
 
     let g = Getch::new();
     loop {
         if let Ok(Key::Char('q')) = g.getch() {
-            game::quit();
+            process::exit(0);
         }
     }
 }
