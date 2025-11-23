@@ -2,6 +2,7 @@ use clap::{Parser, ValueEnum};
 
 mod ai;
 mod block;
+mod field;
 mod ga;
 mod game;
 mod mino;

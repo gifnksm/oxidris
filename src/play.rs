@@ -7,13 +7,35 @@ use std::{
 
 use getch_rs::{Getch, Key};
 
-use crate::{
-    ai,
-    ga::GenoSeq,
-    game::{self, Game},
-    renderer,
-    terminal::Terminal,
-};
+use crate::{ai, ga::GenoSeq, game::Game, renderer, terminal::Terminal};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NormalModeAction {
+    MoveLeft,
+    MoveRight,
+    RotateLeft,
+    RotateRight,
+    SoftDrop,
+    HardDrop,
+    Hold,
+    Quit,
+}
+
+impl NormalModeAction {
+    fn from_key(key: Key) -> Option<Self> {
+        match key {
+            Key::Left => Some(NormalModeAction::MoveLeft),
+            Key::Right => Some(NormalModeAction::MoveRight),
+            Key::Down => Some(NormalModeAction::SoftDrop),
+            Key::Up => Some(NormalModeAction::HardDrop),
+            Key::Char('z') => Some(NormalModeAction::RotateLeft),
+            Key::Char('x') => Some(NormalModeAction::RotateRight),
+            Key::Char(' ') => Some(NormalModeAction::Hold),
+            Key::Char('q') => Some(NormalModeAction::Quit),
+            _ => None,
+        }
+    }
+}
 
 pub(crate) fn normal() -> ! {
     let game = Arc::new(Mutex::new(Game::new()));
@@ -31,7 +53,7 @@ pub(crate) fn normal() -> ! {
 
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
-                if game::try_drop(&mut game).is_err() && game::landing(&mut game).is_err() {
+                if game.auto_drop_and_complete().is_gameover() {
                     renderer::gameover(&game, &mut term).unwrap();
                     let _ = renderer::cleanup(&mut term);
                     process::exit(0);
@@ -43,66 +65,36 @@ pub(crate) fn normal() -> ! {
 
     let g = Getch::new();
     loop {
-        match g.getch() {
-            Ok(Key::Left) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                if game::try_move_left(&mut game).is_ok() {
-                    renderer::draw(&game, &mut term).unwrap();
-                }
-            }
-            Ok(Key::Right) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                if game::try_move_right(&mut game).is_ok() {
-                    renderer::draw(&game, &mut term).unwrap();
-                }
-            }
-            Ok(Key::Down) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                if game::try_drop(&mut game).is_ok() {
-                    renderer::draw(&game, &mut term).unwrap();
-                }
-            }
-            Ok(Key::Up) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                let _ = game::try_hard_drop(&mut game);
-                if game::landing(&mut game).is_err() {
-                    let _ = renderer::gameover(&game, &mut term);
+        let Ok(Some(action)) = g.getch().map(NormalModeAction::from_key) else {
+            continue;
+        };
+
+        let mut game = game.lock().unwrap();
+        let updated = match action {
+            NormalModeAction::MoveLeft => game.try_move_left().is_ok(),
+            NormalModeAction::MoveRight => game.try_move_right().is_ok(),
+            NormalModeAction::RotateLeft => game.try_rotate_left().is_ok(),
+            NormalModeAction::RotateRight => game.try_rotate_right().is_ok(),
+            NormalModeAction::SoftDrop => game.try_soft_drop().is_ok(),
+            NormalModeAction::HardDrop => {
+                if game.hard_drop_and_complete().is_gameover() {
+                    let mut term = term.lock().unwrap();
+                    renderer::gameover(&game, &mut term).unwrap();
                     let _ = renderer::cleanup(&mut term);
                     process::exit(0);
                 }
-                renderer::draw(&game, &mut term).unwrap();
+                true
             }
-            Ok(Key::Char('z')) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                if game::try_rotate_left(&mut game).is_ok() {
-                    renderer::draw(&game, &mut term).unwrap();
-                }
-            }
-            Ok(Key::Char('x')) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                if game::try_rotate_right(&mut game).is_ok() {
-                    renderer::draw(&game, &mut term).unwrap();
-                }
-            }
-            Ok(Key::Char(' ')) => {
-                let mut game = game.lock().unwrap();
-                let mut term = term.lock().unwrap();
-                if game::try_hold(&mut game).is_ok() {
-                    renderer::draw(&game, &mut term).unwrap();
-                }
-            }
-            Ok(Key::Char('q')) => {
+            NormalModeAction::Hold => game.try_hold().is_ok(),
+            NormalModeAction::Quit => {
                 let mut term = term.lock().unwrap();
                 renderer::cleanup(&mut term).unwrap();
                 process::exit(0);
             }
-            _ => {}
+        };
+        if updated {
+            let mut term = term.lock().unwrap();
+            renderer::draw(&game, &mut term).unwrap();
         }
     }
 }

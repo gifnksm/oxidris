@@ -1,16 +1,20 @@
 use std::iter;
 
 use crate::{
+    field::Field,
     ga::{GenoSeq, GenomeKind},
-    game::{self, Game},
+    game::{DropResult, Game},
 };
 
 pub(crate) fn eval(game: &Game, weight: &GenoSeq) -> (Game, bool) {
     let mut elite = ((game.clone(), true), f64::MIN);
 
     for mut game in next_candidates(game) {
-        let _ = game::try_hard_drop(&mut game);
-        let Ok(pre_line) = game::landing(&mut game) else {
+        let result = game.hard_drop_and_complete();
+        let DropResult::Success {
+            lines_cleared: pre_line,
+        } = result
+        else {
             let score = compute_score(&game, weight, true, 0);
             if elite.1 < score {
                 elite.0 = (game, true);
@@ -20,10 +24,11 @@ pub(crate) fn eval(game: &Game, weight: &GenoSeq) -> (Game, bool) {
         };
 
         for mut game in next_candidates(&game) {
-            let _ = game::try_hard_drop(&mut game);
-            let (line, gameover) = match game::landing(&mut game) {
-                Ok(line) => (line, false),
-                Err(()) => (0, true),
+            let (line, gameover) = match game.hard_drop_and_complete() {
+                DropResult::Success {
+                    lines_cleared: line,
+                } => (line, false),
+                DropResult::GameOver => (0, true),
             };
             let score = compute_score(&game, weight, gameover, pre_line + line);
             if elite.1 < score {
@@ -74,30 +79,30 @@ fn compute_score(game: &Game, weight: &GenoSeq, gameover: bool, line: usize) -> 
 
 fn hold(game: &Game) -> Option<Game> {
     let mut game = game.clone();
-    game::try_hold(&mut game).ok()?;
+    game.try_hold().ok()?;
     Some(game)
 }
 
 fn rotate_right(game: &Game) -> Option<Game> {
     let mut game = game.clone();
-    game::try_rotate_right(&mut game).ok()?;
+    game.try_rotate_right().ok()?;
     Some(game)
 }
 
 fn move_left(game: &Game) -> Option<Game> {
     let mut game = game.clone();
-    if game::try_move_left(&mut game).is_err() {
-        game::try_drop(&mut game).ok()?;
-        game::try_move_left(&mut game).ok()?;
+    if game.try_move_left().is_err() {
+        game.try_soft_drop().ok()?;
+        game.try_move_left().ok()?;
     }
     Some(game)
 }
 
 fn move_right(game: &Game) -> Option<Game> {
     let mut game = game.clone();
-    if game::try_move_right(&mut game).is_err() {
-        game::try_drop(&mut game).ok()?;
-        game::try_move_right(&mut game).ok()?;
+    if game.try_move_right().is_err() {
+        game.try_soft_drop().ok()?;
+        game.try_move_right().ok()?;
     }
     Some(game)
 }
@@ -107,23 +112,29 @@ fn normalization(value: f64, min: f64, max: f64) -> f64 {
 }
 
 fn field_height(game: &Game, x: usize) -> usize {
-    game.block_rows()
+    game.field()
+        .block_rows()
         .enumerate()
         .find(|(_y, row)| !row[x].is_empty())
-        .map(|(y, _row)| Game::BLOCKS_HEIGHT - y)
+        .map(|(y, _row)| Field::BLOCKS_HEIGHT - y)
         .unwrap_or(0)
 }
 
 fn field_height_max(game: &Game) -> usize {
-    (0..Game::BLOCKS_HEIGHT)
-        .find(|&y| game.block_row(y).iter().any(|block| !block.is_empty()))
-        .map(|y| Game::BLOCKS_HEIGHT - y)
+    (0..Field::BLOCKS_HEIGHT)
+        .find(|&y| {
+            game.field()
+                .block_row(y)
+                .iter()
+                .any(|block| !block.is_empty())
+        })
+        .map(|y| Field::BLOCKS_HEIGHT - y)
         .unwrap_or(0)
 }
 
 fn diff_in_height(game: &Game) -> usize {
     let mut diff = 0;
-    let mut top = [0; Game::BLOCKS_WIDTH];
+    let mut top = [0; Field::BLOCKS_WIDTH];
 
     for (x, top) in top.iter_mut().enumerate() {
         *top = field_height(game, x);
@@ -136,9 +147,10 @@ fn diff_in_height(game: &Game) -> usize {
 }
 
 fn dead_space_count(game: &Game) -> usize {
-    (0..Game::BLOCKS_WIDTH)
+    (0..Field::BLOCKS_WIDTH)
         .map(|x| {
-            game.block_rows()
+            game.field()
+                .block_rows()
                 .map(|row| row[x])
                 .skip_while(|block| block.is_empty())
                 .filter(|block| block.is_empty())

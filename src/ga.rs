@@ -71,7 +71,7 @@ pub(crate) fn learning() {
                 for (i, ind) in inds.iter_mut().enumerate() {
                     s.spawn(move || {
                         let mut game = Game::new();
-                        while game.line() < LINE_COUNT_MAX {
+                        while game.cleared_lines() < LINE_COUNT_MAX {
                             let gameover;
                             (game, gameover) = ai::eval(&game, &ind.geno);
                             if gameover {

@@ -1,13 +1,6 @@
 use std::{io, sync::Once};
 
-use crate::{
-    block::BlockKind,
-    game::{self, Game},
-    terminal::Terminal,
-};
-
-const FIELD_WIDTH: usize = 12 + 2;
-const FIELD_HEIGHT: usize = 22 + 1;
+use crate::{block::BlockKind, game::Game, terminal::Terminal};
 
 pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
     static INIT: Once = Once::new();
@@ -18,34 +11,20 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
     });
 
     let field = game.field();
-    let pos = game.pos();
-    let mino = game.mino();
-    let hold = game.hold();
-    let next = game.next();
+    let (falling_mino_pos, falling_mino) = game.falling_mino();
+    let held_mino = game.held_mino();
+    let next_minos = game.next_minos();
     let score = game.score();
 
-    let mut field_buf = *field;
+    let mut field_buf = field.clone();
 
-    let ghost_pos = game::ghost_pos(field, pos, mino);
-    for (y, row) in mino.iter().enumerate() {
-        for (x, block) in row.iter().enumerate() {
-            if !block.is_empty() {
-                field_buf[y + ghost_pos.y][x + ghost_pos.x] = BlockKind::Ghost;
-            }
-        }
-    }
-
-    for (y, row) in mino.iter().enumerate() {
-        for (x, block) in row.iter().enumerate() {
-            if !block.is_empty() {
-                field_buf[y + pos.y][x + pos.x] = *block;
-            }
-        }
-    }
+    let drop_pos = game.simulate_drop_position();
+    field_buf.fill_mino_as(&drop_pos, falling_mino, BlockKind::Ghost);
+    field_buf.fill_mino(&falling_mino_pos, falling_mino);
 
     term.reset_styles()?;
     term.move_to(1, 26)?.write("HOLD")?;
-    if let Some(hold) = hold {
+    if let Some(hold) = held_mino {
         for (y, row) in hold.iter().enumerate() {
             term.move_to(y + 2, 26)?;
             for &block in row {
@@ -59,7 +38,7 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
 
     term.reset_styles()?;
     term.move_to(7, 26)?.write("NEXT")?;
-    for (i, next) in next.iter().take(3).enumerate() {
+    for (i, next) in next_minos.iter().take(3).enumerate() {
         for (y, row) in next.iter().enumerate() {
             term.move_to(i * 4 + y + 8, 26)?;
             for block in row {
@@ -86,8 +65,8 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
     term.move_to(8, 40)?.write("q          : Quit")?;
 
     term.move_home()?;
-    for row in &field_buf[0..FIELD_HEIGHT - 1] {
-        for &block in &row[1..FIELD_WIDTH - 1] {
+    for row in field_buf.render_rows() {
+        for block in row {
             let display = block.display();
             term.set_fg(display.fg())?
                 .set_bg(display.bg())?
