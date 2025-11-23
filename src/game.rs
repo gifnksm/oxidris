@@ -213,7 +213,7 @@ pub(crate) fn draw(
     }
 
     println!("\x1b[22;26HSCORE"); // カーソルをスコア位置に移動
-    println!("\x1b[23;26H{score}");
+    println!("\x1b[23;26H{score:>8}");
 
     // Display controls section together
     println!("\x1b[2;40H\x1b[0mCONTROLS");
