@@ -190,7 +190,7 @@ pub(crate) fn draw(
         }
     }
 
-    println!("\x1b[2;26HHOLD"); // カーソルをホールド位置に移動
+    println!("\x1b[2;26H\x1b[0mHOLD"); // カーソルをホールド位置に移動
     if let Some(hold) = hold {
         for (y, row) in hold.iter().enumerate() {
             print!("\x1b[{};26H", y + 3); // カーソルを移動
@@ -201,7 +201,7 @@ pub(crate) fn draw(
         }
     }
 
-    println!("\x1b[8;26HNEXT"); // カーソルをネクスト位置に移動
+    println!("\x1b[8;26H\x1b[0mNEXT"); // カーソルをネクスト位置に移動
     for (i, next) in next.iter().take(3).enumerate() {
         for (y, row) in next.iter().enumerate() {
             print!("\x1b[{};26H", i * 4 + y + 9); // カーソルを移動
@@ -212,8 +212,8 @@ pub(crate) fn draw(
         }
     }
 
-    println!("\x1b[22;26HSCORE"); // カーソルをスコア位置に移動
-    println!("\x1b[23;26H{score:>8}");
+    println!("\x1b[22;26H\x1b[0mSCORE"); // カーソルをスコア位置に移動
+    println!("\x1b[23;26H\x1b[0m{score:>8}");
 
     // Display controls section together
     println!("\x1b[2;40H\x1b[0mCONTROLS");
