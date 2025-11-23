@@ -1,4 +1,4 @@
-use rand::{distributions::Standard, prelude::Distribution, seq::SliceRandom, Rng};
+use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
 
 use crate::block::BlockKind;
 
@@ -18,9 +18,9 @@ pub(crate) enum MinoKind {
     T,
 }
 
-impl Distribution<MinoKind> for Standard {
+impl Distribution<MinoKind> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> MinoKind {
-        match rng.gen_range(0..=6) {
+        match rng.random_range(0..=6) {
             0 => MinoKind::I,
             1 => MinoKind::O,
             2 => MinoKind::S,
@@ -59,7 +59,7 @@ const MINOS: [MinoShape; MINO_KIND_MAX] = {
 };
 
 pub(crate) fn gen_mino_7() -> [MinoShape; MINO_KIND_MAX] {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut que = [
         MinoKind::I,
         MinoKind::O,

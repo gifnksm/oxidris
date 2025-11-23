@@ -4,7 +4,7 @@ use std::{
 };
 
 use getch_rs::{Getch, Key};
-use rand::{distributions::Standard, prelude::Distribution, seq::SliceRandom, Rng};
+use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
 
 use crate::{
     ai,
@@ -44,9 +44,9 @@ impl Index<GenomeKind> for GenoSeq {
     }
 }
 
-impl Distribution<GenoSeq> for Standard {
+impl Distribution<GenoSeq> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenoSeq {
-        GenoSeq(rng.r#gen())
+        GenoSeq(rng.random())
     }
 }
 
@@ -56,10 +56,10 @@ struct Individual {
     score: usize,
 }
 
-impl Distribution<Individual> for Standard {
+impl Distribution<Individual> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Individual {
         Individual {
-            geno: rng.r#gen(),
+            geno: rng.random(),
             score: 0,
         }
     }
@@ -104,7 +104,7 @@ pub(crate) fn learning() -> ! {
 }
 
 fn gen_next_generation(inds: &[Individual]) -> [GenoSeq; POPULATION] {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut genos = vec![];
     genos.extend_from_slice(&crossover(inds));
     genos.extend_from_slice(&mutation(inds));
@@ -115,12 +115,12 @@ fn gen_next_generation(inds: &[Individual]) -> [GenoSeq; POPULATION] {
 
 fn crossover(inds: &[Individual]) -> [GenoSeq; CROSSOVER_LEN] {
     let mut genos = inds.iter().map(|i| i.geno).collect::<Vec<_>>();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     for i in (0..genos.len() - 1).step_by(2) {
         let mut geno1 = genos[i];
         let mut geno2 = genos[i + 1];
-        let point1 = rng.gen_range(0..4);
-        let point2 = rng.gen_range(point1..4);
+        let point1 = rng.random_range(0..4);
+        let point2 = rng.random_range(point1..4);
         mem_swap_range(&mut geno1.0, &mut geno2.0, point1..=point2);
         genos[i] = geno1;
         genos[i + 1] = geno2;
@@ -137,10 +137,10 @@ fn mem_swap_range<T>(x: &mut [T], y: &mut [T], range: RangeInclusive<usize>) {
 
 fn mutation(inds: &[Individual]) -> [GenoSeq; MUTATION_LEN] {
     let mut genos = inds.iter().map(|i| i.geno).collect::<Vec<_>>();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     genos.shuffle(&mut rng);
     for geno in genos.iter_mut().take(MUTATION_LEN) {
-        geno.0[rng.gen_range(0..4)] = rand::random();
+        geno.0[rng.random_range(0..4)] = rand::random();
     }
     genos[..MUTATION_LEN].try_into().unwrap()
 }
