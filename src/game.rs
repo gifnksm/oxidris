@@ -397,7 +397,7 @@ fn spawn_mino(game: &mut Game) -> Result<(), ()> {
 
 pub(crate) fn gameover(game: &Game) -> ! {
     draw(game);
-    println!("GAMEOVER");
+    println!("GAME OVER");
     quit();
 }
 
