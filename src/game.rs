@@ -215,6 +215,16 @@ pub(crate) fn draw(
     println!("\x1b[22;26HSCORE"); // カーソルをスコア位置に移動
     println!("\x1b[23;26H{score}");
 
+    // Display controls section together
+    println!("\x1b[2;40H\x1b[0mCONTROLS");
+    println!("\x1b[3;40H\x1b[0mLeft/Right : Move left/right");
+    println!("\x1b[4;40H\x1b[0mDown       : Soft drop");
+    println!("\x1b[5;40H\x1b[0mUp         : Hard drop");
+    println!("\x1b[6;40H\x1b[0mz          : Rotate left");
+    println!("\x1b[7;40H\x1b[0mx          : Rotate right");
+    println!("\x1b[8;40H\x1b[0mSpace      : Hold");
+    println!("\x1b[9;40H\x1b[0mq          : Quit");
+
     println!("\x1b[H"); // カーソルを先頭に移動
     for row in &field_buf[0..FIELD_HEIGHT - 1] {
         for &block in &row[1..FIELD_WIDTH - 1] {
