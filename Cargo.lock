@@ -118,9 +118,9 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
 name = "getch-rs"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "971f4641cb18ad7ef9449b08be19417cce65f11a2ffd17ba772161d368f45c6a"
+checksum = "204438a76b37cc69e075ac91fd79b2d2bab9f3c9038fe6869faaab19806f6e00"
 dependencies = [
  "libc",
  "nix",
