@@ -73,6 +73,38 @@ pub(crate) struct Field {
     rows: [[BlockKind; FIELD_WIDTH]; FIELD_HEIGHT],
 }
 
+// Field layout with 2-cell wall borders to enable proper tetramino movement.
+//
+// Why 2 cells instead of 1? All tetraminos use 4x4 grids for positioning and collision
+// detection. The key issue is that I-mino has 2 consecutive empty columns adjacent to
+// its block, while other tetraminos have at most 1 empty column in any direction.
+//
+// This means I-mino needs more border space to move naturally near field edges.
+// Without sufficient borders, similar movement restriction problems would occur for
+// all tetraminos, but I-mino demonstrates the issue most clearly.
+//
+// The vertical I-mino occupies this 4x4 grid pattern:
+// (. = empty (E in code), I = I-mino block, W = wall)
+//  [.  I  .  .]
+//  [.  I  .  .]
+//  [.  I  .  .]
+//  [.  I  .  .]
+//
+// Problem with 1-cell border (showing 4x4 grid constraints):
+//             0  1  2  3  4  5  6  7  8  9 10 11
+// Field:      W  .  .  .  .  .  .  .  .  .  .  W    ← 10-column playable area (column 1 to 10)
+// I-mino:    [W  I  .  .] .  .  .  .  .  .  .  W    ← Leftmost: I-block at column 1
+// I-mino:     W  .  .  .  .  .  .  . [.  I  .  W]   ← Rightmost: I-block at column 9, not 10
+//                                          ^^^
+//               The I-mino cannot reach right most columns due to 4x4 grid constraint
+//
+// Solution with 2-cell border:
+//             0  1  2  3  4  5  6  7  8  9 10 11 12 13
+// Field:      W  W  .  .  .  .  .  .  .  .  .  .  W  W   ← 10-column playable area (column 2 to 11)
+// I-mino:     W [W  I  .  .] .  .  .  .  .  .  .  W  W   ← Leftmost: I-block at column 2
+// I-mino:     W  W  .  .  .  .  .  .  .  . [.  I  W  W]  ← Rightmost: I-block at column 11
+//
+// This allows full movement range while maintaining 4x4 grid collision detection.
 const TOP_ROW: [BlockKind; FIELD_WIDTH] = [W, W, W, W, E, E, E, E, E, E, W, W, W, W];
 const MID_ROW: [BlockKind; FIELD_WIDTH] = [W, W, E, E, E, E, E, E, E, E, E, E, W, W];
 const BOTTOM_ROW: [BlockKind; FIELD_WIDTH] = [W, W, W, W, W, W, W, W, W, W, W, W, W, W];
