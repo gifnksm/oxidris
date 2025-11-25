@@ -4,19 +4,19 @@ use crate::{block::BlockKind, game::Game, terminal::Terminal};
 
 // UI layout coordinates
 const FIELD_ROW: usize = 1;
-const FIELD_COL: usize = 1;
+const FIELD_COL: usize = 15;
 
 const HOLD_ROW: usize = 1;
-const HOLD_COL: usize = 26;
+const HOLD_COL: usize = 1;
 
-const NEXT_ROW: usize = 8;
-const NEXT_COL: usize = 26;
+const SCORE_ROW: usize = 10;
+const SCORE_COL: usize = 1;
 
-const SCORE_ROW: usize = 21;
-const SCORE_COL: usize = 26;
+const NEXT_ROW: usize = 1;
+const NEXT_COL: usize = 45;
 
-const CONTROLS_ROW: usize = 1;
-const CONTROLS_COL: usize = 40;
+const CONTROLS_ROW: usize = 10;
+const CONTROLS_COL: usize = 45;
 
 /// Draw the game field
 fn draw_field(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
