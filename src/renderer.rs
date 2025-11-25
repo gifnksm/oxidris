@@ -2,6 +2,128 @@ use std::{io, sync::Once};
 
 use crate::{block::BlockKind, game::Game, terminal::Terminal};
 
+// UI layout coordinates
+const FIELD_ROW: usize = 1;
+const FIELD_COL: usize = 1;
+
+const HOLD_ROW: usize = 1;
+const HOLD_COL: usize = 26;
+
+const NEXT_ROW: usize = 8;
+const NEXT_COL: usize = 26;
+
+const SCORE_ROW: usize = 21;
+const SCORE_COL: usize = 26;
+
+const CONTROLS_ROW: usize = 1;
+const CONTROLS_COL: usize = 40;
+
+/// Draw the game field
+fn draw_field(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
+    terminal.reset_styles()?;
+
+    // Prepare field with ghost piece and falling mino
+    let field = game.field();
+    let (falling_mino_pos, falling_mino) = game.falling_mino();
+    let mut field_buf = field.clone();
+
+    let drop_pos = game.simulate_drop_position();
+    field_buf.fill_mino_as(&drop_pos, falling_mino, BlockKind::Ghost);
+    field_buf.fill_mino(&falling_mino_pos, falling_mino);
+
+    for (row_offset, field_row) in field_buf.render_rows().enumerate() {
+        terminal.move_to(FIELD_ROW + row_offset, FIELD_COL)?;
+        for block in field_row {
+            let display = block.display();
+            terminal
+                .set_fg(display.fg())?
+                .set_bg(display.bg())?
+                .write(display.symbol())?;
+        }
+    }
+    Ok(())
+}
+
+/// Draw the HOLD panel
+fn draw_hold_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
+    terminal
+        .reset_styles()?
+        .move_to(HOLD_ROW, HOLD_COL)?
+        .write("HOLD")?;
+
+    if let Some(hold) = game.held_mino() {
+        for (row_offset, mino_row) in hold.iter().enumerate() {
+            terminal.move_to(HOLD_ROW + row_offset + 1, HOLD_COL)?;
+            for &block in mino_row {
+                let display = block.display();
+                terminal
+                    .set_fg(display.fg())?
+                    .set_bg(display.bg())?
+                    .write(display.symbol())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Draw the NEXT panel
+fn draw_next_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
+    terminal
+        .reset_styles()?
+        .move_to(NEXT_ROW, NEXT_COL)?
+        .write("NEXT")?;
+
+    for (mino_idx, next) in game.next_minos().iter().take(3).enumerate() {
+        for (row_offset, mino_row) in next.iter().enumerate() {
+            terminal.move_to(NEXT_ROW + mino_idx * 4 + row_offset + 1, NEXT_COL)?;
+            for block in mino_row {
+                let display = block.display();
+                terminal
+                    .set_fg(display.fg())?
+                    .set_bg(display.bg())?
+                    .write(display.symbol())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Draw the score panel
+fn draw_score_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
+    terminal
+        .reset_styles()?
+        .move_to(SCORE_ROW, SCORE_COL)?
+        .write("SCORE")?
+        .move_to(SCORE_ROW + 1, SCORE_COL)?
+        .write(format!("{:>8}", game.score()))?;
+    Ok(())
+}
+
+/// Draw the controls panel
+fn draw_controls_panel(terminal: &mut Terminal, _game: &Game) -> io::Result<()> {
+    const CONTROLS: &[(&str, &str)] = &[
+        ("Left/Right", "Move left/right"),
+        ("Down", "Soft drop"),
+        ("Up", "Hard drop"),
+        ("z", "Rotate left"),
+        ("x", "Rotate right"),
+        ("Space", "Hold"),
+        ("q", "Quit"),
+    ];
+
+    terminal
+        .reset_styles()?
+        .move_to(CONTROLS_ROW, CONTROLS_COL)?
+        .write("CONTROLS")?;
+
+    for (line_offset, (key, description)) in CONTROLS.iter().enumerate() {
+        terminal
+            .move_to(CONTROLS_ROW + line_offset + 1, CONTROLS_COL)?
+            .write(format!("{:<12} : {}", key, description))?;
+    }
+    Ok(())
+}
+
 pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
     static INIT: Once = Once::new();
 
@@ -10,70 +132,12 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
         let _ = term.hide_cursor();
     });
 
-    let field = game.field();
-    let (falling_mino_pos, falling_mino) = game.falling_mino();
-    let held_mino = game.held_mino();
-    let next_minos = game.next_minos();
-    let score = game.score();
-
-    let mut field_buf = field.clone();
-
-    let drop_pos = game.simulate_drop_position();
-    field_buf.fill_mino_as(&drop_pos, falling_mino, BlockKind::Ghost);
-    field_buf.fill_mino(&falling_mino_pos, falling_mino);
-
-    term.reset_styles()?;
-    term.move_to(1, 26)?.write("HOLD")?;
-    if let Some(hold) = held_mino {
-        for (y, row) in hold.iter().enumerate() {
-            term.move_to(y + 2, 26)?;
-            for &block in row {
-                let display = block.display();
-                term.set_fg(display.fg())?
-                    .set_bg(display.bg())?
-                    .write(display.symbol())?;
-            }
-        }
-    }
-
-    term.reset_styles()?;
-    term.move_to(7, 26)?.write("NEXT")?;
-    for (i, next) in next_minos.iter().take(3).enumerate() {
-        for (y, row) in next.iter().enumerate() {
-            term.move_to(i * 4 + y + 8, 26)?;
-            for block in row {
-                let display = block.display();
-                term.set_fg(display.fg())?
-                    .set_bg(display.bg())?
-                    .write(display.symbol())?;
-            }
-        }
-    }
-
-    term.reset_styles()?;
-    term.move_to(21, 26)?.write("SCORE")?;
-    term.move_to(22, 26)?.write(format!("{score:>8}"))?;
-
-    // Display controls section together
-    term.move_to(1, 40)?.write("CONTROLS")?;
-    term.move_to(2, 40)?.write("Left/Right : Move left/right")?;
-    term.move_to(3, 40)?.write("Down       : Soft drop")?;
-    term.move_to(4, 40)?.write("Up         : Hard drop")?;
-    term.move_to(5, 40)?.write("z          : Rotate left")?;
-    term.move_to(6, 40)?.write("x          : Rotate right")?;
-    term.move_to(7, 40)?.write("Space      : Hold")?;
-    term.move_to(8, 40)?.write("q          : Quit")?;
-
-    term.move_home()?;
-    for row in field_buf.render_rows() {
-        for block in row {
-            let display = block.display();
-            term.set_fg(display.fg())?
-                .set_bg(display.bg())?
-                .write(display.symbol())?;
-        }
-        term.newline()?;
-    }
+    // Draw each UI element
+    draw_field(term, game)?;
+    draw_hold_panel(term, game)?;
+    draw_next_panel(term, game)?;
+    draw_score_panel(term, game)?;
+    draw_controls_panel(term, game)?;
 
     term.flush()?;
     Ok(())

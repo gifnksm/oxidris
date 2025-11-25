@@ -87,12 +87,6 @@ impl Terminal {
         Ok(self)
     }
 
-    /// Move cursor to home position (1,1)
-    pub(crate) fn move_home(&mut self) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[H")?;
-        Ok(self)
-    }
-
     /// Write text without moving cursor or resetting color
     pub(crate) fn write(&mut self, text: impl fmt::Display) -> io::Result<&mut Self> {
         write!(self.writer, "{text}")?;
