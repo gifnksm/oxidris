@@ -144,9 +144,37 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
 }
 
 pub(crate) fn gameover(game: &Game, term: &mut Terminal) -> io::Result<()> {
+    use crate::terminal::Color;
+    
     draw(game, term)?;
-    term.write("GAME OVER")?;
-    term.newline()?;
+    
+    // Draw a prominent GAME OVER message with background and border
+    let msg_row = FIELD_ROW + 9;
+    let msg_col = FIELD_COL + 3;
+    
+    // Draw top border
+    term.reset_styles()?
+        .move_to(msg_row, msg_col)?
+        .set_fg(Color::RED)?
+        .set_bg(Color::WHITE)?
+        .write("┌─────────────┐")?;
+    
+    // Draw message with background
+    term.move_to(msg_row + 1, msg_col)?
+        .set_fg(Color::RED)?
+        .set_bg(Color::WHITE)?
+        .write("│ GAME OVER!! │")?;
+    
+    // Draw bottom border
+    term.move_to(msg_row + 2, msg_col)?
+        .set_fg(Color::RED)?
+        .set_bg(Color::WHITE)?
+        .write("└─────────────┘")?;
+    
+    // Reset styles and position cursor away from UI
+    term.reset_styles()?
+        .move_to(25, 1)?;
+    
     term.flush()?;
     Ok(())
 }

@@ -93,11 +93,6 @@ impl Terminal {
         Ok(self)
     }
 
-    /// Write a newline
-    pub(crate) fn newline(&mut self) -> io::Result<&mut Self> {
-        writeln!(self.writer)?;
-        Ok(self)
-    }
     /// Flush the output
     pub(crate) fn flush(&mut self) -> io::Result<&mut Self> {
         self.writer.flush()?;
