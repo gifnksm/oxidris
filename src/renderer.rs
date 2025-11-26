@@ -164,15 +164,14 @@ pub(crate) fn gameover(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::
         .set_bg(Color::WHITE)?
         .write("└─────────────┘")?;
 
-    // Reset styles and position cursor away from UI
-    term.reset_styles()?.move_to(25, 1)?;
-
     term.flush()?;
     Ok(())
 }
 
 pub(crate) fn cleanup(term: &mut Terminal) -> io::Result<()> {
-    term.show_cursor()?;
+    term.reset_styles()?
+        .move_to(25, 1)?  // Move cursor to bottom of screen to prevent overwriting
+        .show_cursor()?;
     term.flush()?;
     Ok(())
 }
