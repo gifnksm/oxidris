@@ -15,8 +15,8 @@ const SCORE_COL: usize = 1;
 const NEXT_ROW: usize = 1;
 const NEXT_COL: usize = 45;
 
-const CONTROLS_ROW: usize = 10;
-const CONTROLS_COL: usize = 45;
+const CONTROLS_ROW: usize = 1;
+const CONTROLS_COL: usize = 65;
 
 /// Draw the game field
 fn draw_field(terminal: &mut Terminal, game: &Game, mode: PlayMode) -> io::Result<()> {
@@ -76,9 +76,11 @@ fn draw_next_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
         .move_to(NEXT_ROW, NEXT_COL)?
         .write("NEXT")?;
 
-    for (mino_idx, next) in game.next_minos().iter().take(3).enumerate() {
-        for (row_offset, mino_row) in next.iter().enumerate() {
-            terminal.move_to(NEXT_ROW + mino_idx * 4 + row_offset + 1, NEXT_COL)?;
+    for (mino_idx, next) in game.next_minos().iter().take(7).enumerate() {
+        // Show only rows 1 and 2 (indices 1 and 2) for compact display
+        for (display_row, mino_row) in next[1..=2].iter().enumerate() {
+            let row_position = NEXT_ROW + 1 + mino_idx * 3 + display_row; // 3 rows per mino (2 display + 1 gap)
+            terminal.move_to(row_position, NEXT_COL)?;
             for block in mino_row {
                 let display = block.display();
                 terminal
