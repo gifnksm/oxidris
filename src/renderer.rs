@@ -1,6 +1,6 @@
 use std::{io, sync::Once};
 
-use crate::{block::BlockKind, game::Game, terminal::Terminal};
+use crate::{block::BlockKind, game::Game, play::PlayMode, terminal::Terminal};
 
 // UI layout coordinates
 const FIELD_ROW: usize = 1;
@@ -19,7 +19,7 @@ const CONTROLS_ROW: usize = 10;
 const CONTROLS_COL: usize = 45;
 
 /// Draw the game field
-fn draw_field(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
+fn draw_field(terminal: &mut Terminal, game: &Game, mode: PlayMode) -> io::Result<()> {
     terminal.reset_styles()?;
 
     // Prepare field with ghost piece and falling mino
@@ -27,8 +27,11 @@ fn draw_field(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
     let (falling_mino_pos, falling_mino) = game.falling_mino();
     let mut field_buf = field.clone();
 
-    let drop_pos = game.simulate_drop_position();
-    field_buf.fill_mino_as(&drop_pos, falling_mino, BlockKind::Ghost);
+    // Show ghost piece only in normal mode
+    if mode == PlayMode::Normal {
+        let drop_pos = game.simulate_drop_position();
+        field_buf.fill_mino_as(&drop_pos, falling_mino, BlockKind::Ghost);
+    }
     field_buf.fill_mino(&falling_mino_pos, falling_mino);
 
     for (row_offset, field_row) in field_buf.render_rows().enumerate() {
@@ -100,23 +103,13 @@ fn draw_score_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
 }
 
 /// Draw the controls panel
-fn draw_controls_panel(terminal: &mut Terminal, _game: &Game) -> io::Result<()> {
-    const CONTROLS: &[(&str, &str)] = &[
-        ("Left/Right", "Move left/right"),
-        ("Down", "Soft drop"),
-        ("Up", "Hard drop"),
-        ("z", "Rotate left"),
-        ("x", "Rotate right"),
-        ("Space", "Hold"),
-        ("q", "Quit"),
-    ];
-
+fn draw_controls_panel(terminal: &mut Terminal, _game: &Game, mode: PlayMode) -> io::Result<()> {
     terminal
         .reset_styles()?
         .move_to(CONTROLS_ROW, CONTROLS_COL)?
         .write("CONTROLS")?;
 
-    for (line_offset, (key, description)) in CONTROLS.iter().enumerate() {
+    for (line_offset, (key, description)) in mode.controls().iter().enumerate() {
         terminal
             .move_to(CONTROLS_ROW + line_offset + 1, CONTROLS_COL)?
             .write(format!("{:<12} : {}", key, description))?;
@@ -124,7 +117,7 @@ fn draw_controls_panel(terminal: &mut Terminal, _game: &Game) -> io::Result<()> 
     Ok(())
 }
 
-pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
+pub(crate) fn draw(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Result<()> {
     static INIT: Once = Once::new();
 
     INIT.call_once(|| {
@@ -133,48 +126,45 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal) -> io::Result<()> {
     });
 
     // Draw each UI element
-    draw_field(term, game)?;
+    draw_field(term, game, mode)?;
     draw_hold_panel(term, game)?;
     draw_next_panel(term, game)?;
     draw_score_panel(term, game)?;
-    draw_controls_panel(term, game)?;
+    draw_controls_panel(term, game, mode)?;
 
     term.flush()?;
     Ok(())
 }
 
-pub(crate) fn gameover(game: &Game, term: &mut Terminal) -> io::Result<()> {
+pub(crate) fn gameover(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Result<()> {
     use crate::terminal::Color;
-    
-    draw(game, term)?;
-    
-    // Draw a prominent GAME OVER message with background and border
+
+    draw(game, term, mode)?; // Draw a prominent GAME OVER message with background and border
     let msg_row = FIELD_ROW + 9;
     let msg_col = FIELD_COL + 3;
-    
+
     // Draw top border
     term.reset_styles()?
         .move_to(msg_row, msg_col)?
         .set_fg(Color::RED)?
         .set_bg(Color::WHITE)?
         .write("┌─────────────┐")?;
-    
+
     // Draw message with background
     term.move_to(msg_row + 1, msg_col)?
         .set_fg(Color::RED)?
         .set_bg(Color::WHITE)?
         .write("│ GAME OVER!! │")?;
-    
+
     // Draw bottom border
     term.move_to(msg_row + 2, msg_col)?
         .set_fg(Color::RED)?
         .set_bg(Color::WHITE)?
         .write("└─────────────┘")?;
-    
+
     // Reset styles and position cursor away from UI
-    term.reset_styles()?
-        .move_to(25, 1)?;
-    
+    term.reset_styles()?.move_to(25, 1)?;
+
     term.flush()?;
     Ok(())
 }

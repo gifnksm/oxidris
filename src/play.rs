@@ -10,6 +10,29 @@ use getch_rs::{Getch, Key};
 use crate::{ai, ga::GenoSeq, game::Game, renderer, terminal::Terminal};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PlayMode {
+    Normal,
+    Auto,
+}
+
+impl PlayMode {
+    pub(crate) fn controls(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            PlayMode::Normal => &[
+                ("Left/Right", "Move left/right"),
+                ("Down", "Soft drop"),
+                ("Up", "Hard drop"),
+                ("z", "Rotate left"),
+                ("x", "Rotate right"),
+                ("Space", "Hold"),
+                ("q", "Quit"),
+            ],
+            PlayMode::Auto => &[("q", "Quit")],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NormalModeAction {
     MoveLeft,
     MoveRight,
@@ -40,7 +63,12 @@ impl NormalModeAction {
 pub(crate) fn normal() -> ! {
     let game = Arc::new(Mutex::new(Game::new()));
     let term = Arc::new(Mutex::new(Terminal::stdout()));
-    renderer::draw(&game.lock().unwrap(), &mut term.lock().unwrap()).unwrap();
+    renderer::draw(
+        &game.lock().unwrap(),
+        &mut term.lock().unwrap(),
+        PlayMode::Normal,
+    )
+    .unwrap();
 
     {
         let game = Arc::clone(&game);
@@ -54,11 +82,11 @@ pub(crate) fn normal() -> ! {
                 let mut game = game.lock().unwrap();
                 let mut term = term.lock().unwrap();
                 if game.auto_drop_and_complete().is_gameover() {
-                    renderer::gameover(&game, &mut term).unwrap();
+                    renderer::gameover(&game, &mut term, PlayMode::Normal).unwrap();
                     let _ = renderer::cleanup(&mut term);
                     process::exit(0);
                 }
-                renderer::draw(&game, &mut term).unwrap();
+                renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
             }
         });
     }
@@ -79,7 +107,7 @@ pub(crate) fn normal() -> ! {
             NormalModeAction::HardDrop => {
                 if game.hard_drop_and_complete().is_gameover() {
                     let mut term = term.lock().unwrap();
-                    renderer::gameover(&game, &mut term).unwrap();
+                    renderer::gameover(&game, &mut term, PlayMode::Normal).unwrap();
                     let _ = renderer::cleanup(&mut term);
                     process::exit(0);
                 }
@@ -94,7 +122,7 @@ pub(crate) fn normal() -> ! {
         };
         if updated {
             let mut term = term.lock().unwrap();
-            renderer::draw(&game, &mut term).unwrap();
+            renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
         }
     }
 }
@@ -103,16 +131,16 @@ pub(crate) fn auto() -> ! {
     let _ = thread::spawn(|| {
         let mut game = Game::new();
         let mut term = Terminal::stdout();
-        renderer::draw(&game, &mut term).unwrap();
+        renderer::draw(&game, &mut term, PlayMode::Auto).unwrap();
         loop {
             let gameover;
             (game, gameover) = ai::eval(&game, &GenoSeq([100, 1, 10, 100]));
             if gameover {
-                let _ = renderer::gameover(&game, &mut term);
+                let _ = renderer::gameover(&game, &mut term, PlayMode::Auto);
                 let _ = renderer::cleanup(&mut term);
                 process::exit(0);
             }
-            renderer::draw(&game, &mut term).unwrap();
+            renderer::draw(&game, &mut term, PlayMode::Auto).unwrap();
         }
     });
 
