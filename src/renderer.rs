@@ -119,6 +119,29 @@ fn draw_controls_panel(terminal: &mut Terminal, _game: &Game, mode: PlayMode) ->
     Ok(())
 }
 
+/// Draw pause overlay on the game field
+fn draw_pause_overlay(terminal: &mut Terminal) -> io::Result<()> {
+    use crate::terminal::Color;
+
+    let msg_row = FIELD_ROW + 9;
+    let msg_col = FIELD_COL;
+    let field_width = 24;
+
+    terminal
+        .reset_styles()?
+        .move_to(msg_row, msg_col)?
+        .set_bg(Color::YELLOW)?
+        .set_fg(Color::BLACK)?
+        .write(format_args!("{:width$}", "", width = field_width))?
+        .move_to(msg_row + 1, msg_col)?
+        .write(format_args!("{:^width$}", "PAUSED", width = field_width))?
+        .move_to(msg_row + 2, msg_col)?
+        .write(format_args!("{:width$}", "", width = field_width))?
+        .reset_styles()?;
+
+    Ok(())
+}
+
 pub(crate) fn draw(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Result<()> {
     static INIT: Once = Once::new();
 
@@ -133,6 +156,10 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Resu
     draw_next_panel(term, game)?;
     draw_score_panel(term, game)?;
     draw_controls_panel(term, game, mode)?;
+
+    if game.is_paused() {
+        draw_pause_overlay(term)?;
+    }
 
     term.flush()?;
     Ok(())
@@ -170,7 +197,7 @@ pub(crate) fn gameover(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::
 
 pub(crate) fn cleanup(term: &mut Terminal) -> io::Result<()> {
     term.reset_styles()?
-        .move_to(25, 1)?  // Move cursor to bottom of screen to prevent overwriting
+        .move_to(25, 1)? // Move cursor to bottom of screen to prevent overwriting
         .show_cursor()?;
     term.flush()?;
     Ok(())

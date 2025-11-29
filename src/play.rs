@@ -25,6 +25,7 @@ impl PlayMode {
                 ("z", "Rotate left"),
                 ("x", "Rotate right"),
                 ("Space", "Hold"),
+                ("p", "Pause"),
                 ("q", "Quit"),
             ],
             PlayMode::Auto => &[("q", "Quit")],
@@ -41,6 +42,7 @@ enum NormalModeAction {
     SoftDrop,
     HardDrop,
     Hold,
+    Pause,
     Quit,
 }
 
@@ -54,6 +56,7 @@ impl NormalModeAction {
             Key::Char('z') => Some(NormalModeAction::RotateLeft),
             Key::Char('x') => Some(NormalModeAction::RotateRight),
             Key::Char(' ') => Some(NormalModeAction::Hold),
+            Key::Char('p') => Some(NormalModeAction::Pause),
             Key::Char('q') => Some(NormalModeAction::Quit),
             _ => None,
         }
@@ -80,6 +83,12 @@ pub(crate) fn normal() -> ! {
                 thread::sleep(Duration::from_millis(sleep_msec));
 
                 let mut game = game.lock().unwrap();
+
+                // Skip game progression while paused
+                if game.is_paused() {
+                    continue;
+                }
+
                 let mut term = term.lock().unwrap();
                 if game.auto_drop_and_complete().is_gameover() {
                     renderer::gameover(&game, &mut term, PlayMode::Normal).unwrap();
@@ -98,6 +107,12 @@ pub(crate) fn normal() -> ! {
         };
 
         let mut game = game.lock().unwrap();
+
+        // During pause, only allow pause toggle and quit
+        if game.is_paused() && !matches!(action, NormalModeAction::Pause | NormalModeAction::Quit) {
+            continue;
+        }
+
         let updated = match action {
             NormalModeAction::MoveLeft => game.try_move_left().is_ok(),
             NormalModeAction::MoveRight => game.try_move_right().is_ok(),
@@ -114,6 +129,10 @@ pub(crate) fn normal() -> ! {
                 true
             }
             NormalModeAction::Hold => game.try_hold().is_ok(),
+            NormalModeAction::Pause => {
+                game.toggle_pause();
+                true
+            }
             NormalModeAction::Quit => {
                 let mut term = term.lock().unwrap();
                 renderer::cleanup(&mut term).unwrap();

@@ -30,6 +30,7 @@ pub(crate) struct Game {
     next_minos_queue: VecDeque<MinoShape>,
     score: usize,
     cleared_lines: usize,
+    paused: bool,
 }
 
 impl Game {
@@ -44,6 +45,7 @@ impl Game {
             next_minos_queue: mino::gen_mino_7().into(),
             score: 0,
             cleared_lines: 0,
+            paused: false,
         };
         game.begin_next_mino_fall();
         game
@@ -59,6 +61,14 @@ impl Game {
 
     pub(crate) fn score(&self) -> usize {
         self.score
+    }
+
+    pub(crate) fn is_paused(&self) -> bool {
+        self.paused
+    }
+
+    pub(crate) fn toggle_pause(&mut self) {
+        self.paused = !self.paused;
     }
 
     pub(crate) fn field(&self) -> &Field {
