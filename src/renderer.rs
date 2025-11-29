@@ -11,7 +11,14 @@ use crate::{
 
 // UI layout coordinates
 const TERMINAL_TOP: usize = 1;
+const TERMINAL_BOTTOM: usize = COMPONENT_BOTTOM + 2;
 const TERMINAL_LEFT: usize = 1;
+const TERMINAL_RIGHT: usize = COMPONENT_RIGHT + 1;
+
+const COMPONENT_TOP: usize = TERMINAL_TOP + 1;
+const COMPONENT_BOTTOM: usize = FIELD_PANEL.bottom();
+const COMPONENT_LEFT: usize = TERMINAL_LEFT + 2;
+const COMPONENT_RIGHT: usize = CONTROLS_PANEL.right();
 
 const CHARS_PER_BLOCK: usize = 2;
 const MINO_DISPLAY_WIDTH: usize = 4 * CHARS_PER_BLOCK;
@@ -20,8 +27,8 @@ const MINO_DISPLAY_HEIGHT: usize = 2;
 const LEFT_PANE_BODY_WIDTH: usize = 16;
 
 const HOLD_PANEL: Panel = Panel {
-    top: TERMINAL_TOP,
-    left: TERMINAL_LEFT,
+    top: COMPONENT_TOP,
+    left: COMPONENT_LEFT,
     body_width: LEFT_PANE_BODY_WIDTH,
     body_height: MINO_DISPLAY_HEIGHT,
     title: "HOLD",
@@ -29,14 +36,14 @@ const HOLD_PANEL: Panel = Panel {
 
 const STATS_PANEL: Panel = Panel {
     top: HOLD_PANEL.bottom() + 1,
-    left: TERMINAL_LEFT,
+    left: COMPONENT_LEFT,
     body_width: LEFT_PANE_BODY_WIDTH,
     body_height: 3,
     title: "STATS",
 };
 
 const FIELD_PANEL: Panel = Panel {
-    top: TERMINAL_TOP,
+    top: COMPONENT_TOP,
     left: HOLD_PANEL.right() + 2,
     body_width: CHARS_PER_BLOCK * Field::BLOCKS_WIDTH,
     body_height: Field::BLOCKS_HEIGHT,
@@ -44,7 +51,7 @@ const FIELD_PANEL: Panel = Panel {
 };
 
 const NEXT_PANEL: Panel = Panel {
-    top: TERMINAL_TOP,
+    top: COMPONENT_TOP,
     left: FIELD_PANEL.right() + 2,
     body_width: MINO_DISPLAY_WIDTH,
     body_height: 20,
@@ -52,7 +59,7 @@ const NEXT_PANEL: Panel = Panel {
 };
 
 const CONTROLS_PANEL: Panel = Panel {
-    top: TERMINAL_TOP,
+    top: COMPONENT_TOP,
     left: NEXT_PANEL.right() + 2,
     body_width: 30,
     body_height: 12,
@@ -181,13 +188,24 @@ impl Renderer {
     pub(crate) fn new(mode: PlayMode) -> io::Result<Self> {
         let mut term = Terminal::stdout();
         term.clear_screen()?.hide_cursor()?;
+
+        term.reset_styles()?
+            .set_fg(Color::WHITE)?
+            .set_bg(Color::BLACK)?;
+        for y in TERMINAL_TOP..TERMINAL_BOTTOM {
+            term.move_to(y, TERMINAL_LEFT)?;
+            for _ in TERMINAL_LEFT..TERMINAL_RIGHT {
+                term.write(" ")?;
+            }
+        }
+
         Ok(Self { mode, term })
     }
 
     pub(crate) fn cleanup(&mut self) -> io::Result<()> {
         self.term
             .reset_styles()?
-            .move_to(FIELD_PANEL.bottom() + 3, TERMINAL_LEFT)? // Move cursor to bottom of screen to prevent overwriting
+            .move_to(TERMINAL_BOTTOM, TERMINAL_LEFT)? // Move cursor to bottom of screen to prevent overwriting
             .show_cursor()?;
         self.term.flush()?;
         Ok(())
