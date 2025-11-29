@@ -66,7 +66,7 @@ const MINOS: [MinoShape; MINO_KIND_MAX] = {
     ]
 };
 
-pub(crate) fn gen_mino_7() -> [MinoShape; MINO_KIND_MAX] {
+pub(crate) fn gen_mino_7() -> [MinoKind; MINO_KIND_MAX] {
     let mut rng = rand::rng();
     let mut que = [
         MinoKind::I,
@@ -78,5 +78,5 @@ pub(crate) fn gen_mino_7() -> [MinoShape; MINO_KIND_MAX] {
         MinoKind::T,
     ];
     que.shuffle(&mut rng);
-    que.map(|mino| *mino.shape())
+    que
 }

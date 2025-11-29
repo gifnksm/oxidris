@@ -40,11 +40,11 @@ impl GameState {
 pub(crate) struct Game {
     field: Field,
     falling_mino_position: Position,
-    falling_mino: MinoShape,
-    held_mino: Option<MinoShape>,
+    falling_mino_kind: MinoKind,
+    falling_mino_shape: MinoShape,
+    held_mino: Option<MinoKind>,
     hold_used: bool,
-    next_minos: VecDeque<MinoShape>,
-    next_minos_queue: VecDeque<MinoShape>,
+    next_minos: VecDeque<MinoKind>,
     score: usize,
     cleared_lines: usize,
     state: GameState,
@@ -52,14 +52,15 @@ pub(crate) struct Game {
 
 impl Game {
     pub(crate) fn new() -> Self {
+        let first_mino = MinoKind::I; // dummy initial value
         let mut game = Self {
             field: Field::INITIAL,
             falling_mino_position: Position::INITIAL,
-            falling_mino: *rand::random::<MinoKind>().shape(),
+            falling_mino_kind: first_mino,
+            falling_mino_shape: *first_mino.shape(),
             held_mino: None,
             hold_used: false,
-            next_minos: mino::gen_mino_7().into(),
-            next_minos_queue: mino::gen_mino_7().into(),
+            next_minos: Default::default(),
             score: 0,
             cleared_lines: 0,
             state: GameState::Playing,
@@ -97,14 +98,14 @@ impl Game {
     }
 
     pub(crate) fn falling_mino(&self) -> (Position, &MinoShape) {
-        (self.falling_mino_position, &self.falling_mino)
+        (self.falling_mino_position, &self.falling_mino_shape)
     }
 
-    pub(crate) fn held_mino(&self) -> &Option<MinoShape> {
+    pub(crate) fn held_mino(&self) -> &Option<MinoKind> {
         &self.held_mino
     }
 
-    pub(crate) fn next_minos(&self) -> &VecDeque<MinoShape> {
+    pub(crate) fn next_minos(&self) -> &VecDeque<MinoKind> {
         &self.next_minos
     }
 
@@ -114,7 +115,7 @@ impl Game {
             let Some(new_pos) = drop_pos.down() else {
                 break;
             };
-            if self.field.is_colliding(&new_pos, &self.falling_mino) {
+            if self.field.is_colliding(&new_pos, &self.falling_mino_shape) {
                 break;
             }
             drop_pos = new_pos;
@@ -133,7 +134,7 @@ impl Game {
     }
 
     fn try_move(&mut self, new_pos: Position) -> Result<(), ()> {
-        if self.field.is_colliding(&new_pos, &self.falling_mino) {
+        if self.field.is_colliding(&new_pos, &self.falling_mino_shape) {
             return Err(());
         }
         self.falling_mino_position = new_pos;
@@ -144,7 +145,7 @@ impl Game {
         let mut new_shape = MinoShape::default();
         for (y, row) in new_shape.iter_mut().enumerate() {
             for (x, v) in row.iter_mut().enumerate() {
-                *v = self.falling_mino[x][4 - 1 - y];
+                *v = self.falling_mino_shape[x][4 - 1 - y];
             }
         }
         if self
@@ -154,7 +155,7 @@ impl Game {
             let new_pos = super_rotation(&self.field, &self.falling_mino_position, &new_shape)?;
             self.falling_mino_position = new_pos;
         }
-        self.falling_mino = new_shape;
+        self.falling_mino_shape = new_shape;
         Ok(())
     }
 
@@ -162,7 +163,7 @@ impl Game {
         let mut new_shape = MinoShape::default();
         for (y, row) in new_shape.iter_mut().enumerate() {
             for (x, v) in row.iter_mut().enumerate() {
-                *v = self.falling_mino[4 - 1 - x][y];
+                *v = self.falling_mino_shape[4 - 1 - x][y];
             }
         }
         if self
@@ -172,7 +173,7 @@ impl Game {
             let new_pos = super_rotation(&self.field, &self.falling_mino_position, &new_shape)?;
             self.falling_mino_position = new_pos;
         }
-        self.falling_mino = new_shape;
+        self.falling_mino_shape = new_shape;
         Ok(())
     }
 
@@ -180,16 +181,17 @@ impl Game {
         if self.hold_used {
             return Err(());
         }
-        if let Some(mut hold) = self.held_mino {
+        if let Some(held_mino) = self.held_mino {
             let new_pos = Position::INITIAL;
-            if self.field.is_colliding(&new_pos, &hold) {
+            if self.field.is_colliding(&new_pos, held_mino.shape()) {
                 return Err(());
             }
-            std::mem::swap(&mut hold, &mut self.falling_mino);
-            self.held_mino = Some(hold);
+            self.held_mino = Some(self.falling_mino_kind);
+            self.falling_mino_kind = held_mino;
+            self.falling_mino_shape = *held_mino.shape();
             self.falling_mino_position = new_pos;
         } else {
-            self.held_mino = Some(self.falling_mino);
+            self.held_mino = Some(self.falling_mino_kind);
             self.begin_next_mino_fall();
         }
         self.hold_used = true;
@@ -216,7 +218,7 @@ impl Game {
 
     fn complete_mino_drop(&mut self) -> DropResult {
         self.field
-            .fill_mino(&self.falling_mino_position, &self.falling_mino);
+            .fill_mino(&self.falling_mino_position, &self.falling_mino_shape);
         let line = self.field.clear_lines();
         self.score += SCORE_TABLE[line];
         self.cleared_lines += line;
@@ -224,7 +226,7 @@ impl Game {
         self.begin_next_mino_fall();
         if self
             .field
-            .is_colliding(&self.falling_mino_position, &self.falling_mino)
+            .is_colliding(&self.falling_mino_position, &self.falling_mino_shape)
         {
             self.state = GameState::GameOver;
             return DropResult::GameOver;
@@ -237,15 +239,12 @@ impl Game {
     }
 
     fn begin_next_mino_fall(&mut self) {
-        self.falling_mino_position = Position::INITIAL;
-        self.falling_mino = self.next_minos.pop_front().unwrap();
-        if let Some(next) = self.next_minos_queue.pop_front() {
-            self.next_minos.push_back(next);
-        } else {
-            self.next_minos_queue = mino::gen_mino_7().into();
-            self.next_minos
-                .push_back(self.next_minos_queue.pop_front().unwrap());
+        while self.next_minos.len() <= 7 {
+            self.next_minos.extend(mino::gen_mino_7());
         }
+        self.falling_mino_position = Position::INITIAL;
+        self.falling_mino_kind = self.next_minos.pop_front().unwrap();
+        self.falling_mino_shape = *self.falling_mino_kind.shape();
     }
 }
 

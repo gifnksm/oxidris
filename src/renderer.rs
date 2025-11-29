@@ -245,7 +245,7 @@ impl Renderer {
         if let Some(mino) = game.held_mino() {
             let mino_left =
                 HOLD_PANEL.body_left() + (HOLD_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(mino, HOLD_PANEL.body_top(), mino_left)?;
+            self.draw_mino_at(mino.shape(), HOLD_PANEL.body_top(), mino_left)?;
         }
         Ok(())
     }
@@ -256,7 +256,7 @@ impl Renderer {
             let mino_top = NEXT_PANEL.body_top() + mino_idx * 3;
             let mino_left =
                 NEXT_PANEL.body_left() + (NEXT_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(mino, mino_top, mino_left)?;
+            self.draw_mino_at(mino.shape(), mino_top, mino_left)?;
         }
         Ok(())
     }
