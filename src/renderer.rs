@@ -168,28 +168,25 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Resu
 pub(crate) fn gameover(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Result<()> {
     use crate::terminal::Color;
 
-    draw(game, term, mode)?; // Draw a prominent GAME OVER message with background and border
+    draw(game, term, mode)?;
     let msg_row = FIELD_ROW + 9;
-    let msg_col = FIELD_COL + 3;
+    let msg_col = FIELD_COL;
+    let field_width = 24;
 
-    // Draw top border
     term.reset_styles()?
         .move_to(msg_row, msg_col)?
-        .set_fg(Color::RED)?
-        .set_bg(Color::WHITE)?
-        .write("┌─────────────┐")?;
-
-    // Draw message with background
-    term.move_to(msg_row + 1, msg_col)?
-        .set_fg(Color::RED)?
-        .set_bg(Color::WHITE)?
-        .write("│ GAME OVER!! │")?;
-
-    // Draw bottom border
-    term.move_to(msg_row + 2, msg_col)?
-        .set_fg(Color::RED)?
-        .set_bg(Color::WHITE)?
-        .write("└─────────────┘")?;
+        .set_bg(Color::RED)?
+        .set_fg(Color::WHITE)?
+        .write(format_args!("{:width$}", "", width = field_width))?
+        .move_to(msg_row + 1, msg_col)?
+        .write(format_args!(
+            "{:^width$}",
+            "GAME OVER!!",
+            width = field_width
+        ))?
+        .move_to(msg_row + 2, msg_col)?
+        .write(format_args!("{:width$}", "", width = field_width))?
+        .reset_styles()?;
 
     term.flush()?;
     Ok(())
