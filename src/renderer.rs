@@ -4,7 +4,7 @@ use crate::{
     block::BlockKind,
     field::Field,
     game::{Game, GameState},
-    mino::{MinoKind, MinoShape},
+    mino::MinoKind,
     play::PlayMode,
     terminal::{Color, Terminal},
 };
@@ -245,7 +245,7 @@ impl Renderer {
         if let Some(mino) = game.held_mino() {
             let mino_left =
                 HOLD_PANEL.body_left() + (HOLD_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(mino.shape(), HOLD_PANEL.body_top(), mino_left)?;
+            self.draw_mino_at(mino, HOLD_PANEL.body_top(), mino_left)?;
         }
         Ok(())
     }
@@ -256,7 +256,7 @@ impl Renderer {
             let mino_top = NEXT_PANEL.body_top() + mino_idx * 3;
             let mino_left =
                 NEXT_PANEL.body_left() + (NEXT_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(mino.shape(), mino_top, mino_left)?;
+            self.draw_mino_at(*mino, mino_top, mino_left)?;
         }
         Ok(())
     }
@@ -307,8 +307,8 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_mino_at(&mut self, mino: &MinoShape, top: usize, left: usize) -> io::Result<()> {
-        for (row_offset, mino_row) in mino[1..=2].iter().enumerate() {
+    fn draw_mino_at(&mut self, mino: MinoKind, top: usize, left: usize) -> io::Result<()> {
+        for (row_offset, mino_row) in mino.display_shape().iter().enumerate() {
             self.term.move_to(top + row_offset, left)?;
             for block in mino_row {
                 let display = BlockDisplay::from_kind(*block, false);

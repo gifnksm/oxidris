@@ -2,9 +2,22 @@ use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom}
 
 use crate::block::BlockKind;
 
-pub(crate) type MinoShape = [[BlockKind; 4]; 4];
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MinoRotate(u8);
 
-const MINO_KIND_MAX: usize = 7;
+impl MinoRotate {
+    pub(crate) fn rotate_right(&self) -> Self {
+        MinoRotate((self.0 + 1) % 4)
+    }
+
+    pub(crate) fn rotate_left(&self) -> Self {
+        MinoRotate((self.0 + 3) % 4)
+    }
+
+    const fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -33,12 +46,40 @@ impl Distribution<MinoKind> for StandardUniform {
 }
 
 impl MinoKind {
-    pub(crate) const fn shape(&self) -> &MinoShape {
-        &MINOS[*self as usize]
+    pub(crate) const LEN: usize = 7;
+
+    pub(crate) const fn shape(&self, rotate: MinoRotate) -> &MinoShape {
+        &MINOS[*self as usize][rotate.as_usize()]
+    }
+
+    pub(crate) fn display_shape(&self) -> &[[BlockKind; 4]] {
+        &MINOS[*self as usize][0][1..=2]
     }
 }
 
-const MINOS: [MinoShape; MINO_KIND_MAX] = {
+pub(crate) type MinoShape = [[BlockKind; 4]; 4];
+
+const fn gen_rotates(shape: &MinoShape) -> [MinoShape; 4] {
+    let mut rotates = [*shape; 4];
+    let mut i = 1;
+    while i < 4 {
+        let mut new_shape = [[BlockKind::Empty; 4]; 4];
+        let mut y = 0;
+        while y < 4 {
+            let mut x = 0;
+            while x < 4 {
+                new_shape[y][x] = rotates[i - 1][3 - x][y];
+                x += 1;
+            }
+            y += 1;
+        }
+        rotates[i] = new_shape;
+        i += 1;
+    }
+    rotates
+}
+
+const MINOS: [[MinoShape; 4]; MinoKind::LEN] = {
     use crate::block::BlockKind::Empty as E;
     const I: BlockKind = BlockKind::Mino(MinoKind::I);
     const O: BlockKind = BlockKind::Mino(MinoKind::O);
@@ -50,23 +91,23 @@ const MINOS: [MinoShape; MINO_KIND_MAX] = {
     const EEEE: [BlockKind; 4] = [E; 4];
     [
         // I-Mino
-        [EEEE, EEEE, [I, I, I, I], EEEE],
+        gen_rotates(&[EEEE, EEEE, [I, I, I, I], EEEE]),
         // O-Mino
-        [EEEE, [E, O, O, E], [E, O, O, E], EEEE],
+        gen_rotates(&[EEEE, [E, O, O, E], [E, O, O, E], EEEE]),
         // S-Mino
-        [EEEE, [E, S, S, E], [S, S, E, E], EEEE],
+        gen_rotates(&[EEEE, [E, S, S, E], [S, S, E, E], EEEE]),
         // Z-Mino
-        [EEEE, [Z, Z, E, E], [E, Z, Z, E], EEEE],
+        gen_rotates(&[EEEE, [Z, Z, E, E], [E, Z, Z, E], EEEE]),
         // J-Mino
-        [EEEE, [J, E, E, E], [J, J, J, E], EEEE],
+        gen_rotates(&[EEEE, [J, E, E, E], [J, J, J, E], EEEE]),
         // L-Mino
-        [EEEE, [E, E, L, E], [L, L, L, E], EEEE],
+        gen_rotates(&[EEEE, [E, E, L, E], [L, L, L, E], EEEE]),
         // T-Mino
-        [EEEE, [E, T, E, E], [T, T, T, E], EEEE],
+        gen_rotates(&[EEEE, [E, T, E, E], [T, T, T, E], EEEE]),
     ]
 };
 
-pub(crate) fn gen_mino_7() -> [MinoKind; MINO_KIND_MAX] {
+pub(crate) fn gen_mino_sequence() -> [MinoKind; MinoKind::LEN] {
     let mut rng = rand::rng();
     let mut que = [
         MinoKind::I,
