@@ -81,6 +81,18 @@ impl Terminal {
         Ok(self)
     }
 
+    /// Enable bold text for subsequent writes
+    pub(crate) fn set_bold(&mut self) -> io::Result<&mut Self> {
+        write!(self.writer, "\x1b[1m")?;
+        Ok(self)
+    }
+
+    /// Enable underlined text for subsequent writes
+    pub(crate) fn set_underline(&mut self) -> io::Result<&mut Self> {
+        write!(self.writer, "\x1b[4m")?;
+        Ok(self)
+    }
+
     /// Reset styles to terminal default
     pub(crate) fn reset_styles(&mut self) -> io::Result<&mut Self> {
         write!(self.writer, "\x1b[0m")?;

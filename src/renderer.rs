@@ -52,11 +52,14 @@ fn draw_hold_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
     terminal
         .reset_styles()?
         .move_to(HOLD_ROW, HOLD_COL)?
-        .write("HOLD")?;
+        .set_bold()?
+        .set_underline()?
+        .write("HOLD")?
+        .reset_styles()?;
 
     if let Some(hold) = game.held_mino() {
         for (row_offset, mino_row) in hold.iter().enumerate() {
-            terminal.move_to(HOLD_ROW + row_offset + 1, HOLD_COL)?;
+            terminal.move_to(HOLD_ROW + row_offset + 2, HOLD_COL)?;
             for &block in mino_row {
                 let display = block.display();
                 terminal
@@ -74,12 +77,15 @@ fn draw_next_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
     terminal
         .reset_styles()?
         .move_to(NEXT_ROW, NEXT_COL)?
-        .write("NEXT")?;
+        .set_bold()?
+        .set_underline()?
+        .write("NEXT")?
+        .reset_styles()?;
 
     for (mino_idx, next) in game.next_minos().iter().take(7).enumerate() {
         // Show only rows 1 and 2 (indices 1 and 2) for compact display
         for (display_row, mino_row) in next[1..=2].iter().enumerate() {
-            let row_position = NEXT_ROW + 1 + mino_idx * 3 + display_row; // 3 rows per mino (2 display + 1 gap)
+            let row_position = NEXT_ROW + 2 + mino_idx * 3 + display_row; // 3 rows per mino (2 display + 1 gap)
             terminal.move_to(row_position, NEXT_COL)?;
             for block in mino_row {
                 let display = block.display();
@@ -98,8 +104,11 @@ fn draw_score_panel(terminal: &mut Terminal, game: &Game) -> io::Result<()> {
     terminal
         .reset_styles()?
         .move_to(SCORE_ROW, SCORE_COL)?
+        .set_bold()?
+        .set_underline()?
         .write("SCORE")?
-        .move_to(SCORE_ROW + 1, SCORE_COL)?
+        .reset_styles()?
+        .move_to(SCORE_ROW + 2, SCORE_COL)?
         .write(format!("{:>8}", game.score()))?;
     Ok(())
 }
@@ -109,11 +118,14 @@ fn draw_controls_panel(terminal: &mut Terminal, _game: &Game, mode: PlayMode) ->
     terminal
         .reset_styles()?
         .move_to(CONTROLS_ROW, CONTROLS_COL)?
-        .write("CONTROLS")?;
+        .set_bold()?
+        .set_underline()?
+        .write("CONTROLS")?
+        .reset_styles()?;
 
     for (line_offset, (key, description)) in mode.controls().iter().enumerate() {
         terminal
-            .move_to(CONTROLS_ROW + line_offset + 1, CONTROLS_COL)?
+            .move_to(CONTROLS_ROW + line_offset + 2, CONTROLS_COL)?
             .write(format!("{:<12} : {}", key, description))?;
     }
     Ok(())
@@ -134,6 +146,7 @@ fn draw_pause_overlay(terminal: &mut Terminal) -> io::Result<()> {
         .set_fg(Color::BLACK)?
         .write(format_args!("{:width$}", "", width = field_width))?
         .move_to(msg_row + 1, msg_col)?
+        .set_bold()?
         .write(format_args!("{:^width$}", "PAUSED", width = field_width))?
         .move_to(msg_row + 2, msg_col)?
         .write(format_args!("{:width$}", "", width = field_width))?
@@ -179,6 +192,7 @@ pub(crate) fn gameover(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::
         .set_fg(Color::WHITE)?
         .write(format_args!("{:width$}", "", width = field_width))?
         .move_to(msg_row + 1, msg_col)?
+        .set_bold()?
         .write(format_args!(
             "{:^width$}",
             "GAME OVER!!",
