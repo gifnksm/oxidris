@@ -61,13 +61,6 @@ const BLOCKS_MARGIN_RIGHT: usize = 2;
 const BLOCKS_WIDTH: usize = FIELD_WIDTH - (BLOCKS_MARGIN_LEFT + BLOCKS_MARGIN_RIGHT);
 const BLOCKS_HEIGHT: usize = FIELD_HEIGHT - (BLOCKS_MARGIN_TOP + BLOCKS_MARGIN_BOTTOM);
 
-const RENDER_MARGIN_TOP: usize = 0;
-const RENDER_MARGIN_BOTTOM: usize = 1;
-const RENDER_MARGIN_LEFT: usize = 1;
-const RENDER_MARGIN_RIGHT: usize = 1;
-const RENDER_WIDTH: usize = FIELD_WIDTH - (RENDER_MARGIN_LEFT + RENDER_MARGIN_RIGHT);
-const RENDER_HEIGHT: usize = FIELD_HEIGHT - (RENDER_MARGIN_TOP + RENDER_MARGIN_BOTTOM);
-
 #[derive(Debug, Clone)]
 pub(crate) struct Field {
     rows: [[BlockKind; FIELD_WIDTH]; FIELD_HEIGHT],
@@ -131,12 +124,6 @@ impl Field {
         self.rows[BLOCKS_MARGIN_TOP..][..BLOCKS_HEIGHT]
             .iter()
             .map(|row| &row[BLOCKS_MARGIN_LEFT..][..BLOCKS_WIDTH])
-    }
-
-    pub(crate) fn render_rows(&self) -> impl Iterator<Item = &[BlockKind]> {
-        self.rows[RENDER_MARGIN_TOP..][..RENDER_HEIGHT]
-            .iter()
-            .map(|row| &row[RENDER_MARGIN_LEFT..][..RENDER_WIDTH])
     }
 
     pub(crate) fn fill_mino(&mut self, pos: &Position, mino: &MinoShape) {

@@ -7,7 +7,7 @@ use std::{
 
 use getch_rs::{Getch, Key};
 
-use crate::{ai, ga::GenoSeq, game::Game, renderer, terminal::Terminal};
+use crate::{ai, ga::GenoSeq, game::Game, renderer::Renderer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PlayMode {
@@ -65,18 +65,14 @@ impl NormalModeAction {
 
 pub(crate) fn normal() -> ! {
     let game = Arc::new(Mutex::new(Game::new()));
-    let term = Arc::new(Mutex::new(Terminal::stdout()));
-    renderer::draw(
-        &game.lock().unwrap(),
-        &mut term.lock().unwrap(),
-        PlayMode::Normal,
-    )
-    .unwrap();
+    let mut renderer = Renderer::new(PlayMode::Normal).unwrap();
+    renderer.draw(&game.lock().unwrap()).unwrap();
+    let renderer = Arc::new(Mutex::new(renderer));
 
-    {
+    let _ = thread::spawn({
         let game = Arc::clone(&game);
-        let term = Arc::clone(&term);
-        let _ = thread::spawn(move || {
+        let renderer = Arc::clone(&renderer);
+        move || {
             loop {
                 let level = game.lock().unwrap().level() as u64;
                 let sleep_msec = 100 + u64::saturating_sub(900, level * 100);
@@ -89,17 +85,17 @@ pub(crate) fn normal() -> ! {
                     continue;
                 }
 
-                let mut term = term.lock().unwrap();
                 let gameover = game.auto_drop_and_complete().is_gameover();
-                renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
+                let mut renderer = renderer.lock().unwrap();
+                renderer.draw(&game).unwrap();
 
                 if gameover {
-                    let _ = renderer::cleanup(&mut term);
+                    let _ = renderer.cleanup();
                     process::exit(0);
                 }
             }
-        });
-    }
+        }
+    });
 
     let g = Getch::new();
     loop {
@@ -132,18 +128,17 @@ pub(crate) fn normal() -> ! {
                 true
             }
             NormalModeAction::Quit => {
-                let mut term = term.lock().unwrap();
-                renderer::cleanup(&mut term).unwrap();
+                renderer.lock().unwrap().cleanup().unwrap();
                 process::exit(0);
             }
         };
         if updated {
-            let mut term = term.lock().unwrap();
-            renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
+            let mut renderer = renderer.lock().unwrap();
+            renderer.draw(&game).unwrap();
 
             // Exit after drawing game over state
             if game.state().is_gameover() {
-                let _ = renderer::cleanup(&mut term);
+                let _ = renderer.cleanup();
                 process::exit(0);
             }
         }
@@ -151,27 +146,33 @@ pub(crate) fn normal() -> ! {
 }
 
 pub(crate) fn auto() -> ! {
-    let _ = thread::spawn(|| {
-        let mut game = Game::new();
-        let mut term = Terminal::stdout();
-        renderer::draw(&game, &mut term, PlayMode::Auto).unwrap();
-        loop {
-            let gameover;
-            (game, gameover) = ai::eval(&game, &GenoSeq([100, 1, 10, 100]));
-            renderer::draw(&game, &mut term, PlayMode::Auto).unwrap();
+    let game = Game::new();
+    let mut renderer = Renderer::new(PlayMode::Auto).unwrap();
+    renderer.draw(&game).unwrap();
+    let renderer = Arc::new(Mutex::new(renderer));
 
-            if gameover {
-                let _ = renderer::cleanup(&mut term);
-                process::exit(0);
+    let _ = thread::spawn({
+        let renderer = Arc::clone(&renderer);
+        move || {
+            let mut game = game;
+            renderer.lock().unwrap().draw(&game).unwrap();
+            loop {
+                let gameover;
+                (game, gameover) = ai::eval(&game, &GenoSeq([100, 1, 10, 100]));
+                renderer.lock().unwrap().draw(&game).unwrap();
+
+                if gameover {
+                    renderer.lock().unwrap().cleanup().unwrap();
+                    process::exit(0);
+                }
             }
         }
     });
 
     let g = Getch::new();
-    let mut term = Terminal::stdout();
     loop {
         if let Ok(Key::Char('q')) = g.getch() {
-            renderer::cleanup(&mut term).unwrap();
+            renderer.lock().unwrap().cleanup().unwrap();
             process::exit(0);
         }
     }
