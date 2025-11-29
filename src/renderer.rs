@@ -139,6 +139,7 @@ const fn mino_color(mino: MinoKind) -> Color {
 }
 
 struct BlockDisplay {
+    fg: Color,
     bg: Color,
     symbol: &'static str,
 }
@@ -147,19 +148,19 @@ impl BlockDisplay {
     const fn from_kind(kind: BlockKind, show_dots: bool) -> Self {
         let dot = if show_dots { " ." } else { "  " };
         match kind {
-            BlockKind::Empty => Self::new(Color::BLACK, dot),
-            BlockKind::Wall => Self::new(Color::GRAY, dot),
-            BlockKind::Ghost => Self::new(Color::BLACK, "[]"),
-            BlockKind::Mino(mino) => Self::new(mino_color(mino), "  "),
+            BlockKind::Empty => Self::new(Color::GRAY, Color::BLACK, dot),
+            BlockKind::Wall => Self::new(Color::GRAY, Color::GRAY, dot),
+            BlockKind::Ghost => Self::new(Color::WHITE, Color::BLACK, "[]"),
+            BlockKind::Mino(mino) => Self::new(mino_color(mino), mino_color(mino), "  "),
         }
     }
 
-    const fn new(bg: Color, symbol: &'static str) -> Self {
-        Self { bg, symbol }
+    const fn new(fg: Color, bg: Color, symbol: &'static str) -> Self {
+        Self { fg, bg, symbol }
     }
 
     const fn fg(&self) -> Color {
-        Color::WHITE
+        self.fg
     }
 
     const fn bg(&self) -> Color {
