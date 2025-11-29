@@ -1,6 +1,11 @@
 use std::{io, sync::Once};
 
-use crate::{block::BlockKind, game::Game, play::PlayMode, terminal::Terminal};
+use crate::{
+    block::BlockKind,
+    game::{Game, GameState},
+    play::PlayMode,
+    terminal::Terminal,
+};
 
 // UI layout coordinates
 const FIELD_ROW: usize = 1;
@@ -170,18 +175,21 @@ pub(crate) fn draw(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Resu
     draw_score_panel(term, game)?;
     draw_controls_panel(term, game, mode)?;
 
-    if game.is_paused() {
-        draw_pause_overlay(term)?;
+    // Draw overlays based on game state
+    match game.state() {
+        GameState::Playing => {}
+        GameState::Paused => draw_pause_overlay(term)?,
+        GameState::GameOver => draw_gameover_overlay(term)?,
     }
 
     term.flush()?;
     Ok(())
 }
 
-pub(crate) fn gameover(game: &Game, term: &mut Terminal, mode: PlayMode) -> io::Result<()> {
+/// Draw game over overlay on the game field
+fn draw_gameover_overlay(term: &mut Terminal) -> io::Result<()> {
     use crate::terminal::Color;
 
-    draw(game, term, mode)?;
     let msg_row = FIELD_ROW + 9;
     let msg_col = FIELD_COL;
     let field_width = 24;

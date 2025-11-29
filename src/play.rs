@@ -85,17 +85,18 @@ pub(crate) fn normal() -> ! {
                 let mut game = game.lock().unwrap();
 
                 // Skip game progression while paused
-                if game.is_paused() {
+                if game.state().is_paused() {
                     continue;
                 }
 
                 let mut term = term.lock().unwrap();
-                if game.auto_drop_and_complete().is_gameover() {
-                    renderer::gameover(&game, &mut term, PlayMode::Normal).unwrap();
+                let gameover = game.auto_drop_and_complete().is_gameover();
+                renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
+
+                if gameover {
                     let _ = renderer::cleanup(&mut term);
                     process::exit(0);
                 }
-                renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
             }
         });
     }
@@ -109,7 +110,9 @@ pub(crate) fn normal() -> ! {
         let mut game = game.lock().unwrap();
 
         // During pause, only allow pause toggle and quit
-        if game.is_paused() && !matches!(action, NormalModeAction::Pause | NormalModeAction::Quit) {
+        if game.state().is_paused()
+            && !matches!(action, NormalModeAction::Pause | NormalModeAction::Quit)
+        {
             continue;
         }
 
@@ -120,12 +123,7 @@ pub(crate) fn normal() -> ! {
             NormalModeAction::RotateRight => game.try_rotate_right().is_ok(),
             NormalModeAction::SoftDrop => game.try_soft_drop().is_ok(),
             NormalModeAction::HardDrop => {
-                if game.hard_drop_and_complete().is_gameover() {
-                    let mut term = term.lock().unwrap();
-                    renderer::gameover(&game, &mut term, PlayMode::Normal).unwrap();
-                    let _ = renderer::cleanup(&mut term);
-                    process::exit(0);
-                }
+                game.hard_drop_and_complete();
                 true
             }
             NormalModeAction::Hold => game.try_hold().is_ok(),
@@ -142,6 +140,12 @@ pub(crate) fn normal() -> ! {
         if updated {
             let mut term = term.lock().unwrap();
             renderer::draw(&game, &mut term, PlayMode::Normal).unwrap();
+
+            // Exit after drawing game over state
+            if game.state().is_gameover() {
+                let _ = renderer::cleanup(&mut term);
+                process::exit(0);
+            }
         }
     }
 }
@@ -154,12 +158,12 @@ pub(crate) fn auto() -> ! {
         loop {
             let gameover;
             (game, gameover) = ai::eval(&game, &GenoSeq([100, 1, 10, 100]));
+            renderer::draw(&game, &mut term, PlayMode::Auto).unwrap();
+
             if gameover {
-                let _ = renderer::gameover(&game, &mut term, PlayMode::Auto);
                 let _ = renderer::cleanup(&mut term);
                 process::exit(0);
             }
-            renderer::draw(&game, &mut term, PlayMode::Auto).unwrap();
         }
     });
 

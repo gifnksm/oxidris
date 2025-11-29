@@ -19,6 +19,23 @@ impl DropResult {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GameState {
+    Playing,
+    Paused,
+    GameOver,
+}
+
+impl GameState {
+    pub(crate) fn is_paused(&self) -> bool {
+        matches!(self, GameState::Paused)
+    }
+
+    pub(crate) fn is_gameover(&self) -> bool {
+        matches!(self, GameState::GameOver)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Game {
     field: Field,
@@ -30,7 +47,7 @@ pub(crate) struct Game {
     next_minos_queue: VecDeque<MinoShape>,
     score: usize,
     cleared_lines: usize,
-    paused: bool,
+    state: GameState,
 }
 
 impl Game {
@@ -45,7 +62,7 @@ impl Game {
             next_minos_queue: mino::gen_mino_7().into(),
             score: 0,
             cleared_lines: 0,
-            paused: false,
+            state: GameState::Playing,
         };
         game.begin_next_mino_fall();
         game
@@ -63,12 +80,16 @@ impl Game {
         self.score
     }
 
-    pub(crate) fn is_paused(&self) -> bool {
-        self.paused
+    pub(crate) fn toggle_pause(&mut self) {
+        self.state = match self.state {
+            GameState::Playing => GameState::Paused,
+            GameState::Paused => GameState::Playing,
+            GameState::GameOver => GameState::GameOver, // No change from game over
+        };
     }
 
-    pub(crate) fn toggle_pause(&mut self) {
-        self.paused = !self.paused;
+    pub(crate) fn state(&self) -> &GameState {
+        &self.state
     }
 
     pub(crate) fn field(&self) -> &Field {
@@ -205,6 +226,7 @@ impl Game {
             .field
             .is_colliding(&self.falling_mino_position, &self.falling_mino)
         {
+            self.state = GameState::GameOver;
             return DropResult::GameOver;
         }
 
