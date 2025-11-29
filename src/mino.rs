@@ -53,22 +53,22 @@ impl MinoKind {
     }
 
     pub(crate) fn display_shape(&self) -> &[[BlockKind; 4]] {
-        &MINOS[*self as usize][0][1..=2]
+        &MINOS[*self as usize][0][..2]
     }
 }
 
 pub(crate) type MinoShape = [[BlockKind; 4]; 4];
 
-const fn gen_rotates(shape: &MinoShape) -> [MinoShape; 4] {
+const fn gen_rotates(size: usize, shape: &MinoShape) -> [MinoShape; 4] {
     let mut rotates = [*shape; 4];
     let mut i = 1;
     while i < 4 {
         let mut new_shape = [[BlockKind::Empty; 4]; 4];
         let mut y = 0;
-        while y < 4 {
+        while y < size {
             let mut x = 0;
-            while x < 4 {
-                new_shape[y][x] = rotates[i - 1][3 - x][y];
+            while x < size {
+                new_shape[y][x] = rotates[i - 1][size - 1 - x][y];
                 x += 1;
             }
             y += 1;
@@ -91,19 +91,19 @@ const MINOS: [[MinoShape; 4]; MinoKind::LEN] = {
     const EEEE: [BlockKind; 4] = [E; 4];
     [
         // I-Mino
-        gen_rotates(&[EEEE, EEEE, [I, I, I, I], EEEE]),
+        gen_rotates(4, &[EEEE, [I, I, I, I], EEEE, EEEE]),
         // O-Mino
-        gen_rotates(&[EEEE, [E, O, O, E], [E, O, O, E], EEEE]),
+        gen_rotates(2, &[[O, O, E, E], [O, O, E, E], EEEE, EEEE]),
         // S-Mino
-        gen_rotates(&[EEEE, [E, S, S, E], [S, S, E, E], EEEE]),
+        gen_rotates(3, &[[E, S, S, E], [S, S, E, E], EEEE, EEEE]),
         // Z-Mino
-        gen_rotates(&[EEEE, [Z, Z, E, E], [E, Z, Z, E], EEEE]),
+        gen_rotates(3, &[[Z, Z, E, E], [E, Z, Z, E], EEEE, EEEE]),
         // J-Mino
-        gen_rotates(&[EEEE, [J, E, E, E], [J, J, J, E], EEEE]),
+        gen_rotates(3, &[[J, E, E, E], [J, J, J, E], EEEE, EEEE]),
         // L-Mino
-        gen_rotates(&[EEEE, [E, E, L, E], [L, L, L, E], EEEE]),
+        gen_rotates(3, &[[E, E, L, E], [L, L, L, E], EEEE, EEEE]),
         // T-Mino
-        gen_rotates(&[EEEE, [E, T, E, E], [T, T, T, E], EEEE]),
+        gen_rotates(3, &[[E, T, E, E], [T, T, T, E], EEEE, EEEE]),
     ]
 };
 
