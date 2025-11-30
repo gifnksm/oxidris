@@ -38,7 +38,7 @@ const STATS_PANEL: Panel = Panel {
     top: HOLD_PANEL.bottom() + 1,
     left: COMPONENT_LEFT,
     body_width: LEFT_PANE_BODY_WIDTH,
-    body_height: 5,
+    body_height: 7,
     title: "STATS",
 };
 
@@ -184,6 +184,12 @@ pub(crate) struct Renderer {
     term: Terminal,
 }
 
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        let _ = self.cleanup();
+    }
+}
+
 impl Renderer {
     pub(crate) fn new(mode: PlayMode) -> io::Result<Self> {
         let mut term = Terminal::stdout();
@@ -291,13 +297,26 @@ impl Renderer {
                 game.score(),
                 width = STATS_PANEL.body_width
             ))?
+            .move_to(STATS_PANEL.body_top() + 2, STATS_PANEL.body_left())?
+            .write(format_args!("TIME:",))?
             .move_to(STATS_PANEL.body_top() + 3, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "{:>width$}",
+                format!(
+                    "{:0}:{:0>2}.{:0>2}",
+                    game.duration().as_secs() / 60,
+                    game.duration().as_secs() % 60,
+                    game.duration().subsec_millis() / 10,
+                ),
+                width = STATS_PANEL.body_width
+            ))?
+            .move_to(STATS_PANEL.body_top() + 5, STATS_PANEL.body_left())?
             .write(format_args!(
                 "LEVEL: {:>width$}",
                 game.level(),
                 width = STATS_PANEL.body_width - 7
             ))?
-            .move_to(STATS_PANEL.body_top() + 4, STATS_PANEL.body_left())?
+            .move_to(STATS_PANEL.body_top() + 6, STATS_PANEL.body_left())?
             .write(format_args!(
                 "LINES: {:>width$}",
                 game.cleared_lines(),

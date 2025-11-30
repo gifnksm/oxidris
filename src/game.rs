@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 use crate::{
     field::{Field, Position},
@@ -13,27 +13,11 @@ pub(crate) enum DropResult {
     GameOver,
 }
 
-impl DropResult {
-    pub(crate) fn is_gameover(self) -> bool {
-        matches!(self, DropResult::GameOver)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, derive_more::IsVariant)]
 pub(crate) enum GameState {
     Playing,
     Paused,
     GameOver,
-}
-
-impl GameState {
-    pub(crate) fn is_paused(&self) -> bool {
-        matches!(self, GameState::Paused)
-    }
-
-    pub(crate) fn is_gameover(&self) -> bool {
-        matches!(self, GameState::GameOver)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -48,10 +32,18 @@ pub(crate) struct Game {
     score: usize,
     cleared_lines: usize,
     state: GameState,
+    fps: u64,
+    total_frames: u64,
+    drop_frames: u64,
+}
+
+fn drop_frames(level: u64, fps: u64) -> u64 {
+    let millis = 100 + u64::saturating_sub(900, level * 100);
+    millis * fps / 1000
 }
 
 impl Game {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(fps: u64) -> Self {
         let first_mino = MinoKind::I; // dummy initial value
         let mut game = Self {
             field: Field::INITIAL,
@@ -64,6 +56,9 @@ impl Game {
             score: 0,
             cleared_lines: 0,
             state: GameState::Playing,
+            fps,
+            total_frames: 0,
+            drop_frames: drop_frames(0, fps),
         };
         game.begin_next_mino_fall();
         game
@@ -79,6 +74,13 @@ impl Game {
 
     pub(crate) fn score(&self) -> usize {
         self.score
+    }
+
+    pub(crate) fn duration(&self) -> Duration {
+        const NANOS_PER_SEC: u64 = 1_000_000_000;
+        let secs = self.total_frames / self.fps;
+        let nanos = (self.total_frames % self.fps) * NANOS_PER_SEC / self.fps;
+        Duration::new(secs, nanos.try_into().unwrap())
     }
 
     pub(crate) fn toggle_pause(&mut self) {
@@ -127,6 +129,17 @@ impl Game {
             drop_pos = new_pos;
         }
         drop_pos
+    }
+
+    pub(crate) fn increment_frame(&mut self) -> Option<DropResult> {
+        self.total_frames += 1;
+        self.drop_frames = self.drop_frames.saturating_sub(1);
+        if self.drop_frames == 0 {
+            self.drop_frames = drop_frames(self.level() as u64, self.fps);
+            Some(self.auto_drop_and_complete())
+        } else {
+            None
+        }
     }
 
     pub(crate) fn try_move_left(&mut self) -> Result<(), ()> {

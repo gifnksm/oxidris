@@ -1,13 +1,19 @@
 use std::{
-    process,
+    io, process,
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossterm::event::KeyCode;
 
-use crate::{ai, ga::GenoSeq, game::Game, input::Input, renderer::Renderer};
+use crate::{
+    ai,
+    ga::GenoSeq,
+    game::{Game, GameState},
+    input::Input,
+    renderer::Renderer,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PlayMode {
@@ -63,93 +69,69 @@ impl NormalModeAction {
     }
 }
 
-pub(crate) fn normal() -> ! {
-    let game = Arc::new(Mutex::new(Game::new()));
-    let mut renderer = Renderer::new(PlayMode::Normal).unwrap();
-    renderer.draw(&game.lock().unwrap()).unwrap();
-    let renderer = Arc::new(Mutex::new(renderer));
+const FPS: u64 = 60;
 
-    let _ = thread::spawn({
-        let game = Arc::clone(&game);
-        let renderer = Arc::clone(&renderer);
-        move || {
-            loop {
-                let level = game.lock().unwrap().level() as u64;
-                let sleep_msec = 100 + u64::saturating_sub(900, level * 100);
-                thread::sleep(Duration::from_millis(sleep_msec));
+pub(crate) fn normal() -> io::Result<()> {
+    let mut game = Game::new(FPS);
+    let mut renderer = Renderer::new(PlayMode::Normal)?;
+    renderer.draw(&game)?;
+    let mut input = Input::new()?;
 
-                let mut game = game.lock().unwrap();
-
-                // Skip game progression while paused
-                if game.state().is_paused() {
-                    continue;
-                }
-
-                let gameover = game.auto_drop_and_complete().is_gameover();
-                let mut renderer = renderer.lock().unwrap();
-                renderer.draw(&game).unwrap();
-
-                if gameover {
-                    let _ = renderer.cleanup();
-                    process::exit(0);
-                }
-            }
-        }
-    });
-
-    let mut input = Input::new().unwrap();
-
+    let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
     loop {
-        let Ok(Some(action)) = input.read().map(NormalModeAction::from_key) else {
-            continue;
-        };
+        let now = Instant::now();
+        let mut quit = false;
 
-        let mut game = game.lock().unwrap();
-
-        // During pause, only allow pause toggle and quit
-        if game.state().is_paused()
-            && !matches!(action, NormalModeAction::Pause | NormalModeAction::Quit)
-        {
-            continue;
+        // Handle input
+        while let Some(key) = input.try_read()? {
+            if let Some(action) = NormalModeAction::from_key(key) {
+                match game.state() {
+                    GameState::Playing => match action {
+                        NormalModeAction::MoveLeft => _ = game.try_move_left(),
+                        NormalModeAction::MoveRight => _ = game.try_move_right(),
+                        NormalModeAction::RotateLeft => _ = game.try_rotate_left(),
+                        NormalModeAction::RotateRight => _ = game.try_rotate_right(),
+                        NormalModeAction::SoftDrop => _ = game.try_soft_drop(),
+                        NormalModeAction::HardDrop => _ = game.hard_drop_and_complete(),
+                        NormalModeAction::Hold => _ = game.try_hold(),
+                        NormalModeAction::Pause => game.toggle_pause(),
+                        NormalModeAction::Quit => quit = true,
+                    },
+                    GameState::Paused => match action {
+                        NormalModeAction::Pause => game.toggle_pause(),
+                        NormalModeAction::Quit => quit = true,
+                        _ => {}
+                    },
+                    GameState::GameOver => unreachable!(),
+                }
+            }
         }
 
-        let updated = match action {
-            NormalModeAction::MoveLeft => game.try_move_left().is_ok(),
-            NormalModeAction::MoveRight => game.try_move_right().is_ok(),
-            NormalModeAction::RotateLeft => game.try_rotate_left().is_ok(),
-            NormalModeAction::RotateRight => game.try_rotate_right().is_ok(),
-            NormalModeAction::SoftDrop => game.try_soft_drop().is_ok(),
-            NormalModeAction::HardDrop => {
-                game.hard_drop_and_complete();
-                true
-            }
-            NormalModeAction::Hold => game.try_hold().is_ok(),
-            NormalModeAction::Pause => {
-                game.toggle_pause();
-                true
-            }
-            NormalModeAction::Quit => {
-                renderer.lock().unwrap().cleanup().unwrap();
-                crossterm::terminal::disable_raw_mode().unwrap();
-                process::exit(0);
-            }
-        };
-        if updated {
-            let mut renderer = renderer.lock().unwrap();
-            renderer.draw(&game).unwrap();
+        // Game progression
+        if !quit && game.state().is_playing() {
+            let _ = game.increment_frame();
+        }
 
-            // Exit after drawing game over state
-            if game.state().is_gameover() {
-                let _ = renderer.cleanup();
-                let _ = input.cleanup();
-                process::exit(0);
-            }
+        renderer.draw(&game)?;
+
+        if game.state().is_game_over() || quit {
+            break;
+        }
+
+        let elapsed = now.elapsed();
+        if elapsed < frame_duration {
+            thread::sleep(frame_duration - elapsed);
         }
     }
+
+    renderer.cleanup()?;
+    input.cleanup()?;
+
+    Ok(())
 }
 
 pub(crate) fn auto() -> ! {
-    let game = Game::new();
+    let game = Game::new(FPS);
     let mut renderer = Renderer::new(PlayMode::Auto).unwrap();
     renderer.draw(&game).unwrap();
     let renderer = Arc::new(Mutex::new(renderer));

@@ -1,9 +1,8 @@
-use std::{ops::Index, process, thread};
+use std::{ops::Index, thread};
 
-use crossterm::event::KeyCode;
 use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
 
-use crate::{ai, game::Game, input::Input};
+use crate::{ai, game::Game};
 
 const POPULATION: usize = 20;
 const GENERATION_MAX: usize = 20;
@@ -60,41 +59,30 @@ impl Distribution<Individual> for StandardUniform {
 }
 
 pub(crate) fn learning() {
-    let _ = thread::spawn(|| {
-        let mut inds = rand::random::<[Individual; POPULATION]>();
-        for r#gen in 0..GENERATION_MAX {
-            println!("{gen}世代目:\r");
-            thread::scope(|s| {
-                for (i, ind) in inds.iter_mut().enumerate() {
-                    s.spawn(move || {
-                        let mut game = Game::new();
-                        while game.cleared_lines() < LINE_COUNT_MAX {
-                            let gameover;
-                            (game, gameover) = ai::eval(&game, ind.geno);
-                            if gameover {
-                                break;
-                            }
+    let mut inds = rand::random::<[Individual; POPULATION]>();
+    for r#gen in 0..GENERATION_MAX {
+        println!("{gen}世代目:\r");
+        thread::scope(|s| {
+            for (i, ind) in inds.iter_mut().enumerate() {
+                s.spawn(move || {
+                    let mut game = Game::new(60);
+                    while game.cleared_lines() < LINE_COUNT_MAX {
+                        let gameover;
+                        (game, gameover) = ai::eval(&game, ind.geno);
+                        if gameover {
+                            break;
                         }
-                        ind.score = game.score();
-                        println!("{i}: {:?} => {}\r", ind.geno.0, ind.score);
-                    });
-                }
-            });
-            let next_genos = gen_next_generation(&inds);
-            inds.iter_mut()
-                .map(|i| &mut i.geno)
-                .zip(next_genos)
-                .for_each(|(g, n)| *g = n);
-        }
-        process::exit(0);
-    });
-
-    let mut input = Input::new().unwrap();
-    loop {
-        if let Ok(KeyCode::Char('q')) = input.read() {
-            let _ = input.cleanup();
-            process::exit(0);
-        }
+                    }
+                    ind.score = game.score();
+                    println!("{i}: {:?} => {}\r", ind.geno.0, ind.score);
+                });
+            }
+        });
+        let next_genos = gen_next_generation(&inds);
+        inds.iter_mut()
+            .map(|i| &mut i.geno)
+            .zip(next_genos)
+            .for_each(|(g, n)| *g = n);
     }
 }
 

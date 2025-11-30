@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, time::Duration};
 
 use crossterm::{
     event::{self, KeyCode},
@@ -28,6 +28,16 @@ impl Input {
                 return Ok(event.code);
             }
         }
+    }
+
+    #[expect(clippy::unused_self)]
+    pub(crate) fn try_read(&mut self) -> io::Result<Option<KeyCode>> {
+        while event::poll(Duration::from_millis(0))? {
+            if let Some(event) = event::read()?.as_key_event() {
+                return Ok(Some(event.code));
+            }
+        }
+        Ok(None)
     }
 }
 

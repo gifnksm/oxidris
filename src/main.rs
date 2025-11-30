@@ -1,3 +1,5 @@
+use std::io;
+
 use clap::{Parser, ValueEnum};
 
 mod ai;
@@ -29,11 +31,12 @@ enum Mode {
     Learning,
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.mode {
-        Mode::Normal => play::normal(),
+        Mode::Normal => play::normal()?,
         Mode::Auto => play::auto(),
         Mode::Learning => ga::learning(),
     }
+    Ok(())
 }
