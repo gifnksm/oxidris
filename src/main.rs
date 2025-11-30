@@ -24,7 +24,7 @@ enum Mode {
     Normal,
     /// Run auto play
     Auto,
-    /// Learning with GeneticAlgorithm
+    /// Learning with genetic algorithm
     Learning,
 }
 

@@ -63,21 +63,21 @@ impl Terminal {
 
     /// Move cursor to specific position (1-indexed)
     pub(crate) fn move_to(&mut self, row: usize, col: usize) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[{};{}H", row, col)?;
+        write!(self.writer, "\x1b[{row};{col}H")?;
         Ok(self)
     }
 
     /// Set foreground color for subsequent writes
     pub(crate) fn set_fg(&mut self, color: Color) -> io::Result<&mut Self> {
         let Color { r, g, b } = color;
-        write!(self.writer, "\x1b[38;2;{};{};{}m", r, g, b)?;
+        write!(self.writer, "\x1b[38;2;{r};{g};{b}m")?;
         Ok(self)
     }
 
     /// Set background color for subsequent writes
     pub(crate) fn set_bg(&mut self, color: Color) -> io::Result<&mut Self> {
         let Color { r, g, b } = color;
-        write!(self.writer, "\x1b[48;2;{};{};{}m", r, g, b)?;
+        write!(self.writer, "\x1b[48;2;{r};{g};{b}m")?;
         Ok(self)
     }
 

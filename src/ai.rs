@@ -6,7 +6,7 @@ use crate::{
     game::{DropResult, Game},
 };
 
-pub(crate) fn eval(game: &Game, weight: &GenoSeq) -> (Game, bool) {
+pub(crate) fn eval(game: &Game, weight: GenoSeq) -> (Game, bool) {
     let mut elite = ((game.clone(), true), f64::MIN);
 
     for mut game in next_candidates(game) {
@@ -55,24 +55,25 @@ fn next_candidates(game: &Game) -> impl Iterator<Item = Game> + use<> {
     })
 }
 
-fn compute_score(game: &Game, weight: &GenoSeq, gameover: bool, line: usize) -> f64 {
+fn compute_score(game: &Game, weight: GenoSeq, gameover: bool, line: usize) -> f64 {
     if gameover {
         return 0.0;
     }
 
+    let line = u16::try_from(line).unwrap();
     let height_max = field_height_max(game);
     let height_diff = diff_in_height(game);
     let dead_space = dead_space_count(game);
 
-    let mut line = normalization(line as f64, 0.0, 8.0);
-    let mut height_max = 1.0 - normalization(height_max as f64, 0.0, 20.0);
-    let mut height_diff = 1.0 - normalization(height_diff as f64, 0.0, 200.0);
-    let mut dead_space = 1.0 - normalization(dead_space as f64, 0.0, 200.0);
+    let mut line = normalization(f64::from(line), 0.0, 8.0);
+    let mut height_max = 1.0 - normalization(f64::from(height_max), 0.0, 20.0);
+    let mut height_diff = 1.0 - normalization(f64::from(height_diff), 0.0, 200.0);
+    let mut dead_space = 1.0 - normalization(f64::from(dead_space), 0.0, 200.0);
 
-    line *= weight[GenomeKind::Line] as f64;
-    height_max *= weight[GenomeKind::HeightMax] as f64;
-    height_diff *= weight[GenomeKind::HeightDiff] as f64;
-    dead_space *= weight[GenomeKind::DeadSpace] as f64;
+    line *= f64::from(weight[GenomeKind::Line]);
+    height_max *= f64::from(weight[GenomeKind::HeightMax]);
+    height_diff *= f64::from(weight[GenomeKind::HeightDiff]);
+    dead_space *= f64::from(weight[GenomeKind::DeadSpace]);
 
     line + height_max + height_diff + dead_space
 }
@@ -111,28 +112,31 @@ fn normalization(value: f64, min: f64, max: f64) -> f64 {
     (value - min) / (max - min)
 }
 
-fn field_height(game: &Game, x: usize) -> usize {
-    game.field()
+fn field_height(game: &Game, x: usize) -> u16 {
+    let height = game
+        .field()
         .block_rows()
         .enumerate()
         .find(|(_y, row)| !row[x].is_empty())
-        .map(|(y, _row)| Field::BLOCKS_HEIGHT - y)
-        .unwrap_or(0)
+        .map_or(0, |(y, _row)| Field::BLOCKS_HEIGHT - y);
+
+    u16::try_from(height).unwrap()
 }
 
-fn field_height_max(game: &Game) -> usize {
-    (0..Field::BLOCKS_HEIGHT)
+fn field_height_max(game: &Game) -> u16 {
+    let max = (0..Field::BLOCKS_HEIGHT)
         .find(|&y| {
             game.field()
                 .block_row(y)
                 .iter()
                 .any(|block| !block.is_empty())
         })
-        .map(|y| Field::BLOCKS_HEIGHT - y)
-        .unwrap_or(0)
+        .map_or(0, |y| Field::BLOCKS_HEIGHT - y);
+
+    u16::try_from(max).unwrap()
 }
 
-fn diff_in_height(game: &Game) -> usize {
+fn diff_in_height(game: &Game) -> u16 {
     let mut diff = 0;
     let mut top = [0; Field::BLOCKS_WIDTH];
 
@@ -146,8 +150,8 @@ fn diff_in_height(game: &Game) -> usize {
     diff
 }
 
-fn dead_space_count(game: &Game) -> usize {
-    (0..Field::BLOCKS_WIDTH)
+fn dead_space_count(game: &Game) -> u16 {
+    let count = (0..Field::BLOCKS_WIDTH)
         .map(|x| {
             game.field()
                 .block_rows()
@@ -156,5 +160,7 @@ fn dead_space_count(game: &Game) -> usize {
                 .filter(|block| block.is_empty())
                 .count()
         })
-        .sum()
+        .sum::<usize>();
+
+    u16::try_from(count).unwrap()
 }

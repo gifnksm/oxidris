@@ -11,7 +11,7 @@ pub(crate) enum BlockKind {
 }
 
 impl BlockKind {
-    pub(crate) fn is_empty(&self) -> bool {
-        *self == BlockKind::Empty
+    pub(crate) fn is_empty(self) -> bool {
+        self == BlockKind::Empty
     }
 }

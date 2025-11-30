@@ -300,7 +300,7 @@ impl Renderer {
                     CONTROLS_PANEL.body_top() + line_offset + 1,
                     CONTROLS_PANEL.body_left(),
                 )?
-                .write(format!("{:<12} : {}", key, description))?;
+                .write(format_args!("{key:<12} : {description}"))?;
         }
         Ok(())
     }
@@ -318,7 +318,7 @@ impl Renderer {
             .write(format_args!("{:width$}", ""))?
             .move_to(top + 1, left)?
             .set_bold()?
-            .write(format_args!("{:^width$}", message))?
+            .write(format_args!("{message:^width$}"))?
             .move_to(top + 2, left)?
             .write(format_args!("{:width$}", ""))?
             .reset_styles()?;

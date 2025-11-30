@@ -1,7 +1,4 @@
-use std::{
-    ops::{Index, RangeInclusive},
-    process, thread,
-};
+use std::{ops::Index, process, thread};
 
 use getch_rs::{Getch, Key};
 use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
@@ -14,9 +11,9 @@ const LINE_COUNT_MAX: usize = 256;
 const CROSSOVER_RATE: usize = 60;
 const MUTATION_RATE: usize = 10;
 const SELECTION_RATE: usize = 30;
-const CROSSOVER_LEN: usize = (POPULATION as f64 * (CROSSOVER_RATE as f64 / 100.)) as usize;
-const MUTATION_LEN: usize = (POPULATION as f64 * (MUTATION_RATE as f64 / 100.)) as usize;
-const SELECTION_LEN: usize = (POPULATION as f64 * (SELECTION_RATE as f64 / 100.)) as usize;
+const CROSSOVER_LEN: usize = POPULATION * CROSSOVER_RATE / 100;
+const MUTATION_LEN: usize = POPULATION * MUTATION_RATE / 100;
+const SELECTION_LEN: usize = POPULATION * SELECTION_RATE / 100;
 #[allow(clippy::assertions_on_constants)]
 const _: () = assert!(CROSSOVER_RATE + MUTATION_RATE + SELECTION_RATE == 100);
 #[allow(clippy::assertions_on_constants)]
@@ -73,7 +70,7 @@ pub(crate) fn learning() {
                         let mut game = Game::new();
                         while game.cleared_lines() < LINE_COUNT_MAX {
                             let gameover;
-                            (game, gameover) = ai::eval(&game, &ind.geno);
+                            (game, gameover) = ai::eval(&game, ind.geno);
                             if gameover {
                                 break;
                             }
@@ -113,23 +110,13 @@ fn gen_next_generation(inds: &[Individual]) -> [GenoSeq; POPULATION] {
 fn crossover(inds: &[Individual]) -> [GenoSeq; CROSSOVER_LEN] {
     let mut genos = inds.iter().map(|i| i.geno).collect::<Vec<_>>();
     let mut rng = rand::rng();
-    for i in (0..genos.len() - 1).step_by(2) {
-        let mut geno1 = genos[i];
-        let mut geno2 = genos[i + 1];
-        let point1 = rng.random_range(0..4);
-        let point2 = rng.random_range(point1..4);
-        mem_swap_range(&mut geno1.0, &mut geno2.0, point1..=point2);
-        genos[i] = geno1;
-        genos[i + 1] = geno2;
+    for [g1, g2] in genos.as_chunks_mut::<2>().0 {
+        let p1 = rng.random_range(0..4);
+        let p2 = rng.random_range(p1..4);
+        g1.0[p1..=p2].swap_with_slice(&mut g2.0[p1..=p2]);
     }
     genos.shuffle(&mut rng);
     genos[..CROSSOVER_LEN].try_into().unwrap()
-}
-
-fn mem_swap_range<T>(x: &mut [T], y: &mut [T], range: RangeInclusive<usize>) {
-    for i in range {
-        std::mem::swap(&mut x[i], &mut y[i]);
-    }
 }
 
 fn mutation(inds: &[Individual]) -> [GenoSeq; MUTATION_LEN] {
@@ -148,29 +135,4 @@ fn selection(inds: &[Individual]) -> [GenoSeq; SELECTION_LEN] {
     new_inds.iter().map(|i| i.geno).collect::<Vec<_>>()[..SELECTION_LEN]
         .try_into()
         .unwrap()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_mem_swap_range() {
-        let tests = [
-            (0..=0, [[5, 2, 3, 4], [1, 6, 7, 8]]),
-            (0..=1, [[5, 6, 3, 4], [1, 2, 7, 8]]),
-            (1..=1, [[1, 6, 3, 4], [5, 2, 7, 8]]),
-            (1..=2, [[1, 6, 7, 4], [5, 2, 3, 8]]),
-            (1..=3, [[1, 6, 7, 8], [5, 2, 3, 4]]),
-            (0..=3, [[5, 6, 7, 8], [1, 2, 3, 4]]),
-        ];
-
-        for (range, [geno1_expect, geno2_expect]) in tests {
-            let mut geno1 = [1, 2, 3, 4];
-            let mut geno2 = [5, 6, 7, 8];
-            mem_swap_range(&mut geno1, &mut geno2, range);
-            assert_eq!(geno1, geno1_expect);
-            assert_eq!(geno2, geno2_expect);
-        }
-    }
 }

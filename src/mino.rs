@@ -6,15 +6,15 @@ use crate::block::BlockKind;
 pub(crate) struct MinoRotate(u8);
 
 impl MinoRotate {
-    pub(crate) fn rotate_right(&self) -> Self {
+    pub(crate) fn rotate_right(self) -> Self {
         MinoRotate((self.0 + 1) % 4)
     }
 
-    pub(crate) fn rotate_left(&self) -> Self {
+    pub(crate) fn rotate_left(self) -> Self {
         MinoRotate((self.0 + 3) % 4)
     }
 
-    const fn as_usize(&self) -> usize {
+    const fn as_usize(self) -> usize {
         self.0 as usize
     }
 }

@@ -47,7 +47,7 @@ enum NormalModeAction {
 }
 
 impl NormalModeAction {
-    fn from_key(key: Key) -> Option<Self> {
+    fn from_key(key: &Key) -> Option<Self> {
         match key {
             Key::Left => Some(NormalModeAction::MoveLeft),
             Key::Right => Some(NormalModeAction::MoveRight),
@@ -99,7 +99,7 @@ pub(crate) fn normal() -> ! {
 
     let g = Getch::new();
     loop {
-        let Ok(Some(action)) = g.getch().map(NormalModeAction::from_key) else {
+        let Ok(Some(action)) = g.getch().map(|key| NormalModeAction::from_key(&key)) else {
             continue;
         };
 
@@ -158,7 +158,7 @@ pub(crate) fn auto() -> ! {
             renderer.lock().unwrap().draw(&game).unwrap();
             loop {
                 let gameover;
-                (game, gameover) = ai::eval(&game, &GenoSeq([100, 1, 10, 100]));
+                (game, gameover) = ai::eval(&game, GenoSeq([100, 1, 10, 100]));
                 renderer.lock().unwrap().draw(&game).unwrap();
 
                 if gameover {

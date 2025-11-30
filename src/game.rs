@@ -60,7 +60,7 @@ impl Game {
             falling_mino_rotate: MinoRotate::default(),
             held_mino: None,
             hold_used: false,
-            next_minos: Default::default(),
+            next_minos: VecDeque::default(),
             score: 0,
             cleared_lines: 0,
             state: GameState::Playing,
