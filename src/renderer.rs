@@ -38,7 +38,7 @@ const STATS_PANEL: Panel = Panel {
     top: HOLD_PANEL.bottom() + 1,
     left: COMPONENT_LEFT,
     body_width: LEFT_PANE_BODY_WIDTH,
-    body_height: 3,
+    body_height: 5,
     title: "STATS",
 };
 
@@ -283,10 +283,24 @@ impl Renderer {
     fn draw_stats_panel(&mut self, game: &Game) -> io::Result<()> {
         STATS_PANEL.draw_border(&mut self.term)?;
         self.term
+            .move_to(STATS_PANEL.body_top(), STATS_PANEL.body_left())?
+            .write(format_args!("SCORE:",))?
             .move_to(STATS_PANEL.body_top() + 1, STATS_PANEL.body_left())?
             .write(format_args!(
-                "SCORE: {:>width$}",
+                "{:>width$}",
                 game.score(),
+                width = STATS_PANEL.body_width
+            ))?
+            .move_to(STATS_PANEL.body_top() + 3, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "LEVEL: {:>width$}",
+                game.level(),
+                width = STATS_PANEL.body_width - 7
+            ))?
+            .move_to(STATS_PANEL.body_top() + 4, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "LINES: {:>width$}",
+                game.cleared_lines(),
                 width = STATS_PANEL.body_width - 7
             ))?;
         Ok(())
