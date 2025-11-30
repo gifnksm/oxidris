@@ -10,9 +10,9 @@ use crate::{
 };
 
 // UI layout coordinates
-const TERMINAL_TOP: usize = 1;
+const TERMINAL_TOP: usize = 0;
 const TERMINAL_BOTTOM: usize = COMPONENT_BOTTOM + 2;
-const TERMINAL_LEFT: usize = 1;
+const TERMINAL_LEFT: usize = 0;
 const TERMINAL_RIGHT: usize = COMPONENT_RIGHT + 1;
 
 const COMPONENT_TOP: usize = TERMINAL_TOP + 1;

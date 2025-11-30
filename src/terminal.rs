@@ -3,6 +3,8 @@ use std::{
     io::{self, BufWriter, Write},
 };
 
+use crossterm::{cursor, queue, style, terminal};
+
 /// RGB color representation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Color {
@@ -43,53 +45,63 @@ impl Terminal {
         }
     }
 
-    /// Clear the entire screen and move cursor to home
+    /// Clear the entire screen
     pub(crate) fn clear_screen(&mut self) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[2J\x1b[H")?;
+        queue!(self.writer, terminal::Clear(terminal::ClearType::All))?;
         Ok(self)
     }
 
     /// Hide the cursor
     pub(crate) fn hide_cursor(&mut self) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[?25l")?;
+        queue!(self.writer, cursor::Hide)?;
         Ok(self)
     }
 
     /// Show the cursor
     pub(crate) fn show_cursor(&mut self) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[?25h")?;
+        queue!(self.writer, cursor::Show)?;
         Ok(self)
     }
 
     /// Move cursor to specific position (1-indexed)
     pub(crate) fn move_to(&mut self, row: usize, col: usize) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[{row};{col}H")?;
+        let x = u16::try_from(col).unwrap();
+        let y = u16::try_from(row).unwrap();
+        queue!(self.writer, cursor::MoveTo(x, y))?;
         Ok(self)
     }
 
     /// Set foreground color for subsequent writes
     pub(crate) fn set_fg(&mut self, color: Color) -> io::Result<&mut Self> {
-        let Color { r, g, b } = color;
-        write!(self.writer, "\x1b[38;2;{r};{g};{b}m")?;
+        let color = style::Color::Rgb {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+        };
+        queue!(self.writer, style::SetForegroundColor(color))?;
         Ok(self)
     }
 
     /// Set background color for subsequent writes
     pub(crate) fn set_bg(&mut self, color: Color) -> io::Result<&mut Self> {
-        let Color { r, g, b } = color;
-        write!(self.writer, "\x1b[48;2;{r};{g};{b}m")?;
+        let color = style::Color::Rgb {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+        };
+        queue!(self.writer, style::SetBackgroundColor(color))?;
         Ok(self)
     }
 
     /// Enable bold text for subsequent writes
     pub(crate) fn set_bold(&mut self) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[1m")?;
+        queue!(self.writer, style::SetAttribute(style::Attribute::Bold))?;
         Ok(self)
     }
 
     /// Reset styles to terminal default
     pub(crate) fn reset_styles(&mut self) -> io::Result<&mut Self> {
-        write!(self.writer, "\x1b[0m")?;
+        queue!(self.writer, style::SetAttribute(style::Attribute::Reset))?;
         Ok(self)
     }
 
