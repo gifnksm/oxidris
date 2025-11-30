@@ -5,6 +5,7 @@ mod block;
 mod field;
 mod ga;
 mod game;
+mod input;
 mod mino;
 mod play;
 mod renderer;

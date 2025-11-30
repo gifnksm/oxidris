@@ -5,9 +5,9 @@ use std::{
     time::Duration,
 };
 
-use getch_rs::{Getch, Key};
+use crossterm::event::KeyCode;
 
-use crate::{ai, ga::GenoSeq, game::Game, renderer::Renderer};
+use crate::{ai, ga::GenoSeq, game::Game, input::Input, renderer::Renderer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PlayMode {
@@ -47,17 +47,17 @@ enum NormalModeAction {
 }
 
 impl NormalModeAction {
-    fn from_key(key: &Key) -> Option<Self> {
+    fn from_key(key: KeyCode) -> Option<Self> {
         match key {
-            Key::Left => Some(NormalModeAction::MoveLeft),
-            Key::Right => Some(NormalModeAction::MoveRight),
-            Key::Down => Some(NormalModeAction::SoftDrop),
-            Key::Up => Some(NormalModeAction::HardDrop),
-            Key::Char('z') => Some(NormalModeAction::RotateLeft),
-            Key::Char('x') => Some(NormalModeAction::RotateRight),
-            Key::Char(' ') => Some(NormalModeAction::Hold),
-            Key::Char('p') => Some(NormalModeAction::Pause),
-            Key::Char('q') => Some(NormalModeAction::Quit),
+            KeyCode::Left => Some(NormalModeAction::MoveLeft),
+            KeyCode::Right => Some(NormalModeAction::MoveRight),
+            KeyCode::Down => Some(NormalModeAction::SoftDrop),
+            KeyCode::Up => Some(NormalModeAction::HardDrop),
+            KeyCode::Char('z') => Some(NormalModeAction::RotateLeft),
+            KeyCode::Char('x') => Some(NormalModeAction::RotateRight),
+            KeyCode::Char(' ') => Some(NormalModeAction::Hold),
+            KeyCode::Char('p') => Some(NormalModeAction::Pause),
+            KeyCode::Char('q') => Some(NormalModeAction::Quit),
             _ => None,
         }
     }
@@ -97,9 +97,10 @@ pub(crate) fn normal() -> ! {
         }
     });
 
-    let g = Getch::new();
+    let mut input = Input::new().unwrap();
+
     loop {
-        let Ok(Some(action)) = g.getch().map(|key| NormalModeAction::from_key(&key)) else {
+        let Ok(Some(action)) = input.read().map(NormalModeAction::from_key) else {
             continue;
         };
 
@@ -129,6 +130,7 @@ pub(crate) fn normal() -> ! {
             }
             NormalModeAction::Quit => {
                 renderer.lock().unwrap().cleanup().unwrap();
+                crossterm::terminal::disable_raw_mode().unwrap();
                 process::exit(0);
             }
         };
@@ -139,6 +141,7 @@ pub(crate) fn normal() -> ! {
             // Exit after drawing game over state
             if game.state().is_gameover() {
                 let _ = renderer.cleanup();
+                let _ = input.cleanup();
                 process::exit(0);
             }
         }
@@ -169,10 +172,11 @@ pub(crate) fn auto() -> ! {
         }
     });
 
-    let g = Getch::new();
+    let mut input = Input::new().unwrap();
     loop {
-        if let Ok(Key::Char('q')) = g.getch() {
-            renderer.lock().unwrap().cleanup().unwrap();
+        if let Ok(KeyCode::Char('q')) = input.read() {
+            let _ = renderer.lock().unwrap().cleanup();
+            let _ = input.cleanup();
             process::exit(0);
         }
     }

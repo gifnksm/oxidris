@@ -1,9 +1,9 @@
 use std::{ops::Index, process, thread};
 
-use getch_rs::{Getch, Key};
+use crossterm::event::KeyCode;
 use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
 
-use crate::{ai, game::Game};
+use crate::{ai, game::Game, input::Input};
 
 const POPULATION: usize = 20;
 const GENERATION_MAX: usize = 20;
@@ -63,7 +63,7 @@ pub(crate) fn learning() {
     let _ = thread::spawn(|| {
         let mut inds = rand::random::<[Individual; POPULATION]>();
         for r#gen in 0..GENERATION_MAX {
-            println!("{gen}世代目:");
+            println!("{gen}世代目:\r");
             thread::scope(|s| {
                 for (i, ind) in inds.iter_mut().enumerate() {
                     s.spawn(move || {
@@ -76,7 +76,7 @@ pub(crate) fn learning() {
                             }
                         }
                         ind.score = game.score();
-                        println!("{i}: {:?} => {}", ind.geno.0, ind.score);
+                        println!("{i}: {:?} => {}\r", ind.geno.0, ind.score);
                     });
                 }
             });
@@ -89,9 +89,10 @@ pub(crate) fn learning() {
         process::exit(0);
     });
 
-    let g = Getch::new();
+    let mut input = Input::new().unwrap();
     loop {
-        if let Ok(Key::Char('q')) = g.getch() {
+        if let Ok(KeyCode::Char('q')) = input.read() {
+            let _ = input.cleanup();
             process::exit(0);
         }
     }
