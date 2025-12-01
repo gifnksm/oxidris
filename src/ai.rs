@@ -23,16 +23,16 @@ pub(crate) fn eval(game: &Game, weight: GenoSeq) -> (Game, bool) {
             continue;
         };
 
-        for mut game in next_candidates(&game) {
-            let (line, gameover) = match game.hard_drop_and_complete() {
+        for mut next in next_candidates(&game) {
+            let (line, gameover) = match next.hard_drop_and_complete() {
                 DropResult::Success {
                     lines_cleared: line,
                 } => (line, false),
                 DropResult::GameOver => (0, true),
             };
-            let score = compute_score(&game, weight, gameover, pre_line + line);
+            let score = compute_score(&next, weight, gameover, pre_line + line);
             if elite.1 < score {
-                elite.0 = (game, gameover);
+                elite.0 = (game.clone(), gameover);
                 elite.1 = score;
             }
         }
