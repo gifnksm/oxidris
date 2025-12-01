@@ -1,8 +1,8 @@
-use std::{collections::VecDeque, time::Duration};
+use std::time::Duration;
 
 use crate::{
     field::{Field, Position},
-    mino::{self, MinoKind, MinoRotate, MinoShape},
+    mino::{MinoGenerator, MinoKind, MinoRotate, MinoShape},
 };
 
 const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
@@ -28,7 +28,7 @@ pub(crate) struct Game {
     falling_mino_rotate: MinoRotate,
     held_mino: Option<MinoKind>,
     hold_used: bool,
-    next_minos: VecDeque<MinoKind>,
+    mino_generator: MinoGenerator,
     score: usize,
     cleared_lines: usize,
     state: GameState,
@@ -52,7 +52,7 @@ impl Game {
             falling_mino_rotate: MinoRotate::default(),
             held_mino: None,
             hold_used: false,
-            next_minos: VecDeque::default(),
+            mino_generator: MinoGenerator::new(),
             score: 0,
             cleared_lines: 0,
             state: GameState::Playing,
@@ -110,8 +110,8 @@ impl Game {
         self.held_mino
     }
 
-    pub(crate) fn next_minos(&self) -> &VecDeque<MinoKind> {
-        &self.next_minos
+    pub(crate) fn next_minos(&self) -> impl Iterator<Item = MinoKind> + '_ {
+        self.mino_generator.next_minos()
     }
 
     pub(crate) fn simulate_drop_position(&self) -> Position {
@@ -257,10 +257,7 @@ impl Game {
     }
 
     fn begin_next_mino_fall(&mut self) {
-        while self.next_minos.len() <= MinoKind::LEN {
-            self.next_minos.extend(mino::gen_mino_sequence());
-        }
-        self.falling_mino_kind = self.next_minos.pop_front().unwrap();
+        self.falling_mino_kind = self.mino_generator.pop_next();
         self.falling_mino_position = Position::INITIAL;
         self.falling_mino_rotate = MinoRotate::default();
     }

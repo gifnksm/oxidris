@@ -277,11 +277,11 @@ impl Renderer {
 
     fn draw_next_panel(&mut self, game: &Game) -> io::Result<()> {
         NEXT_PANEL.draw_border(&mut self.term)?;
-        for (mino_idx, mino) in game.next_minos().iter().take(7).enumerate() {
+        for (mino_idx, mino) in game.next_minos().take(7).enumerate() {
             let mino_top = NEXT_PANEL.body_top() + mino_idx * 3;
             let mino_left =
                 NEXT_PANEL.body_left() + (NEXT_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(*mino, mino_top, mino_left)?;
+            self.draw_mino_at(mino, mino_top, mino_left)?;
         }
         Ok(())
     }
