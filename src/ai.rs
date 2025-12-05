@@ -3,42 +3,36 @@ use std::iter;
 use crate::{
     field::Field,
     ga::{GenoSeq, GenomeKind},
-    game::{DropResult, Game},
+    game::Game,
 };
 
-pub(crate) fn eval(game: &Game, weight: GenoSeq) -> (Game, bool) {
-    let mut elite = ((game.clone(), true), f64::MIN);
+pub(crate) fn eval(game: &Game, weight: GenoSeq) -> Game {
+    let mut best_score = f64::MIN;
+    let mut best_game = game.clone();
+    let init_lines_cleared = game.cleared_lines();
 
     for mut game in next_candidates(game) {
-        let result = game.hard_drop_and_complete();
-        let DropResult::Success {
-            lines_cleared: pre_line,
-        } = result
-        else {
-            let score = compute_score(&game, weight, true, 0);
-            if elite.1 < score {
-                elite.0 = (game, true);
-                elite.1 = score;
+        game.hard_drop_and_complete();
+        if game.state().is_game_over() {
+            let score = compute_score(&game, weight, init_lines_cleared);
+            if score > best_score {
+                best_score = score;
+                best_game = game;
             }
             continue;
-        };
+        }
 
         for mut next in next_candidates(&game) {
-            let (line, gameover) = match next.hard_drop_and_complete() {
-                DropResult::Success {
-                    lines_cleared: line,
-                } => (line, false),
-                DropResult::GameOver => (0, true),
-            };
-            let score = compute_score(&next, weight, gameover, pre_line + line);
-            if elite.1 < score {
-                elite.0 = (game.clone(), gameover);
-                elite.1 = score;
+            next.hard_drop_and_complete();
+            let score = compute_score(&next, weight, init_lines_cleared);
+            if score > best_score {
+                best_score = score;
+                best_game = game.clone();
             }
         }
     }
 
-    elite.0
+    best_game
 }
 
 fn next_candidates(game: &Game) -> impl Iterator<Item = Game> + use<> {
@@ -55,27 +49,27 @@ fn next_candidates(game: &Game) -> impl Iterator<Item = Game> + use<> {
     })
 }
 
-fn compute_score(game: &Game, weight: GenoSeq, gameover: bool, line: usize) -> f64 {
-    if gameover {
+fn compute_score(game: &Game, weight: GenoSeq, init_lines_cleared: usize) -> f64 {
+    if game.state().is_game_over() {
         return 0.0;
     }
 
-    let line = u16::try_from(line).unwrap();
+    let lines_cleared = u16::try_from(game.cleared_lines() - init_lines_cleared).unwrap();
     let height_max = field_height_max(game);
     let height_diff = diff_in_height(game);
     let dead_space = dead_space_count(game);
 
-    let mut line = normalization(f64::from(line), 0.0, 8.0);
-    let mut height_max = 1.0 - normalization(f64::from(height_max), 0.0, 20.0);
-    let mut height_diff = 1.0 - normalization(f64::from(height_diff), 0.0, 200.0);
-    let mut dead_space = 1.0 - normalization(f64::from(dead_space), 0.0, 200.0);
+    let mut lines_cleared = normalize(f64::from(lines_cleared), 0.0, 8.0);
+    let mut height_max = 1.0 - normalize(f64::from(height_max), 0.0, 20.0);
+    let mut height_diff = 1.0 - normalize(f64::from(height_diff), 0.0, 200.0);
+    let mut dead_space = 1.0 - normalize(f64::from(dead_space), 0.0, 200.0);
 
-    line *= f64::from(weight[GenomeKind::Line]);
+    lines_cleared *= f64::from(weight[GenomeKind::LinesCleared]);
     height_max *= f64::from(weight[GenomeKind::HeightMax]);
     height_diff *= f64::from(weight[GenomeKind::HeightDiff]);
     dead_space *= f64::from(weight[GenomeKind::DeadSpace]);
 
-    line + height_max + height_diff + dead_space
+    lines_cleared + height_max + height_diff + dead_space
 }
 
 fn hold(game: &Game) -> Option<Game> {
@@ -108,7 +102,7 @@ fn move_right(game: &Game) -> Option<Game> {
     Some(game)
 }
 
-fn normalization(value: f64, min: f64, max: f64) -> f64 {
+fn normalize(value: f64, min: f64, max: f64) -> f64 {
     (value - min) / (max - min)
 }
 

@@ -20,7 +20,7 @@ const _: () = assert!(CROSSOVER_LEN + MUTATION_LEN + SELECTION_LEN == POPULATION
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GenomeKind {
-    Line,
+    LinesCleared,
     HeightMax,
     HeightDiff,
     DeadSpace,
@@ -67,9 +67,8 @@ pub(crate) fn learning() {
                 s.spawn(move || {
                     let mut game = Game::new(60);
                     while game.cleared_lines() < LINE_COUNT_MAX {
-                        let gameover;
-                        (game, gameover) = ai::eval(&game, ind.geno);
-                        if gameover {
+                        game = ai::eval(&game, ind.geno);
+                        if game.state().is_game_over() {
                             break;
                         }
                     }

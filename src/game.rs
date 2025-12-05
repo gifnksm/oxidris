@@ -7,7 +7,7 @@ use crate::{
 
 const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, derive_more::IsVariant)]
 pub(crate) enum DropResult {
     Success { lines_cleared: usize },
     GameOver,

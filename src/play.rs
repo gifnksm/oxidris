@@ -142,11 +142,10 @@ pub(crate) fn auto() -> ! {
             let mut game = game;
             renderer.lock().unwrap().draw(&game).unwrap();
             loop {
-                let gameover;
-                (game, gameover) = ai::eval(&game, GenoSeq([100, 1, 10, 100]));
+                game = ai::eval(&game, GenoSeq([100, 1, 10, 100]));
                 renderer.lock().unwrap().draw(&game).unwrap();
 
-                if gameover {
+                if game.state().is_game_over() {
                     renderer.lock().unwrap().cleanup().unwrap();
                     process::exit(0);
                 }
