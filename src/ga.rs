@@ -61,7 +61,7 @@ impl Distribution<Individual> for StandardUniform {
 pub(crate) fn learning() {
     let mut inds = rand::random::<[Individual; POPULATION]>();
     for r#gen in 0..GENERATION_MAX {
-        println!("{gen}世代目:\r");
+        println!("{gen}th Generation:");
         thread::scope(|s| {
             for (i, ind) in inds.iter_mut().enumerate() {
                 s.spawn(move || {
@@ -74,10 +74,16 @@ pub(crate) fn learning() {
                         }
                     }
                     ind.score = game.score();
-                    println!("{i}: {:?} => {}\r", ind.geno.0, ind.score);
+                    println!("  {i:2}: {:?} => {}", ind.geno.0, ind.score);
                 });
             }
         });
+
+        let avg_score: usize = inds.iter().map(|i| i.score).sum::<usize>() / POPULATION;
+        let max_score = inds.iter().map(|i| i.score).max().unwrap();
+        let min_score = inds.iter().map(|i| i.score).min().unwrap();
+        println!("  Avg Score: {avg_score}, Max Score: {max_score}, Min Score: {min_score}");
+
         let next_genos = gen_next_generation(&inds);
         inds.iter_mut()
             .map(|i| &mut i.geno)
