@@ -54,8 +54,7 @@ pub(crate) struct Field {
 // I-mino:     W  W  .  .  .  .  .  .  .  . [.  I  W  W]  ← Rightmost: I-block at column 11
 //
 // This allows full movement range while maintaining 4x4 grid collision detection.
-const TOP_ROW: [BlockKind; FIELD_WIDTH] = [W, W, W, W, E, E, E, E, E, E, W, W, W, W];
-const MID_ROW: [BlockKind; FIELD_WIDTH] = [W, W, E, E, E, E, E, E, E, E, E, E, W, W];
+const TOP_ROW: [BlockKind; FIELD_WIDTH] = [W, W, E, E, E, E, E, E, E, E, E, E, W, W];
 const BOTTOM_ROW: [BlockKind; FIELD_WIDTH] = [W, W, W, W, W, W, W, W, W, W, W, W, W, W];
 
 impl Field {
@@ -65,9 +64,9 @@ impl Field {
     pub(crate) const INITIAL: Self = {
         Self {
             rows: [
-                TOP_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW,
-                MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW, MID_ROW,
-                MID_ROW, MID_ROW, MID_ROW, BOTTOM_ROW, BOTTOM_ROW,
+                TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW,
+                TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW, TOP_ROW,
+                TOP_ROW, TOP_ROW, TOP_ROW, BOTTOM_ROW, BOTTOM_ROW,
             ],
         }
     };
@@ -136,7 +135,7 @@ impl Field {
                 for y2 in (2..=y).rev() {
                     self.rows[y2] = self.rows[y2 - 1];
                 }
-                self.rows[1] = MID_ROW;
+                self.rows[1] = TOP_ROW;
             }
         }
         count

@@ -86,19 +86,13 @@ fn rotate_right(game: &Game) -> Option<Game> {
 
 fn move_left(game: &Game) -> Option<Game> {
     let mut game = game.clone();
-    if game.try_move_left().is_err() {
-        game.try_soft_drop().ok()?;
-        game.try_move_left().ok()?;
-    }
+    game.try_move_left().ok()?;
     Some(game)
 }
 
 fn move_right(game: &Game) -> Option<Game> {
     let mut game = game.clone();
-    if game.try_move_right().is_err() {
-        game.try_soft_drop().ok()?;
-        game.try_move_right().ok()?;
-    }
+    game.try_move_right().ok()?;
     Some(game)
 }
 
