@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use crate::{
-    field::{Field, Position},
-    mino::{MinoGenerator, MinoKind, MinoRotate, MinoShape},
+    field::Field,
+    mino::{Mino, MinoGenerator, MinoKind},
 };
 
 const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
@@ -23,9 +23,7 @@ pub(crate) enum GameState {
 #[derive(Debug, Clone)]
 pub(crate) struct Game {
     field: Field,
-    falling_mino_kind: MinoKind,
-    falling_mino_position: Position,
-    falling_mino_rotate: MinoRotate,
+    falling_mino: Mino,
     held_mino: Option<MinoKind>,
     hold_used: bool,
     mino_generator: MinoGenerator,
@@ -47,9 +45,7 @@ impl Game {
         let first_mino = MinoKind::I; // dummy initial value
         let mut game = Self {
             field: Field::INITIAL,
-            falling_mino_kind: first_mino,
-            falling_mino_position: Position::INITIAL,
-            falling_mino_rotate: MinoRotate::default(),
+            falling_mino: Mino::new(first_mino),
             held_mino: None,
             hold_used: false,
             mino_generator: MinoGenerator::new(),
@@ -99,11 +95,8 @@ impl Game {
         &self.field
     }
 
-    pub(crate) fn falling_mino(&self) -> (Position, &MinoShape) {
-        (
-            self.falling_mino_position,
-            self.falling_mino_kind.shape(self.falling_mino_rotate),
-        )
+    pub(crate) fn falling_mino(&self) -> &Mino {
+        &self.falling_mino
     }
 
     pub(crate) fn held_mino(&self) -> Option<MinoKind> {
@@ -114,21 +107,15 @@ impl Game {
         self.mino_generator.next_minos()
     }
 
-    pub(crate) fn simulate_drop_position(&self) -> Position {
-        let mut drop_pos = self.falling_mino_position;
-        loop {
-            let Some(new_pos) = drop_pos.down() else {
-                break;
-            };
-            if self.field.is_colliding(
-                &new_pos,
-                self.falling_mino_kind.shape(self.falling_mino_rotate),
-            ) {
+    pub(crate) fn simulate_drop_position(&self) -> Mino {
+        let mut dropped = self.falling_mino;
+        while let Some(mino) = dropped.down() {
+            if self.field.is_colliding(&mino) {
                 break;
             }
-            drop_pos = new_pos;
+            dropped = mino;
         }
-        drop_pos
+        dropped
     }
 
     pub(crate) fn increment_frame(&mut self) -> Option<DropResult> {
@@ -142,52 +129,39 @@ impl Game {
         }
     }
 
-    pub(crate) fn try_move_left(&mut self) -> Result<(), ()> {
-        let new_pos = self.falling_mino_position.left().ok_or(())?;
-        self.try_move(new_pos)
-    }
-
-    pub(crate) fn try_move_right(&mut self) -> Result<(), ()> {
-        let new_pos = self.falling_mino_position.right().ok_or(())?;
-        self.try_move(new_pos)
-    }
-
-    fn try_move(&mut self, new_pos: Position) -> Result<(), ()> {
-        if self.field.is_colliding(
-            &new_pos,
-            self.falling_mino_kind.shape(self.falling_mino_rotate),
-        ) {
+    fn try_update_falling_mino(&mut self, mino: Mino) -> Result<(), ()> {
+        if self.field.is_colliding(&mino) {
             return Err(());
         }
-        self.falling_mino_position = new_pos;
+        self.falling_mino = mino;
         Ok(())
     }
 
+    pub(crate) fn try_move_left(&mut self) -> Result<(), ()> {
+        let mino = self.falling_mino.left().ok_or(())?;
+        self.try_update_falling_mino(mino)
+    }
+
+    pub(crate) fn try_move_right(&mut self) -> Result<(), ()> {
+        let mino = self.falling_mino.right().ok_or(())?;
+        self.try_update_falling_mino(mino)
+    }
+
     pub(crate) fn try_rotate_left(&mut self) -> Result<(), ()> {
-        let new_rotate = self.falling_mino_rotate.rotate_left();
-        let new_shape = self.falling_mino_kind.shape(new_rotate);
-        if self
-            .field
-            .is_colliding(&self.falling_mino_position, new_shape)
-        {
-            let new_pos = super_rotation(&self.field, &self.falling_mino_position, new_shape)?;
-            self.falling_mino_position = new_pos;
+        let mut mino = self.falling_mino.rotated_left();
+        if self.field.is_colliding(&mino) {
+            mino = super_rotation(&self.field, &mino)?;
         }
-        self.falling_mino_rotate = new_rotate;
+        self.falling_mino = mino;
         Ok(())
     }
 
     pub(crate) fn try_rotate_right(&mut self) -> Result<(), ()> {
-        let new_rotate = self.falling_mino_rotate.rotate_right();
-        let new_shape = self.falling_mino_kind.shape(new_rotate);
-        if self
-            .field
-            .is_colliding(&self.falling_mino_position, new_shape)
-        {
-            let new_pos = super_rotation(&self.field, &self.falling_mino_position, new_shape)?;
-            self.falling_mino_position = new_pos;
+        let mut mino = self.falling_mino.rotated_right();
+        if self.field.is_colliding(&mino) {
+            mino = super_rotation(&self.field, &mino)?;
         }
-        self.falling_mino_rotate = new_rotate;
+        self.falling_mino = mino;
         Ok(())
     }
 
@@ -196,18 +170,14 @@ impl Game {
             return Err(());
         }
         if let Some(held_mino) = self.held_mino {
-            let new_pos = Position::INITIAL;
-            let new_rotate = MinoRotate::default();
-            let new_shape = held_mino.shape(new_rotate);
-            if self.field.is_colliding(&new_pos, new_shape) {
+            let mino = Mino::new(held_mino);
+            if self.field.is_colliding(&mino) {
                 return Err(());
             }
-            self.held_mino = Some(self.falling_mino_kind);
-            self.falling_mino_kind = held_mino;
-            self.falling_mino_position = new_pos;
-            self.falling_mino_rotate = new_rotate;
+            self.held_mino = Some(self.falling_mino.kind());
+            self.falling_mino = mino;
         } else {
-            self.held_mino = Some(self.falling_mino_kind);
+            self.held_mino = Some(self.falling_mino.kind());
             self.begin_next_mino_fall();
         }
         self.hold_used = true;
@@ -215,9 +185,8 @@ impl Game {
     }
 
     pub(crate) fn try_soft_drop(&mut self) -> Result<(), ()> {
-        let new_pos = self.falling_mino_position.down().ok_or(())?;
-        self.try_move(new_pos)?;
-        Ok(())
+        let mino = self.falling_mino.down().ok_or(())?;
+        self.try_update_falling_mino(mino)
     }
 
     pub(crate) fn hard_drop_and_complete(&mut self) -> DropResult {
@@ -233,19 +202,13 @@ impl Game {
     }
 
     fn complete_mino_drop(&mut self) -> DropResult {
-        self.field.fill_mino(
-            &self.falling_mino_position,
-            self.falling_mino_kind.shape(self.falling_mino_rotate),
-        );
+        self.field.fill_mino(&self.falling_mino);
         let line = self.field.clear_lines();
         self.score += SCORE_TABLE[line];
         self.cleared_lines += line;
 
         self.begin_next_mino_fall();
-        if self.field.is_colliding(
-            &self.falling_mino_position,
-            self.falling_mino_kind.shape(self.falling_mino_rotate),
-        ) {
+        if self.field.is_colliding(&self.falling_mino) {
             self.state = GameState::GameOver;
             return DropResult::GameOver;
         }
@@ -257,17 +220,15 @@ impl Game {
     }
 
     fn begin_next_mino_fall(&mut self) {
-        self.falling_mino_kind = self.mino_generator.pop_next();
-        self.falling_mino_position = Position::INITIAL;
-        self.falling_mino_rotate = MinoRotate::default();
+        self.falling_mino = Mino::new(self.mino_generator.pop_next());
     }
 }
 
-fn super_rotation(field: &Field, pos: &Position, mino: &MinoShape) -> Result<Position, ()> {
-    let diff_pos = [pos.up(), pos.right(), pos.down(), pos.left()];
-    for pos in diff_pos.iter().flatten() {
-        if !field.is_colliding(pos, mino) {
-            return Ok(*pos);
+fn super_rotation(field: &Field, mino: &Mino) -> Result<Mino, ()> {
+    let minos = [mino.up(), mino.right(), mino.down(), mino.left()];
+    for mino in minos.iter().flatten() {
+        if !field.is_colliding(mino) {
+            return Ok(*mino);
         }
     }
     Err(())

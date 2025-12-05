@@ -1,58 +1,14 @@
-use crate::{block::BlockKind, mino::MinoShape};
+use crate::{block::BlockKind, mino::Mino};
 use BlockKind::{Empty as E, Wall as W};
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Position {
-    x: usize,
-    y: usize,
-}
-
-impl Position {
-    pub(crate) const INITIAL: Self = Self::new(5, 0);
-
-    pub(crate) const fn new(x: usize, y: usize) -> Self {
-        Self { x, y }
-    }
-
-    pub(crate) const fn left(&self) -> Option<Self> {
-        if self.x == MIN_X {
-            None
-        } else {
-            Some(Self::new(self.x - 1, self.y))
-        }
-    }
-
-    pub(crate) const fn right(&self) -> Option<Self> {
-        if self.x >= MAX_X {
-            None
-        } else {
-            Some(Self::new(self.x + 1, self.y))
-        }
-    }
-
-    pub(crate) const fn up(&self) -> Option<Self> {
-        if self.y == MIN_Y {
-            None
-        } else {
-            Some(Self::new(self.x, self.y - 1))
-        }
-    }
-
-    pub(crate) const fn down(&self) -> Option<Self> {
-        if self.y >= MAX_Y {
-            None
-        } else {
-            Some(Self::new(self.x, self.y + 1))
-        }
-    }
-}
 
 const FIELD_WIDTH: usize = 12 + 2;
 const FIELD_HEIGHT: usize = 22 + 1;
-const MIN_X: usize = 0;
-const MAX_X: usize = FIELD_WIDTH - 1;
-const MIN_Y: usize = 0;
-const MAX_Y: usize = FIELD_HEIGHT - 1;
+pub(crate) const MIN_X: usize = 0;
+pub(crate) const MAX_X: usize = FIELD_WIDTH - 1;
+pub(crate) const MIN_Y: usize = 0;
+pub(crate) const MAX_Y: usize = FIELD_HEIGHT - 1;
+pub(crate) const INIT_MINO_X: usize = 5;
+pub(crate) const INIT_MINO_Y: usize = 0;
 
 const BLOCKS_MARGIN_TOP: usize = 1;
 const BLOCKS_MARGIN_BOTTOM: usize = 2;
@@ -126,33 +82,41 @@ impl Field {
             .map(|row| &row[BLOCKS_MARGIN_LEFT..][..BLOCKS_WIDTH])
     }
 
-    pub(crate) fn fill_mino(&mut self, pos: &Position, mino: &MinoShape) {
-        for (y, mino_row) in mino.iter().enumerate() {
+    pub(crate) fn fill_mino(&mut self, mino: &Mino) {
+        let pos = mino.position();
+        for (y, mino_row) in mino.shape().iter().enumerate() {
             for (x, block) in mino_row.iter().enumerate() {
                 if !block.is_empty() {
-                    self.rows[y + pos.y][x + pos.x] = *block;
+                    self.rows[y + pos.y()][x + pos.x()] = *block;
                 }
             }
         }
     }
 
-    pub(crate) fn fill_mino_as(&mut self, pos: &Position, mino: &MinoShape, kind: BlockKind) {
-        for (y, mino_row) in mino.iter().enumerate() {
+    pub(crate) fn fill_mino_as(&mut self, mino: &Mino, kind: BlockKind) {
+        let pos = mino.position();
+        for (y, mino_row) in mino.shape().iter().enumerate() {
             for (x, block) in mino_row.iter().enumerate() {
                 if !block.is_empty() {
-                    self.rows[y + pos.y][x + pos.x] = kind;
+                    self.rows[y + pos.y()][x + pos.x()] = kind;
                 }
             }
         }
     }
 
-    pub(crate) fn is_colliding(&self, pos: &Position, mino: &MinoShape) -> bool {
-        for (y, mino_row) in mino.iter().enumerate() {
-            for (x, block) in mino_row.iter().enumerate() {
-                if y + pos.y >= FIELD_HEIGHT || x + pos.x >= FIELD_WIDTH {
+    pub(crate) fn is_colliding(&self, mino: &Mino) -> bool {
+        let pos = mino.position();
+        for (dy, mino_row) in mino.shape().iter().enumerate() {
+            let y = dy + pos.y();
+            if y >= FIELD_HEIGHT {
+                continue;
+            }
+            for (dx, block) in mino_row.iter().enumerate() {
+                let x = dx + pos.x();
+                if x >= FIELD_WIDTH {
                     continue;
                 }
-                if !block.is_empty() && !self.rows[y + pos.y][x + pos.x].is_empty() {
+                if !block.is_empty() && !self.rows[y][x].is_empty() {
                     return true;
                 }
             }

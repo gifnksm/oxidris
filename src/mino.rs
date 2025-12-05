@@ -7,21 +7,159 @@ use rand::{
     seq::SliceRandom,
 };
 
-use crate::block::BlockKind;
+use crate::{
+    block::BlockKind,
+    field::{INIT_MINO_X, INIT_MINO_Y, MAX_X, MAX_Y, MIN_X, MIN_Y},
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Mino {
+    position: MinoPosition,
+    rotation: MinoRotation,
+    kind: MinoKind,
+}
+
+impl Mino {
+    pub(crate) fn new(kind: MinoKind) -> Self {
+        Self {
+            position: MinoPosition::INITIAL,
+            rotation: MinoRotation::default(),
+            kind,
+        }
+    }
+
+    pub(crate) fn position(&self) -> MinoPosition {
+        self.position
+    }
+
+    pub(crate) fn kind(&self) -> MinoKind {
+        self.kind
+    }
+
+    pub(crate) fn shape(&self) -> &MinoShape {
+        self.kind.shape(self.rotation)
+    }
+
+    pub(crate) fn left(&self) -> Option<Self> {
+        let new_pos = self.position.left()?;
+        Some(Self {
+            position: new_pos,
+            rotation: self.rotation,
+            kind: self.kind,
+        })
+    }
+
+    pub(crate) fn right(&self) -> Option<Self> {
+        let new_pos = self.position.right()?;
+        Some(Self {
+            position: new_pos,
+            rotation: self.rotation,
+            kind: self.kind,
+        })
+    }
+
+    pub(crate) fn up(&self) -> Option<Self> {
+        let new_pos = self.position.up()?;
+        Some(Self {
+            position: new_pos,
+            rotation: self.rotation,
+            kind: self.kind,
+        })
+    }
+
+    pub(crate) fn down(&self) -> Option<Self> {
+        let new_pos = self.position.down()?;
+        Some(Self {
+            position: new_pos,
+            rotation: self.rotation,
+            kind: self.kind,
+        })
+    }
+
+    pub(crate) fn rotated_right(&self) -> Self {
+        Self {
+            position: self.position,
+            rotation: self.rotation.rotated_right(),
+            kind: self.kind,
+        }
+    }
+
+    pub(crate) fn rotated_left(&self) -> Self {
+        Self {
+            position: self.position,
+            rotation: self.rotation.rotated_left(),
+            kind: self.kind,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MinoPosition {
+    x: usize,
+    y: usize,
+}
+
+impl MinoPosition {
+    pub(crate) const INITIAL: Self = Self::new(INIT_MINO_X, INIT_MINO_Y);
+
+    pub(crate) const fn new(x: usize, y: usize) -> Self {
+        Self { x, y }
+    }
+
+    pub(crate) fn x(self) -> usize {
+        self.x
+    }
+
+    pub(crate) fn y(self) -> usize {
+        self.y
+    }
+
+    pub(crate) const fn left(&self) -> Option<Self> {
+        if self.x == MIN_X {
+            None
+        } else {
+            Some(Self::new(self.x - 1, self.y))
+        }
+    }
+
+    pub(crate) const fn right(&self) -> Option<Self> {
+        if self.x >= MAX_X {
+            None
+        } else {
+            Some(Self::new(self.x + 1, self.y))
+        }
+    }
+
+    pub(crate) const fn up(&self) -> Option<Self> {
+        if self.y == MIN_Y {
+            None
+        } else {
+            Some(Self::new(self.x, self.y - 1))
+        }
+    }
+
+    pub(crate) const fn down(&self) -> Option<Self> {
+        if self.y >= MAX_Y {
+            None
+        } else {
+            Some(Self::new(self.x, self.y + 1))
+        }
+    }
+}
 
 /// Represents the rotation state of a tetromino.
 ///
 /// 0: 0 degrees, 1: 90° right, 2: 180°, 3: 90° left.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct MinoRotate(u8);
+pub(crate) struct MinoRotation(u8);
 
-impl MinoRotate {
-    pub(crate) fn rotate_right(self) -> Self {
-        MinoRotate((self.0 + 1) % 4)
+impl MinoRotation {
+    pub(crate) fn rotated_right(self) -> Self {
+        MinoRotation((self.0 + 1) % 4)
     }
 
-    pub(crate) fn rotate_left(self) -> Self {
-        MinoRotate((self.0 + 3) % 4)
+    pub(crate) fn rotated_left(self) -> Self {
+        MinoRotation((self.0 + 3) % 4)
     }
 
     const fn as_usize(self) -> usize {
@@ -71,13 +209,13 @@ impl MinoKind {
     ///
     /// # Arguments
     ///
-    /// * `rotate` - The rotation state.
+    /// * `rotation` - The rotation state.
     ///
     /// # Returns
     ///
     /// Reference to the tetromino shape.
-    pub(crate) const fn shape(&self, rotate: MinoRotate) -> &MinoShape {
-        &MINOS[*self as usize][rotate.as_usize()]
+    pub(crate) const fn shape(&self, rotation: MinoRotation) -> &MinoShape {
+        &MINOS[*self as usize][rotation.as_usize()]
     }
 
     /// Returns the 2-row shape for NEXT/HOLD display.

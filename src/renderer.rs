@@ -232,15 +232,15 @@ impl Renderer {
 
         // Prepare field with ghost piece and falling mino
         let field = game.field();
-        let (falling_mino_pos, falling_mino) = game.falling_mino();
+        let falling_mino = game.falling_mino();
         let mut field_buf = field.clone();
 
         // Show ghost piece only in normal mode
         if self.mode == PlayMode::Normal {
-            let drop_pos = game.simulate_drop_position();
-            field_buf.fill_mino_as(&drop_pos, falling_mino, BlockKind::Ghost);
+            let dropped = game.simulate_drop_position();
+            field_buf.fill_mino_as(&dropped, BlockKind::Ghost);
         }
-        field_buf.fill_mino(&falling_mino_pos, falling_mino);
+        field_buf.fill_mino(falling_mino);
 
         FIELD_PANEL.draw_border(&mut self.term)?;
         for (row_offset, field_row) in field_buf.block_rows().enumerate() {
