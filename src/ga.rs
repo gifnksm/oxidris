@@ -1,22 +1,21 @@
-use std::{ops::Index, thread};
+use std::{mem, ops::Index, thread};
 
-use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
+use rand::{
+    Rng,
+    distr::StandardUniform,
+    prelude::Distribution,
+    seq::{IndexedMutRandom, SliceRandom},
+};
 
 use crate::{ai, game::Game};
 
-const POPULATION: usize = 20;
-const GENERATION_MAX: usize = 20;
+const GAME_COUNT: usize = 5;
+const POPULATION: usize = 30;
+const GENERATION_MAX: usize = 30;
 const LINE_COUNT_MAX: usize = 256;
-const CROSSOVER_RATE: usize = 60;
-const MUTATION_RATE: usize = 10;
-const SELECTION_RATE: usize = 30;
-const CROSSOVER_LEN: usize = POPULATION * CROSSOVER_RATE / 100;
-const MUTATION_LEN: usize = POPULATION * MUTATION_RATE / 100;
-const SELECTION_LEN: usize = POPULATION * SELECTION_RATE / 100;
-#[allow(clippy::assertions_on_constants)]
-const _: () = assert!(CROSSOVER_RATE + MUTATION_RATE + SELECTION_RATE == 100);
-#[allow(clippy::assertions_on_constants)]
-const _: () = assert!(CROSSOVER_LEN + MUTATION_LEN + SELECTION_LEN == POPULATION);
+const MUTATION_RATE: u32 = 20;
+const SELECTION_RATE: u32 = 20;
+const SELECTION_LEN: usize = POPULATION * (SELECTION_RATE as usize) / 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GenomeKind {
@@ -65,14 +64,18 @@ pub(crate) fn learning() {
         thread::scope(|s| {
             for (i, ind) in inds.iter_mut().enumerate() {
                 s.spawn(move || {
-                    let mut game = Game::new(60);
-                    while game.cleared_lines() < LINE_COUNT_MAX {
-                        game = ai::eval(&game, ind.geno);
-                        if game.state().is_game_over() {
-                            break;
+                    ind.score = 0;
+                    for _ in 0..GAME_COUNT {
+                        let mut game = Game::new(60);
+                        while game.cleared_lines() < LINE_COUNT_MAX {
+                            game = ai::eval(&game, ind.geno);
+                            if game.state().is_game_over() {
+                                break;
+                            }
                         }
+                        ind.score += game.score();
                     }
-                    ind.score = game.score();
+                    ind.score /= GAME_COUNT;
                     println!("  {i:2}: {:?} => {}", ind.geno.0, ind.score);
                 });
             }
@@ -83,50 +86,45 @@ pub(crate) fn learning() {
         let min_score = inds.iter().map(|i| i.score).min().unwrap();
         println!("  Avg Score: {avg_score}, Max Score: {max_score}, Min Score: {min_score}");
 
-        let next_genos = gen_next_generation(&inds);
-        inds.iter_mut()
-            .map(|i| &mut i.geno)
-            .zip(next_genos)
-            .for_each(|(g, n)| *g = n);
+        gen_next_generation(&mut inds);
     }
 }
 
-fn gen_next_generation(inds: &[Individual]) -> [GenoSeq; POPULATION] {
-    let mut rng = rand::rng();
-    let mut genos = vec![];
-    genos.extend_from_slice(&crossover(inds));
-    genos.extend_from_slice(&mutation(inds));
-    genos.extend_from_slice(&selection(inds));
-    genos.shuffle(&mut rng);
-    genos.try_into().unwrap()
+fn gen_next_generation(inds: &mut [Individual; POPULATION]) {
+    inds.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+
+    let mut next_inds = vec![];
+
+    // drop the worst individuals
+    let selected_inds = &mut inds[..POPULATION - SELECTION_LEN];
+
+    // keep the best individuals
+    next_inds.extend_from_slice(&selected_inds[..SELECTION_LEN]);
+
+    // crossover and mutation for the reset individuals
+    crossover(selected_inds);
+    mutation(selected_inds);
+    next_inds.extend_from_slice(selected_inds);
+
+    inds.copy_from_slice(&next_inds);
 }
 
-fn crossover(inds: &[Individual]) -> [GenoSeq; CROSSOVER_LEN] {
-    let mut genos = inds.iter().map(|i| i.geno).collect::<Vec<_>>();
+fn crossover(inds: &mut [Individual]) {
     let mut rng = rand::rng();
-    for [g1, g2] in genos.as_chunks_mut::<2>().0 {
-        let p1 = rng.random_range(0..4);
-        let p2 = rng.random_range(p1..4);
-        g1.0[p1..=p2].swap_with_slice(&mut g2.0[p1..=p2]);
+    inds.shuffle(&mut rng);
+    for [i1, i2] in inds.as_chunks_mut().0 {
+        let mut idx = [0, 1, 2, 3];
+        idx.shuffle(&mut rng);
+        mem::swap(&mut i1.geno.0[idx[0]], &mut i2.geno.0[idx[0]]);
+        mem::swap(&mut i1.geno.0[idx[1]], &mut i2.geno.0[idx[1]]);
     }
-    genos.shuffle(&mut rng);
-    genos[..CROSSOVER_LEN].try_into().unwrap()
 }
 
-fn mutation(inds: &[Individual]) -> [GenoSeq; MUTATION_LEN] {
-    let mut genos = inds.iter().map(|i| i.geno).collect::<Vec<_>>();
+fn mutation(inds: &mut [Individual]) {
     let mut rng = rand::rng();
-    genos.shuffle(&mut rng);
-    for geno in genos.iter_mut().take(MUTATION_LEN) {
-        geno.0[rng.random_range(0..4)] = rand::random();
+    for ind in inds.iter_mut() {
+        if rand::random_ratio(MUTATION_RATE, 1000) {
+            *ind.geno.0.choose_mut(&mut rng).unwrap() = rand::random();
+        }
     }
-    genos[..MUTATION_LEN].try_into().unwrap()
-}
-
-fn selection(inds: &[Individual]) -> [GenoSeq; SELECTION_LEN] {
-    let mut new_inds = inds.to_vec();
-    new_inds.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-    new_inds.iter().map(|i| i.geno).collect::<Vec<_>>()[..SELECTION_LEN]
-        .try_into()
-        .unwrap()
 }
