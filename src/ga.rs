@@ -1,4 +1,4 @@
-use std::{mem, ops::Index, thread};
+use std::{iter, mem, ops::Index, thread};
 
 use rand::{
     Rng,
@@ -12,7 +12,7 @@ use crate::{ai, game::Game};
 const GAME_COUNT: usize = 5;
 const POPULATION: usize = 30;
 const GENERATION_MAX: usize = 30;
-const LINE_COUNT_MAX: usize = 256;
+const PIECE_COUNT: usize = 500;
 const MUTATION_RATE: u32 = 20;
 const SELECTION_RATE: u32 = 20;
 const SELECTION_LEN: usize = POPULATION * (SELECTION_RATE as usize) / 100;
@@ -61,13 +61,16 @@ pub(crate) fn learning() {
     let mut inds = rand::random::<[Individual; POPULATION]>();
     for r#gen in 0..GENERATION_MAX {
         println!("{gen}th Generation:");
+        let games = iter::repeat_with(|| Game::new(60))
+            .take(GAME_COUNT)
+            .collect::<Vec<_>>();
         thread::scope(|s| {
             for (i, ind) in inds.iter_mut().enumerate() {
+                let games = &games;
                 s.spawn(move || {
                     ind.score = 0;
-                    for _ in 0..GAME_COUNT {
-                        let mut game = Game::new(60);
-                        while game.cleared_lines() < LINE_COUNT_MAX {
+                    for mut game in games.iter().cloned() {
+                        for _ in 0..PIECE_COUNT {
                             game = ai::eval(&game, ind.geno);
                             if game.state().is_game_over() {
                                 break;
