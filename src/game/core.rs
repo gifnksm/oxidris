@@ -68,19 +68,16 @@ impl GameCore {
         self.held_mino
     }
 
+    pub(crate) fn is_hold_used(&self) -> bool {
+        self.hold_used
+    }
+
     pub(crate) fn next_minos(&self) -> impl Iterator<Item = MinoKind> + '_ {
         self.mino_generator.next_minos()
     }
 
     pub(crate) fn simulate_drop_position(&self) -> Mino {
-        let mut dropped = self.falling_mino;
-        while let Some(mino) = dropped.down() {
-            if self.field.is_colliding(&mino) {
-                break;
-            }
-            dropped = mino;
-        }
-        dropped
+        self.falling_mino.simulate_drop_position(&self.field)
     }
 
     pub(crate) fn try_hold(&mut self) -> Result<(), ()> {

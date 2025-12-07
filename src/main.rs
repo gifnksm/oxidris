@@ -35,7 +35,7 @@ fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.mode {
         Mode::Normal => play::normal()?,
-        Mode::Auto => play::auto(),
+        Mode::Auto => play::auto()?,
         Mode::Learning => ga::learning(),
     }
     Ok(())

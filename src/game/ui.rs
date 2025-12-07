@@ -39,6 +39,10 @@ impl GameUi {
         }
     }
 
+    pub(crate) fn core(&self) -> &GameCore {
+        &self.core
+    }
+
     pub(crate) fn level(&self) -> usize {
         self.core.level()
     }

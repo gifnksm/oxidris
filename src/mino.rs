@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use arrayvec::ArrayVec;
 use rand::{
     Rng, SeedableRng as _,
     distr::StandardUniform,
@@ -30,6 +31,10 @@ impl Mino {
 
     pub(crate) fn position(&self) -> MinoPosition {
         self.position
+    }
+
+    pub(crate) fn rotation(&self) -> MinoRotation {
+        self.rotation
     }
 
     pub(crate) fn kind(&self) -> MinoKind {
@@ -106,6 +111,31 @@ impl Mino {
             mino = super_rotation(field, &mino)?;
         }
         Some(mino)
+    }
+
+    pub(crate) fn super_rotations(self, field: &Field) -> ArrayVec<Self, 4> {
+        let mut rotations = ArrayVec::new();
+        rotations.push(self);
+        if self.kind == MinoKind::O {
+            return rotations;
+        }
+        let mut prev = self;
+        for _ in 0..3 {
+            let Some(mino) = prev.super_rotated_right(field) else {
+                break;
+            };
+            rotations.push(mino);
+            prev = mino;
+        }
+        rotations
+    }
+
+    pub(crate) fn simulate_drop_position(&self, field: &Field) -> Self {
+        let mut dropped = *self;
+        while let Some(mino) = dropped.down().filter(|m| !field.is_colliding(m)) {
+            dropped = mino;
+        }
+        dropped
     }
 }
 

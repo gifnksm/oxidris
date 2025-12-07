@@ -1,14 +1,12 @@
 use std::{
-    io, process,
-    sync::{Arc, Mutex},
-    thread,
+    io, thread,
     time::{Duration, Instant},
 };
 
 use crossterm::event::KeyCode;
 
 use crate::{
-    ai,
+    ai::{self, Move},
     ga::GenoSeq,
     game::{GameState, GameUi},
     input::Input,
@@ -130,35 +128,77 @@ pub(crate) fn normal() -> io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn auto() -> ! {
-    let game = GameUi::new(FPS);
+pub(crate) fn auto() -> io::Result<()> {
+    let mut game = GameUi::new(FPS);
     let mut renderer = Renderer::new(PlayMode::Auto).unwrap();
     renderer.draw(&game).unwrap();
-    let renderer = Arc::new(Mutex::new(renderer));
+    let mut input = Input::new()?;
+    let mut target_move = None;
 
-    let _ = thread::spawn({
-        let renderer = Arc::clone(&renderer);
-        move || {
-            let mut game = game;
-            renderer.lock().unwrap().draw(&game).unwrap();
-            loop {
-                game = ai::eval(&game, GenoSeq([100, 1, 10, 100]));
-                renderer.lock().unwrap().draw(&game).unwrap();
+    let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
+    loop {
+        let now = Instant::now();
+        let mut quit = false;
 
-                if game.state().is_game_over() {
-                    renderer.lock().unwrap().cleanup().unwrap();
-                    process::exit(0);
-                }
+        // Handle input
+        while let Some(key) = input.try_read()? {
+            if key == KeyCode::Char('q') {
+                quit = true;
             }
         }
-    });
 
-    let mut input = Input::new().unwrap();
-    loop {
-        if let Ok(KeyCode::Char('q')) = input.read() {
-            let _ = renderer.lock().unwrap().cleanup();
-            let _ = input.cleanup();
-            process::exit(0);
+        // Game progression
+        if !quit && game.state().is_playing() {
+            game.increment_frame();
+        }
+
+        renderer.draw(&game)?;
+
+        if game.state().is_game_over() || quit {
+            break;
+        }
+
+        if target_move.is_none()
+            && let Some((mv, _next_game)) = ai::eval(game.core(), GenoSeq([100, 1, 10, 100]))
+        {
+            target_move = Some(mv);
+        }
+
+        if let Some(tmv) = &target_move
+            && operate_game(&mut game, tmv)
+        {
+            target_move = None;
+        }
+
+        let elapsed = now.elapsed();
+        if elapsed < frame_duration {
+            thread::sleep(frame_duration - elapsed);
         }
     }
+    renderer.cleanup()?;
+    input.cleanup()?;
+    Ok(())
+}
+
+fn operate_game(game: &mut GameUi, target: &Move) -> bool {
+    assert!(target.is_hold_used || !game.core().is_hold_used());
+    if target.is_hold_used && !game.core().is_hold_used() {
+        return game.try_hold().is_err();
+    }
+
+    let falling_mino = game.core().falling_mino();
+    assert_eq!(target.mino.kind(), falling_mino.kind());
+    if falling_mino.rotation() != target.mino.rotation() {
+        return game.try_rotate_right().is_err();
+    }
+
+    if falling_mino.position().x() < target.mino.position().x() {
+        return game.try_move_right().is_err();
+    } else if falling_mino.position().x() > target.mino.position().x() {
+        return game.try_move_left().is_err();
+    }
+    assert_eq!(falling_mino.position().x(), target.mino.position().x());
+    game.hard_drop_and_complete();
+
+    true
 }

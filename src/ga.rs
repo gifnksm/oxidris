@@ -7,7 +7,7 @@ use rand::{
     seq::{IndexedMutRandom, SliceRandom},
 };
 
-use crate::{ai, game::GameUi};
+use crate::{ai, game::GameCore};
 
 const GAME_COUNT: usize = 5;
 const POPULATION: usize = 30;
@@ -61,7 +61,7 @@ pub(crate) fn learning() {
     let mut inds = rand::random::<[Individual; POPULATION]>();
     for r#gen in 0..GENERATION_MAX {
         println!("{gen}th Generation:");
-        let games = iter::repeat_with(|| GameUi::new(60))
+        let games = iter::repeat_with(GameCore::new)
             .take(GAME_COUNT)
             .collect::<Vec<_>>();
         thread::scope(|s| {
@@ -71,10 +71,10 @@ pub(crate) fn learning() {
                     ind.score = 0;
                     for mut game in games.iter().cloned() {
                         for _ in 0..PIECE_COUNT {
-                            game = ai::eval(&game, ind.geno);
-                            if game.state().is_game_over() {
+                            let Some((_, next_game)) = ai::eval(&game, ind.geno) else {
                                 break;
-                            }
+                            };
+                            game = next_game;
                         }
                         ind.score += game.score();
                     }

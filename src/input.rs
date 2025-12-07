@@ -22,15 +22,6 @@ impl Input {
     }
 
     #[expect(clippy::unused_self)]
-    pub(crate) fn read(&mut self) -> io::Result<KeyCode> {
-        loop {
-            if let Some(event) = event::read()?.as_key_event() {
-                return Ok(event.code);
-            }
-        }
-    }
-
-    #[expect(clippy::unused_self)]
     pub(crate) fn try_read(&mut self) -> io::Result<Option<KeyCode>> {
         while event::poll(Duration::from_millis(0))? {
             if let Some(event) = event::read()?.as_key_event() {

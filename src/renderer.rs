@@ -3,7 +3,7 @@ use std::io;
 use crate::{
     block::BlockKind,
     field::Field,
-    game::{GameUi, GameState},
+    game::{GameState, GameUi},
     mino::MinoKind,
     play::PlayMode,
     terminal::{Color, Terminal},
