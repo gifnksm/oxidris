@@ -72,7 +72,7 @@ impl Field {
     };
 
     pub(crate) fn block_row(&self, y: usize) -> &[BlockKind] {
-        &self.rows[y + 1][2..FIELD_WIDTH - 2]
+        &self.rows[y + 1][BLOCKS_MARGIN_LEFT..][..BLOCKS_WIDTH]
     }
 
     pub(crate) fn block_rows(&self) -> impl Iterator<Item = &[BlockKind]> {
@@ -124,20 +124,21 @@ impl Field {
     }
 
     pub(crate) fn clear_lines(&mut self) -> usize {
+        let block_rows = &mut self.rows[BLOCKS_MARGIN_TOP..][..BLOCKS_HEIGHT];
         let mut count = 0;
-        for y in 1..FIELD_HEIGHT - BLOCKS_MARGIN_BOTTOM {
-            let check_row = self.rows[y];
-            let can_erase = check_row[BLOCKS_MARGIN_LEFT..][..BLOCKS_WIDTH]
+        for y in (0..BLOCKS_HEIGHT).rev() {
+            let can_erase = block_rows[y][BLOCKS_MARGIN_LEFT..][..BLOCKS_WIDTH]
                 .iter()
                 .all(|&v| !v.is_empty());
             if can_erase {
                 count += 1;
-                for y2 in (2..=y).rev() {
-                    self.rows[y2] = self.rows[y2 - 1];
-                }
-                self.rows[1] = TOP_ROW;
+                continue;
+            }
+            if count > 0 {
+                block_rows[y + count] = block_rows[y];
             }
         }
+        block_rows[..count].fill(TOP_ROW);
         count
     }
 }
