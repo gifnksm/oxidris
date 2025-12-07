@@ -1,13 +1,13 @@
 use crate::core::{
-    board::Board,
     piece::{Piece, PieceGenerator, PieceKind},
+    render_board::RenderBoard,
 };
 
 const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
 
 #[derive(Debug, Clone)]
 pub(crate) struct GameState {
-    board: Board,
+    board: RenderBoard,
     falling_piece: Piece,
     held_piece: Option<PieceKind>,
     hold_used: bool,
@@ -20,7 +20,7 @@ impl GameState {
     pub(crate) fn new() -> Self {
         let first_piece = PieceKind::I; // dummy initial value
         let mut game = Self {
-            board: Board::INITIAL,
+            board: RenderBoard::INITIAL,
             falling_piece: Piece::new(first_piece),
             held_piece: None,
             hold_used: false,
@@ -44,7 +44,7 @@ impl GameState {
         self.score
     }
 
-    pub(crate) fn board(&self) -> &Board {
+    pub(crate) fn board(&self) -> &RenderBoard {
         &self.board
     }
 

@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use crate::core::{
-    board::Board,
     piece::{Piece, PieceKind},
+    render_board::RenderBoard,
 };
 
 use super::state::GameState;
@@ -74,7 +74,7 @@ impl GameSession {
         };
     }
 
-    pub(crate) fn board(&self) -> &Board {
+    pub(crate) fn board(&self) -> &RenderBoard {
         self.game_state.board()
     }
 

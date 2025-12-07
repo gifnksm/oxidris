@@ -8,9 +8,9 @@ use rand::{
     seq::SliceRandom,
 };
 
-use super::{
-    block::BlockKind,
-    board::{Board, INIT_PIECE_X, INIT_PIECE_Y, MAX_X, MAX_Y, MIN_X, MIN_Y},
+use super::render_board::{
+    PIECE_SPAWN_X, PIECE_SPAWN_Y, RenderBoard, RenderCell, TOTAL_MAX_X, TOTAL_MAX_Y, TOTAL_MIN_X,
+    TOTAL_MIN_Y,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub(crate) struct Piece {
 impl Piece {
     pub(crate) fn new(kind: PieceKind) -> Self {
         Self {
-            position: PiecePosition::INITIAL,
+            position: PiecePosition::SPAWN_POSITION,
             rotation: PieceRotation::default(),
             kind,
         }
@@ -41,8 +41,10 @@ impl Piece {
         self.kind
     }
 
-    pub(crate) fn shape(&self) -> &PieceShape {
-        self.kind.shape(self.rotation)
+    pub(crate) fn occupied_positions(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.kind
+            .occupied_positions(self.rotation)
+            .map(move |(dx, dy)| (self.position.x() + dx, self.position.y() + dy))
     }
 
     pub(crate) fn left(&self) -> Option<Self> {
@@ -97,7 +99,7 @@ impl Piece {
         }
     }
 
-    pub(crate) fn super_rotated_left(self, board: &Board) -> Option<Self> {
+    pub(crate) fn super_rotated_left(self, board: &RenderBoard) -> Option<Self> {
         let mut piece = self.rotated_left();
         if board.is_colliding(&piece) {
             piece = super_rotation(board, &piece)?;
@@ -105,7 +107,7 @@ impl Piece {
         Some(piece)
     }
 
-    pub(crate) fn super_rotated_right(self, board: &Board) -> Option<Self> {
+    pub(crate) fn super_rotated_right(self, board: &RenderBoard) -> Option<Self> {
         let mut piece = self.rotated_right();
         if board.is_colliding(&piece) {
             piece = super_rotation(board, &piece)?;
@@ -113,7 +115,7 @@ impl Piece {
         Some(piece)
     }
 
-    pub(crate) fn super_rotations(self, board: &Board) -> ArrayVec<Self, 4> {
+    pub(crate) fn super_rotations(self, board: &RenderBoard) -> ArrayVec<Self, 4> {
         let mut rotations = ArrayVec::new();
         rotations.push(self);
         if self.kind == PieceKind::O {
@@ -130,7 +132,7 @@ impl Piece {
         rotations
     }
 
-    pub(crate) fn simulate_drop_position(&self, board: &Board) -> Self {
+    pub(crate) fn simulate_drop_position(&self, board: &RenderBoard) -> Self {
         let mut dropped = *self;
         while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(m)) {
             dropped = piece;
@@ -139,7 +141,7 @@ impl Piece {
     }
 }
 
-fn super_rotation(board: &Board, piece: &Piece) -> Option<Piece> {
+fn super_rotation(board: &RenderBoard, piece: &Piece) -> Option<Piece> {
     let pieces = [piece.up(), piece.right(), piece.down(), piece.left()];
     for piece in pieces.iter().flatten() {
         if !board.is_colliding(piece) {
@@ -156,7 +158,7 @@ pub(crate) struct PiecePosition {
 }
 
 impl PiecePosition {
-    pub(crate) const INITIAL: Self = Self::new(INIT_PIECE_X, INIT_PIECE_Y);
+    pub(crate) const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
 
     pub(crate) const fn new(x: usize, y: usize) -> Self {
         Self { x, y }
@@ -171,7 +173,7 @@ impl PiecePosition {
     }
 
     pub(crate) const fn left(&self) -> Option<Self> {
-        if self.x == MIN_X {
+        if self.x == TOTAL_MIN_X {
             None
         } else {
             Some(Self::new(self.x - 1, self.y))
@@ -179,7 +181,7 @@ impl PiecePosition {
     }
 
     pub(crate) const fn right(&self) -> Option<Self> {
-        if self.x >= MAX_X {
+        if self.x >= TOTAL_MAX_X {
             None
         } else {
             Some(Self::new(self.x + 1, self.y))
@@ -187,7 +189,7 @@ impl PiecePosition {
     }
 
     pub(crate) const fn up(&self) -> Option<Self> {
-        if self.y == MIN_Y {
+        if self.y == TOTAL_MIN_Y {
             None
         } else {
             Some(Self::new(self.x, self.y - 1))
@@ -195,7 +197,7 @@ impl PiecePosition {
     }
 
     pub(crate) const fn down(&self) -> Option<Self> {
-        if self.y >= MAX_Y {
+        if self.y >= TOTAL_MAX_Y {
             None
         } else {
             Some(Self::new(self.x, self.y + 1))
@@ -261,37 +263,34 @@ impl PieceKind {
     /// Number of piece types (7).
     pub(crate) const LEN: usize = 7;
 
-    /// Returns the piece shape for the given rotation.
-    ///
-    /// # Arguments
-    ///
-    /// * `rotation` - The rotation state.
-    ///
-    /// # Returns
-    ///
-    /// Reference to the piece shape.
-    pub(crate) const fn shape(&self, rotation: PieceRotation) -> &PieceShape {
-        &PIECES[*self as usize][rotation.as_usize()]
-    }
-
-    /// Returns the 2-row shape for NEXT/HOLD display.
-    ///
-    /// # Returns
-    ///
-    /// Reference to a 2-row shape for preview display.
-    pub(crate) fn display_shape(&self) -> &[[BlockKind; 4]] {
-        &PIECES[*self as usize][0][..2]
+    /// Returns an iterator of occupied positions for the piece in the given rotation.
+    pub(crate) fn occupied_positions(
+        &self,
+        rotation: PieceRotation,
+    ) -> impl Iterator<Item = (usize, usize)> + '_ {
+        PIECES[*self as usize][rotation.as_usize()]
+            .iter()
+            .enumerate()
+            .flat_map(move |(dy, row)| {
+                row.iter().enumerate().filter_map(move |(dx, &cell)| {
+                    if cell.is_empty() {
+                        None
+                    } else {
+                        Some((dx, dy))
+                    }
+                })
+            })
     }
 }
 
-/// Piece shape (4x4 block array).
-pub(crate) type PieceShape = [[BlockKind; 4]; 4];
+/// Piece shape (4x4 cell array).
+pub(crate) type PieceShape = [[RenderCell; 4]; 4];
 
 const fn gen_rotates(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
     let mut rotates = [*shape; 4];
     let mut i = 1;
     while i < 4 {
-        let mut new_shape = [[BlockKind::Empty; 4]; 4];
+        let mut new_shape = [[RenderCell::Empty; 4]; 4];
         let mut y = 0;
         while y < size {
             let mut x = 0;
@@ -308,15 +307,15 @@ const fn gen_rotates(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
 }
 
 const PIECES: [[PieceShape; 4]; PieceKind::LEN] = {
-    use BlockKind::Empty as E;
-    const I: BlockKind = BlockKind::Piece(PieceKind::I);
-    const O: BlockKind = BlockKind::Piece(PieceKind::O);
-    const S: BlockKind = BlockKind::Piece(PieceKind::S);
-    const Z: BlockKind = BlockKind::Piece(PieceKind::Z);
-    const J: BlockKind = BlockKind::Piece(PieceKind::J);
-    const L: BlockKind = BlockKind::Piece(PieceKind::L);
-    const T: BlockKind = BlockKind::Piece(PieceKind::T);
-    const EEEE: [BlockKind; 4] = [E; 4];
+    use RenderCell::Empty as E;
+    const I: RenderCell = RenderCell::Piece(PieceKind::I);
+    const O: RenderCell = RenderCell::Piece(PieceKind::O);
+    const S: RenderCell = RenderCell::Piece(PieceKind::S);
+    const Z: RenderCell = RenderCell::Piece(PieceKind::Z);
+    const J: RenderCell = RenderCell::Piece(PieceKind::J);
+    const L: RenderCell = RenderCell::Piece(PieceKind::L);
+    const T: RenderCell = RenderCell::Piece(PieceKind::T);
+    const EEEE: [RenderCell; 4] = [E; 4];
     [
         // I-piece
         gen_rotates(4, &[EEEE, [I, I, I, I], EEEE, EEEE]),

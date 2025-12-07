@@ -4,7 +4,7 @@ use arrayvec::ArrayVec;
 
 use crate::{
     ai::genetic::{GenoSeq, GenomeKind},
-    core::{board::Board, piece::Piece},
+    core::{piece::Piece, render_board::RenderBoard},
     engine::state::GameState,
 };
 
@@ -78,15 +78,15 @@ fn available_piece_moves(game: &GameState) -> impl Iterator<Item = Move> + use<>
                 is_hold_used,
                 piece,
             })
-            .collect::<ArrayVec<_, { Board::BLOCKS_WIDTH }>>()
+            .collect::<ArrayVec<_, { RenderBoard::PLAYABLE_WIDTH }>>()
     })
 }
 
-fn move_left(piece: &Piece, board: &Board) -> Option<Piece> {
+fn move_left(piece: &Piece, board: &RenderBoard) -> Option<Piece> {
     piece.left().filter(|moved| !board.is_colliding(moved))
 }
 
-fn move_right(piece: &Piece, board: &Board) -> Option<Piece> {
+fn move_right(piece: &Piece, board: &RenderBoard) -> Option<Piece> {
     piece.right().filter(|moved| !board.is_colliding(moved))
 }
 
@@ -122,27 +122,27 @@ fn normalize(value: f64, min: f64, max: f64) -> f64 {
     (value - min) / (max - min)
 }
 
-fn column_height(board: &Board, x: usize) -> u16 {
+fn column_height(board: &RenderBoard, x: usize) -> u16 {
     let height = board
-        .block_rows()
+        .playable_rows()
         .enumerate()
         .find(|(_y, row)| !row[x].is_empty())
-        .map_or(0, |(y, _row)| Board::BLOCKS_HEIGHT - y);
+        .map_or(0, |(y, _row)| RenderBoard::PLAYABLE_HEIGHT - y);
 
     u16::try_from(height).unwrap()
 }
 
-fn compute_height_max(board: &Board) -> u16 {
-    let max = (0..Board::BLOCKS_HEIGHT)
-        .find(|&y| board.block_row(y).iter().any(|block| !block.is_empty()))
-        .map_or(0, |y| Board::BLOCKS_HEIGHT - y);
+fn compute_height_max(board: &RenderBoard) -> u16 {
+    let max = (0..RenderBoard::PLAYABLE_HEIGHT)
+        .find(|&y| board.playable_row(y).iter().any(|cell| !cell.is_empty()))
+        .map_or(0, |y| RenderBoard::PLAYABLE_HEIGHT - y);
 
     u16::try_from(max).unwrap()
 }
 
-fn compute_height_diff(board: &Board) -> u16 {
+fn compute_height_diff(board: &RenderBoard) -> u16 {
     let mut diff = 0;
-    let mut top = [0; Board::BLOCKS_WIDTH];
+    let mut top = [0; RenderBoard::PLAYABLE_WIDTH];
 
     for (x, top) in top.iter_mut().enumerate() {
         *top = column_height(board, x);
@@ -154,14 +154,14 @@ fn compute_height_diff(board: &Board) -> u16 {
     diff
 }
 
-fn compute_dead_space(board: &Board) -> u16 {
-    let count = (0..Board::BLOCKS_WIDTH)
+fn compute_dead_space(board: &RenderBoard) -> u16 {
+    let count = (0..RenderBoard::PLAYABLE_WIDTH)
         .map(|x| {
             board
-                .block_rows()
+                .playable_rows()
                 .map(|row| row[x])
-                .skip_while(|block| block.is_empty())
-                .filter(|block| block.is_empty())
+                .skip_while(|cell| cell.is_empty())
+                .filter(|cell| cell.is_empty())
                 .count()
         })
         .sum::<usize>();
