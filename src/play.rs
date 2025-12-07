@@ -10,7 +10,7 @@ use crossterm::event::KeyCode;
 use crate::{
     ai,
     ga::GenoSeq,
-    game::{Game, GameState},
+    game::{GameState, GameUi},
     input::Input,
     renderer::Renderer,
 };
@@ -72,7 +72,7 @@ impl NormalModeAction {
 const FPS: u64 = 60;
 
 pub(crate) fn normal() -> io::Result<()> {
-    let mut game = Game::new(FPS);
+    let mut game = GameUi::new(FPS);
     let mut renderer = Renderer::new(PlayMode::Normal)?;
     renderer.draw(&game)?;
     let mut input = Input::new()?;
@@ -92,7 +92,7 @@ pub(crate) fn normal() -> io::Result<()> {
                         NormalModeAction::RotateLeft => _ = game.try_rotate_left(),
                         NormalModeAction::RotateRight => _ = game.try_rotate_right(),
                         NormalModeAction::SoftDrop => _ = game.try_soft_drop(),
-                        NormalModeAction::HardDrop => _ = game.hard_drop_and_complete(),
+                        NormalModeAction::HardDrop => game.hard_drop_and_complete(),
                         NormalModeAction::Hold => _ = game.try_hold(),
                         NormalModeAction::Pause => game.toggle_pause(),
                         NormalModeAction::Quit => quit = true,
@@ -109,7 +109,7 @@ pub(crate) fn normal() -> io::Result<()> {
 
         // Game progression
         if !quit && game.state().is_playing() {
-            let _ = game.increment_frame();
+            game.increment_frame();
         }
 
         renderer.draw(&game)?;
@@ -131,7 +131,7 @@ pub(crate) fn normal() -> io::Result<()> {
 }
 
 pub(crate) fn auto() -> ! {
-    let game = Game::new(FPS);
+    let game = GameUi::new(FPS);
     let mut renderer = Renderer::new(PlayMode::Auto).unwrap();
     renderer.draw(&game).unwrap();
     let renderer = Arc::new(Mutex::new(renderer));

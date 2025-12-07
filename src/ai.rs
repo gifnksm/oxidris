@@ -3,10 +3,10 @@ use std::iter;
 use crate::{
     field::Field,
     ga::{GenoSeq, GenomeKind},
-    game::Game,
+    game::GameUi,
 };
 
-pub(crate) fn eval(game: &Game, weight: GenoSeq) -> Game {
+pub(crate) fn eval(game: &GameUi, weight: GenoSeq) -> GameUi {
     let mut best_score = f64::MIN;
     let mut best_game = game.clone();
     let init_lines_cleared = game.cleared_lines();
@@ -35,7 +35,7 @@ pub(crate) fn eval(game: &Game, weight: GenoSeq) -> Game {
     best_game
 }
 
-fn next_candidates(game: &Game) -> impl Iterator<Item = Game> + use<> {
+fn next_candidates(game: &GameUi) -> impl Iterator<Item = GameUi> + use<> {
     (iter::once(game.clone()).chain(hold(game))).flat_map(|game| {
         {
             iter::once(game.clone())
@@ -49,7 +49,7 @@ fn next_candidates(game: &Game) -> impl Iterator<Item = Game> + use<> {
     })
 }
 
-fn compute_score(game: &Game, weight: GenoSeq, init_lines_cleared: usize) -> f64 {
+fn compute_score(game: &GameUi, weight: GenoSeq, init_lines_cleared: usize) -> f64 {
     if game.state().is_game_over() {
         return 0.0;
     }
@@ -72,25 +72,25 @@ fn compute_score(game: &Game, weight: GenoSeq, init_lines_cleared: usize) -> f64
     lines_cleared + height_max + height_diff + dead_space
 }
 
-fn hold(game: &Game) -> Option<Game> {
+fn hold(game: &GameUi) -> Option<GameUi> {
     let mut game = game.clone();
     game.try_hold().ok()?;
     Some(game)
 }
 
-fn rotate_right(game: &Game) -> Option<Game> {
+fn rotate_right(game: &GameUi) -> Option<GameUi> {
     let mut game = game.clone();
     game.try_rotate_right().ok()?;
     Some(game)
 }
 
-fn move_left(game: &Game) -> Option<Game> {
+fn move_left(game: &GameUi) -> Option<GameUi> {
     let mut game = game.clone();
     game.try_move_left().ok()?;
     Some(game)
 }
 
-fn move_right(game: &Game) -> Option<Game> {
+fn move_right(game: &GameUi) -> Option<GameUi> {
     let mut game = game.clone();
     game.try_move_right().ok()?;
     Some(game)
@@ -100,7 +100,7 @@ fn normalize(value: f64, min: f64, max: f64) -> f64 {
     (value - min) / (max - min)
 }
 
-fn field_height(game: &Game, x: usize) -> u16 {
+fn field_height(game: &GameUi, x: usize) -> u16 {
     let height = game
         .field()
         .block_rows()
@@ -111,7 +111,7 @@ fn field_height(game: &Game, x: usize) -> u16 {
     u16::try_from(height).unwrap()
 }
 
-fn field_height_max(game: &Game) -> u16 {
+fn field_height_max(game: &GameUi) -> u16 {
     let max = (0..Field::BLOCKS_HEIGHT)
         .find(|&y| {
             game.field()
@@ -124,7 +124,7 @@ fn field_height_max(game: &Game) -> u16 {
     u16::try_from(max).unwrap()
 }
 
-fn diff_in_height(game: &Game) -> u16 {
+fn diff_in_height(game: &GameUi) -> u16 {
     let mut diff = 0;
     let mut top = [0; Field::BLOCKS_WIDTH];
 
@@ -138,7 +138,7 @@ fn diff_in_height(game: &Game) -> u16 {
     diff
 }
 
-fn dead_space_count(game: &Game) -> u16 {
+fn dead_space_count(game: &GameUi) -> u16 {
     let count = (0..Field::BLOCKS_WIDTH)
         .map(|x| {
             game.field()

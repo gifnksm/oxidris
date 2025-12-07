@@ -9,7 +9,7 @@ use rand::{
 
 use crate::{
     block::BlockKind,
-    field::{INIT_MINO_X, INIT_MINO_Y, MAX_X, MAX_Y, MIN_X, MIN_Y},
+    field::{Field, INIT_MINO_X, INIT_MINO_Y, MAX_X, MAX_Y, MIN_X, MIN_Y},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +91,32 @@ impl Mino {
             kind: self.kind,
         }
     }
+
+    pub(crate) fn super_rotated_left(self, field: &Field) -> Option<Self> {
+        let mut mino = self.rotated_left();
+        if field.is_colliding(&mino) {
+            mino = super_rotation(field, &mino)?;
+        }
+        Some(mino)
+    }
+
+    pub(crate) fn super_rotated_right(self, field: &Field) -> Option<Self> {
+        let mut mino = self.rotated_right();
+        if field.is_colliding(&mino) {
+            mino = super_rotation(field, &mino)?;
+        }
+        Some(mino)
+    }
+}
+
+fn super_rotation(field: &Field, mino: &Mino) -> Option<Mino> {
+    let minos = [mino.up(), mino.right(), mino.down(), mino.left()];
+    for mino in minos.iter().flatten() {
+        if !field.is_colliding(mino) {
+            return Some(*mino);
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

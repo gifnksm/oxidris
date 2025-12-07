@@ -3,7 +3,7 @@ use std::io;
 use crate::{
     block::BlockKind,
     field::Field,
-    game::{Game, GameState},
+    game::{GameUi, GameState},
     mino::MinoKind,
     play::PlayMode,
     terminal::{Color, Terminal},
@@ -217,7 +217,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub(crate) fn draw(&mut self, game: &Game) -> io::Result<()> {
+    pub(crate) fn draw(&mut self, game: &GameUi) -> io::Result<()> {
         self.draw_field_panel(game)?;
         self.draw_hold_panel(game)?;
         self.draw_next_panel(game)?;
@@ -227,7 +227,7 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_field_panel(&mut self, game: &Game) -> io::Result<()> {
+    fn draw_field_panel(&mut self, game: &GameUi) -> io::Result<()> {
         self.term.reset_styles()?;
 
         // Prepare field with ghost piece and falling mino
@@ -265,7 +265,7 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_hold_panel(&mut self, game: &Game) -> io::Result<()> {
+    fn draw_hold_panel(&mut self, game: &GameUi) -> io::Result<()> {
         HOLD_PANEL.draw_border(&mut self.term)?;
         if let Some(mino) = game.held_mino() {
             let mino_left =
@@ -275,7 +275,7 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_next_panel(&mut self, game: &Game) -> io::Result<()> {
+    fn draw_next_panel(&mut self, game: &GameUi) -> io::Result<()> {
         NEXT_PANEL.draw_border(&mut self.term)?;
         for (mino_idx, mino) in game.next_minos().take(7).enumerate() {
             let mino_top = NEXT_PANEL.body_top() + mino_idx * 3;
@@ -286,7 +286,7 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_stats_panel(&mut self, game: &Game) -> io::Result<()> {
+    fn draw_stats_panel(&mut self, game: &GameUi) -> io::Result<()> {
         STATS_PANEL.draw_border(&mut self.term)?;
         self.term
             .move_to(STATS_PANEL.body_top(), STATS_PANEL.body_left())?
