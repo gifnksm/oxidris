@@ -17,6 +17,7 @@ pub(crate) enum SessionState {
 #[derive(Debug, Clone)]
 pub(crate) struct GameSession {
     game_state: GameState,
+    render_board: RenderBoard,
     session_state: SessionState,
     fps: u64,
     total_frames: u64,
@@ -32,6 +33,7 @@ impl GameSession {
     pub(crate) fn new(fps: u64) -> Self {
         Self {
             game_state: GameState::new(),
+            render_board: RenderBoard::INITIAL,
             session_state: SessionState::Playing,
             fps,
             total_frames: 0,
@@ -74,8 +76,8 @@ impl GameSession {
         };
     }
 
-    pub(crate) fn board(&self) -> &RenderBoard {
-        self.game_state.board()
+    pub(crate) fn render_board(&self) -> &RenderBoard {
+        &self.render_board
     }
 
     pub(crate) fn falling_piece(&self) -> &Piece {
@@ -155,8 +157,12 @@ impl GameSession {
     }
 
     fn complete_piece_drop(&mut self) {
-        if self.game_state.complete_piece_drop().is_err() {
+        self.render_board
+            .fill_piece(self.game_state.falling_piece());
+        let Ok(cleared_lines) = self.game_state.complete_piece_drop() else {
             self.session_state = SessionState::GameOver;
-        }
+            return;
+        };
+        assert_eq!(self.render_board.clear_lines(), cleared_lines);
     }
 }

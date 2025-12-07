@@ -8,9 +8,9 @@ use rand::{
     seq::SliceRandom,
 };
 
-use super::render_board::{
-    PIECE_SPAWN_X, PIECE_SPAWN_Y, RenderBoard, RenderCell, TOTAL_MAX_X, TOTAL_MAX_Y, TOTAL_MIN_X,
-    TOTAL_MIN_Y,
+use super::{
+    bit_board::{BitBoard, PIECE_SPAWN_X, PIECE_SPAWN_Y},
+    render_board::RenderCell,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +39,10 @@ impl Piece {
 
     pub(crate) fn kind(&self) -> PieceKind {
         self.kind
+    }
+
+    pub(crate) fn mask(&self) -> PieceMask {
+        self.kind.mask(self.rotation)
     }
 
     pub(crate) fn occupied_positions(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
@@ -99,7 +103,7 @@ impl Piece {
         }
     }
 
-    pub(crate) fn super_rotated_left(self, board: &RenderBoard) -> Option<Self> {
+    pub(crate) fn super_rotated_left(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_left();
         if board.is_colliding(&piece) {
             piece = super_rotation(board, &piece)?;
@@ -107,7 +111,7 @@ impl Piece {
         Some(piece)
     }
 
-    pub(crate) fn super_rotated_right(self, board: &RenderBoard) -> Option<Self> {
+    pub(crate) fn super_rotated_right(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_right();
         if board.is_colliding(&piece) {
             piece = super_rotation(board, &piece)?;
@@ -115,7 +119,7 @@ impl Piece {
         Some(piece)
     }
 
-    pub(crate) fn super_rotations(self, board: &RenderBoard) -> ArrayVec<Self, 4> {
+    pub(crate) fn super_rotations(self, board: &BitBoard) -> ArrayVec<Self, 4> {
         let mut rotations = ArrayVec::new();
         rotations.push(self);
         if self.kind == PieceKind::O {
@@ -132,7 +136,7 @@ impl Piece {
         rotations
     }
 
-    pub(crate) fn simulate_drop_position(&self, board: &RenderBoard) -> Self {
+    pub(crate) fn simulate_drop_position(&self, board: &BitBoard) -> Self {
         let mut dropped = *self;
         while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(m)) {
             dropped = piece;
@@ -141,7 +145,7 @@ impl Piece {
     }
 }
 
-fn super_rotation(board: &RenderBoard, piece: &Piece) -> Option<Piece> {
+fn super_rotation(board: &BitBoard, piece: &Piece) -> Option<Piece> {
     let pieces = [piece.up(), piece.right(), piece.down(), piece.left()];
     for piece in pieces.iter().flatten() {
         if !board.is_colliding(piece) {
@@ -158,9 +162,9 @@ pub(crate) struct PiecePosition {
 }
 
 impl PiecePosition {
-    pub(crate) const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
+    const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
 
-    pub(crate) const fn new(x: usize, y: usize) -> Self {
+    const fn new(x: usize, y: usize) -> Self {
         Self { x, y }
     }
 
@@ -172,32 +176,32 @@ impl PiecePosition {
         self.y
     }
 
-    pub(crate) const fn left(&self) -> Option<Self> {
-        if self.x == TOTAL_MIN_X {
+    const fn left(&self) -> Option<Self> {
+        if self.x == 0 {
             None
         } else {
             Some(Self::new(self.x - 1, self.y))
         }
     }
 
-    pub(crate) const fn right(&self) -> Option<Self> {
-        if self.x >= TOTAL_MAX_X {
+    const fn right(&self) -> Option<Self> {
+        if self.x >= BitBoard::TOTAL_WIDTH - 1 {
             None
         } else {
             Some(Self::new(self.x + 1, self.y))
         }
     }
 
-    pub(crate) const fn up(&self) -> Option<Self> {
-        if self.y == TOTAL_MIN_Y {
+    const fn up(&self) -> Option<Self> {
+        if self.y == 0 {
             None
         } else {
             Some(Self::new(self.x, self.y - 1))
         }
     }
 
-    pub(crate) const fn down(&self) -> Option<Self> {
-        if self.y >= TOTAL_MAX_Y {
+    const fn down(&self) -> Option<Self> {
+        if self.y >= BitBoard::TOTAL_HEIGHT - 1 {
             None
         } else {
             Some(Self::new(self.x, self.y + 1))
@@ -261,14 +265,18 @@ impl Distribution<PieceKind> for StandardUniform {
 
 impl PieceKind {
     /// Number of piece types (7).
-    pub(crate) const LEN: usize = 7;
+    const LEN: usize = 7;
+
+    pub(crate) fn mask(self, rotation: PieceRotation) -> PieceMask {
+        PIECE_MASKS[self as usize][rotation.as_usize()]
+    }
 
     /// Returns an iterator of occupied positions for the piece in the given rotation.
     pub(crate) fn occupied_positions(
         &self,
         rotation: PieceRotation,
     ) -> impl Iterator<Item = (usize, usize)> + '_ {
-        PIECES[*self as usize][rotation.as_usize()]
+        PIECE_SHAPES[*self as usize][rotation.as_usize()]
             .iter()
             .enumerate()
             .flat_map(move |(dy, row)| {
@@ -283,10 +291,69 @@ impl PieceKind {
     }
 }
 
-/// Piece shape (4x4 cell array).
-pub(crate) type PieceShape = [[RenderCell; 4]; 4];
+pub(crate) type PieceMask = [u16; 4];
 
-const fn gen_rotates(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
+const fn mask_rotations(size: usize, mask: PieceMask) -> [PieceMask; 4] {
+    let mut rotates = [mask; 4];
+    let mut i = 1;
+    while i < 4 {
+        let mut new_mask = [0; 4];
+        let mut y = 0;
+        while y < size {
+            let mut x = 0;
+            while x < size {
+                if (rotates[i - 1][size - 1 - x] & (1 << y)) != 0 {
+                    new_mask[y] |= 1 << x;
+                }
+                x += 1;
+            }
+            y += 1;
+        }
+        rotates[i] = new_mask;
+        i += 1;
+    }
+    rotates
+}
+
+const PIECE_MASKS: [[PieceMask; 4]; PieceKind::LEN] = {
+    const fn m(bits: [bool; 4]) -> u16 {
+        let mut mask = 0;
+        let mut i = 0;
+        while i < 4 {
+            if bits[i] {
+                mask |= 1 << i;
+            }
+            i += 1;
+        }
+        mask
+    }
+
+    const C: bool = true;
+    const E: bool = false;
+    const EEEE: u16 = m([E; 4]);
+
+    [
+        // I-piece
+        mask_rotations(4, [EEEE, m([C, C, C, C]), EEEE, EEEE]),
+        // O-piece
+        mask_rotations(2, [m([C, C, E, E]), m([C, C, E, E]), EEEE, EEEE]),
+        // S-piece
+        mask_rotations(3, [m([E, C, C, E]), m([C, C, E, E]), EEEE, EEEE]),
+        // Z-piece
+        mask_rotations(3, [m([C, C, E, E]), m([E, C, C, E]), EEEE, EEEE]),
+        // J-piece
+        mask_rotations(3, [m([C, E, E, E]), m([C, C, C, E]), EEEE, EEEE]),
+        // L-piece
+        mask_rotations(3, [m([E, E, C, E]), m([C, C, C, E]), EEEE, EEEE]),
+        // T-piece
+        mask_rotations(3, [m([E, C, E, E]), m([C, C, C, E]), EEEE, EEEE]),
+    ]
+};
+
+/// Piece shape (4x4 cell array).
+type PieceShape = [[RenderCell; 4]; 4];
+
+const fn shape_rotations(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
     let mut rotates = [*shape; 4];
     let mut i = 1;
     while i < 4 {
@@ -306,7 +373,7 @@ const fn gen_rotates(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
     rotates
 }
 
-const PIECES: [[PieceShape; 4]; PieceKind::LEN] = {
+const PIECE_SHAPES: [[PieceShape; 4]; PieceKind::LEN] = {
     use RenderCell::Empty as E;
     const I: RenderCell = RenderCell::Piece(PieceKind::I);
     const O: RenderCell = RenderCell::Piece(PieceKind::O);
@@ -318,19 +385,19 @@ const PIECES: [[PieceShape; 4]; PieceKind::LEN] = {
     const EEEE: [RenderCell; 4] = [E; 4];
     [
         // I-piece
-        gen_rotates(4, &[EEEE, [I, I, I, I], EEEE, EEEE]),
+        shape_rotations(4, &[EEEE, [I, I, I, I], EEEE, EEEE]),
         // O-piece
-        gen_rotates(2, &[[O, O, E, E], [O, O, E, E], EEEE, EEEE]),
+        shape_rotations(2, &[[O, O, E, E], [O, O, E, E], EEEE, EEEE]),
         // S-piece
-        gen_rotates(3, &[[E, S, S, E], [S, S, E, E], EEEE, EEEE]),
+        shape_rotations(3, &[[E, S, S, E], [S, S, E, E], EEEE, EEEE]),
         // Z-piece
-        gen_rotates(3, &[[Z, Z, E, E], [E, Z, Z, E], EEEE, EEEE]),
+        shape_rotations(3, &[[Z, Z, E, E], [E, Z, Z, E], EEEE, EEEE]),
         // J-piece
-        gen_rotates(3, &[[J, E, E, E], [J, J, J, E], EEEE, EEEE]),
+        shape_rotations(3, &[[J, E, E, E], [J, J, J, E], EEEE, EEEE]),
         // L-piece
-        gen_rotates(3, &[[E, E, L, E], [L, L, L, E], EEEE, EEEE]),
+        shape_rotations(3, &[[E, E, L, E], [L, L, L, E], EEEE, EEEE]),
         // T-piece
-        gen_rotates(3, &[[E, T, E, E], [T, T, T, E], EEEE, EEEE]),
+        shape_rotations(3, &[[E, T, E, E], [T, T, T, E], EEEE, EEEE]),
     ]
 };
 

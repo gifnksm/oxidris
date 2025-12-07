@@ -4,7 +4,11 @@ use arrayvec::ArrayVec;
 
 use crate::{
     ai::genetic::{GenoSeq, GenomeKind},
-    core::{piece::Piece, render_board::RenderBoard},
+    core::{
+        bit_board::{BitBoard, SENTINEL_MARGIN_LEFT},
+        piece::Piece,
+        render_board::RenderBoard,
+    },
     engine::state::GameState,
 };
 
@@ -82,11 +86,11 @@ fn available_piece_moves(game: &GameState) -> impl Iterator<Item = Move> + use<>
     })
 }
 
-fn move_left(piece: &Piece, board: &RenderBoard) -> Option<Piece> {
+fn move_left(piece: &Piece, board: &BitBoard) -> Option<Piece> {
     piece.left().filter(|moved| !board.is_colliding(moved))
 }
 
-fn move_right(piece: &Piece, board: &RenderBoard) -> Option<Piece> {
+fn move_right(piece: &Piece, board: &BitBoard) -> Option<Piece> {
     piece.right().filter(|moved| !board.is_colliding(moved))
 }
 
@@ -122,27 +126,27 @@ fn normalize(value: f64, min: f64, max: f64) -> f64 {
     (value - min) / (max - min)
 }
 
-fn column_height(board: &RenderBoard, x: usize) -> u16 {
+fn column_height(board: &BitBoard, x: usize) -> u16 {
     let height = board
         .playable_rows()
         .enumerate()
-        .find(|(_y, row)| !row[x].is_empty())
-        .map_or(0, |(y, _row)| RenderBoard::PLAYABLE_HEIGHT - y);
+        .find(|(_y, row)| row.is_cell_occupied(x))
+        .map_or(0, |(y, _row)| BitBoard::PLAYABLE_HEIGHT - y);
 
     u16::try_from(height).unwrap()
 }
 
-fn compute_height_max(board: &RenderBoard) -> u16 {
-    let max = (0..RenderBoard::PLAYABLE_HEIGHT)
-        .find(|&y| board.playable_row(y).iter().any(|cell| !cell.is_empty()))
-        .map_or(0, |y| RenderBoard::PLAYABLE_HEIGHT - y);
+fn compute_height_max(board: &BitBoard) -> u16 {
+    let max = (0..BitBoard::PLAYABLE_HEIGHT)
+        .find(|&y| board.playable_row(y).iter().any(|cell| cell))
+        .map_or(0, |y| BitBoard::PLAYABLE_HEIGHT - y);
 
     u16::try_from(max).unwrap()
 }
 
-fn compute_height_diff(board: &RenderBoard) -> u16 {
+fn compute_height_diff(board: &BitBoard) -> u16 {
     let mut diff = 0;
-    let mut top = [0; RenderBoard::PLAYABLE_WIDTH];
+    let mut top = [0; BitBoard::PLAYABLE_WIDTH];
 
     for (x, top) in top.iter_mut().enumerate() {
         *top = column_height(board, x);
@@ -154,14 +158,14 @@ fn compute_height_diff(board: &RenderBoard) -> u16 {
     diff
 }
 
-fn compute_dead_space(board: &RenderBoard) -> u16 {
-    let count = (0..RenderBoard::PLAYABLE_WIDTH)
+fn compute_dead_space(board: &BitBoard) -> u16 {
+    let count = (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + BitBoard::PLAYABLE_WIDTH)
         .map(|x| {
             board
                 .playable_rows()
-                .map(|row| row[x])
-                .skip_while(|cell| cell.is_empty())
-                .filter(|cell| cell.is_empty())
+                .map(move |row| row.is_cell_occupied(x))
+                .skip_while(|&cell| !cell)
+                .filter(|&cell| !cell)
                 .count()
         })
         .sum::<usize>();

@@ -1,13 +1,13 @@
 use crate::core::{
+    bit_board::BitBoard,
     piece::{Piece, PieceGenerator, PieceKind},
-    render_board::RenderBoard,
 };
 
 const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
 
 #[derive(Debug, Clone)]
 pub(crate) struct GameState {
-    board: RenderBoard,
+    board: BitBoard,
     falling_piece: Piece,
     held_piece: Option<PieceKind>,
     hold_used: bool,
@@ -20,7 +20,7 @@ impl GameState {
     pub(crate) fn new() -> Self {
         let first_piece = PieceKind::I; // dummy initial value
         let mut game = Self {
-            board: RenderBoard::INITIAL,
+            board: BitBoard::INITIAL,
             falling_piece: Piece::new(first_piece),
             held_piece: None,
             hold_used: false,
@@ -44,7 +44,7 @@ impl GameState {
         self.score
     }
 
-    pub(crate) fn board(&self) -> &RenderBoard {
+    pub(crate) fn board(&self) -> &BitBoard {
         &self.board
     }
 
@@ -99,11 +99,11 @@ impl GameState {
         Ok(())
     }
 
-    pub(crate) fn complete_piece_drop(&mut self) -> Result<(), ()> {
+    pub(crate) fn complete_piece_drop(&mut self) -> Result<usize, ()> {
         self.board.fill_piece(&self.falling_piece);
-        let line = self.board.clear_lines();
-        self.score += SCORE_TABLE[line];
-        self.cleared_lines += line;
+        let cleared_lines = self.board.clear_lines();
+        self.score += SCORE_TABLE[cleared_lines];
+        self.cleared_lines += cleared_lines;
 
         self.begin_next_piece_fall();
         if self.board.is_colliding(&self.falling_piece) {
@@ -111,7 +111,7 @@ impl GameState {
         }
 
         self.hold_used = false;
-        Ok(())
+        Ok(cleared_lines)
     }
 
     fn begin_next_piece_fall(&mut self) {

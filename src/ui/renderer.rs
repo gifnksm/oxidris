@@ -233,7 +233,7 @@ impl Renderer {
         self.term.reset_styles()?;
 
         // Prepare board with ghost piece and falling piece
-        let board = game.board();
+        let board = game.render_board();
         let falling_piece = game.falling_piece();
         let mut board_buf = board.clone();
 
