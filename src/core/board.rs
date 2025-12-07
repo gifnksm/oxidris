@@ -148,14 +148,8 @@ impl Board {
         let pos = piece.position();
         for (dy, piece_row) in piece.shape().iter().enumerate() {
             let y = dy + pos.y();
-            if y >= BOARD_HEIGHT {
-                continue;
-            }
             for (dx, block) in piece_row.iter().enumerate() {
                 let x = dx + pos.x();
-                if x >= BOARD_WIDTH {
-                    continue;
-                }
                 if !block.is_empty() && !self.rows[y].cells[x].is_empty() {
                     return true;
                 }
