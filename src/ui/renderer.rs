@@ -1,13 +1,12 @@
 use std::io;
 
 use crate::{
-    block::BlockKind,
-    field::Field,
-    game::{GameState, GameUi},
-    mino::MinoKind,
-    play::PlayMode,
-    terminal::{Color, Terminal},
+    core::{block::BlockKind, board::Board, piece::PieceKind},
+    engine::session::{GameSession, SessionState},
+    modes::PlayMode,
 };
+
+use super::terminal::{Color, Terminal};
 
 // UI layout coordinates
 const TERMINAL_TOP: usize = 0;
@@ -16,13 +15,13 @@ const TERMINAL_LEFT: usize = 0;
 const TERMINAL_RIGHT: usize = COMPONENT_RIGHT + 1;
 
 const COMPONENT_TOP: usize = TERMINAL_TOP + 1;
-const COMPONENT_BOTTOM: usize = FIELD_PANEL.bottom();
+const COMPONENT_BOTTOM: usize = BOARD_PANEL.bottom();
 const COMPONENT_LEFT: usize = TERMINAL_LEFT + 2;
 const COMPONENT_RIGHT: usize = CONTROLS_PANEL.right();
 
 const CHARS_PER_BLOCK: usize = 2;
-const MINO_DISPLAY_WIDTH: usize = 4 * CHARS_PER_BLOCK;
-const MINO_DISPLAY_HEIGHT: usize = 2;
+const PIECE_DISPLAY_WIDTH: usize = 4 * CHARS_PER_BLOCK;
+const PIECE_DISPLAY_HEIGHT: usize = 2;
 
 const LEFT_PANE_BODY_WIDTH: usize = 16;
 
@@ -30,7 +29,7 @@ const HOLD_PANEL: Panel = Panel {
     top: COMPONENT_TOP,
     left: COMPONENT_LEFT,
     body_width: LEFT_PANE_BODY_WIDTH,
-    body_height: MINO_DISPLAY_HEIGHT,
+    body_height: PIECE_DISPLAY_HEIGHT,
     title: "HOLD",
 };
 
@@ -42,18 +41,18 @@ const STATS_PANEL: Panel = Panel {
     title: "STATS",
 };
 
-const FIELD_PANEL: Panel = Panel {
+const BOARD_PANEL: Panel = Panel {
     top: COMPONENT_TOP,
     left: HOLD_PANEL.right() + 2,
-    body_width: CHARS_PER_BLOCK * Field::BLOCKS_WIDTH,
-    body_height: Field::BLOCKS_HEIGHT,
+    body_width: CHARS_PER_BLOCK * Board::BLOCKS_WIDTH,
+    body_height: Board::BLOCKS_HEIGHT,
     title: "",
 };
 
 const NEXT_PANEL: Panel = Panel {
     top: COMPONENT_TOP,
-    left: FIELD_PANEL.right() + 2,
-    body_width: MINO_DISPLAY_WIDTH,
+    left: BOARD_PANEL.right() + 2,
+    body_width: PIECE_DISPLAY_WIDTH,
     body_height: 20,
     title: "NEXT",
 };
@@ -133,15 +132,15 @@ impl Panel {
     }
 }
 
-const fn mino_color(mino: MinoKind) -> Color {
-    match mino {
-        MinoKind::I => Color::CYAN,
-        MinoKind::O => Color::YELLOW,
-        MinoKind::S => Color::GREEN,
-        MinoKind::Z => Color::RED,
-        MinoKind::J => Color::BLUE,
-        MinoKind::L => Color::ORANGE,
-        MinoKind::T => Color::MAGENTA,
+const fn piece_color(piece: PieceKind) -> Color {
+    match piece {
+        PieceKind::I => Color::CYAN,
+        PieceKind::O => Color::YELLOW,
+        PieceKind::S => Color::GREEN,
+        PieceKind::Z => Color::RED,
+        PieceKind::J => Color::BLUE,
+        PieceKind::L => Color::ORANGE,
+        PieceKind::T => Color::MAGENTA,
     }
 }
 
@@ -158,7 +157,7 @@ impl BlockDisplay {
             BlockKind::Empty => Self::new(Color::GRAY, Color::BLACK, dot),
             BlockKind::Wall => Self::new(Color::GRAY, Color::GRAY, dot),
             BlockKind::Ghost => Self::new(Color::WHITE, Color::BLACK, "[]"),
-            BlockKind::Mino(mino) => Self::new(mino_color(mino), mino_color(mino), "  "),
+            BlockKind::Piece(piece) => Self::new(piece_color(piece), piece_color(piece), "  "),
         }
     }
 
@@ -217,8 +216,8 @@ impl Renderer {
         Ok(())
     }
 
-    pub(crate) fn draw(&mut self, game: &GameUi) -> io::Result<()> {
-        self.draw_field_panel(game)?;
+    pub(crate) fn draw(&mut self, game: &GameSession) -> io::Result<()> {
+        self.draw_board_panel(game)?;
         self.draw_hold_panel(game)?;
         self.draw_next_panel(game)?;
         self.draw_stats_panel(game)?;
@@ -227,26 +226,26 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_field_panel(&mut self, game: &GameUi) -> io::Result<()> {
+    fn draw_board_panel(&mut self, game: &GameSession) -> io::Result<()> {
         self.term.reset_styles()?;
 
-        // Prepare field with ghost piece and falling mino
-        let field = game.field();
-        let falling_mino = game.falling_mino();
-        let mut field_buf = field.clone();
+        // Prepare board with ghost piece and falling piece
+        let board = game.board();
+        let falling_piece = game.falling_piece();
+        let mut board_buf = board.clone();
 
         // Show ghost piece only in normal mode
         if self.mode == PlayMode::Normal {
             let dropped = game.simulate_drop_position();
-            field_buf.fill_mino_as(&dropped, BlockKind::Ghost);
+            board_buf.fill_piece_as(&dropped, BlockKind::Ghost);
         }
-        field_buf.fill_mino(falling_mino);
+        board_buf.fill_piece(falling_piece);
 
-        FIELD_PANEL.draw_border(&mut self.term)?;
-        for (row_offset, field_row) in field_buf.block_rows().enumerate() {
+        BOARD_PANEL.draw_border(&mut self.term)?;
+        for (row_offset, board_row) in board_buf.block_rows().enumerate() {
             self.term
-                .move_to(FIELD_PANEL.body_top() + row_offset, FIELD_PANEL.body_left())?;
-            for block in field_row {
+                .move_to(BOARD_PANEL.body_top() + row_offset, BOARD_PANEL.body_left())?;
+            for block in board_row {
                 let display = BlockDisplay::from_kind(*block, true);
                 self.term
                     .set_fg(display.fg())?
@@ -256,37 +255,37 @@ impl Renderer {
         }
 
         // Draw overlays based on game state
-        match game.state() {
-            GameState::Playing => {}
-            GameState::Paused => self.draw_overlay(Color::YELLOW, Color::BLACK, "PAUSED")?,
-            GameState::GameOver => self.draw_overlay(Color::RED, Color::WHITE, "GAME OVER!!")?,
+        match game.session_state() {
+            SessionState::Playing => {}
+            SessionState::Paused => self.draw_overlay(Color::YELLOW, Color::BLACK, "PAUSED")?,
+            SessionState::GameOver => self.draw_overlay(Color::RED, Color::WHITE, "GAME OVER!!")?,
         }
 
         Ok(())
     }
 
-    fn draw_hold_panel(&mut self, game: &GameUi) -> io::Result<()> {
+    fn draw_hold_panel(&mut self, game: &GameSession) -> io::Result<()> {
         HOLD_PANEL.draw_border(&mut self.term)?;
-        if let Some(mino) = game.held_mino() {
-            let mino_left =
-                HOLD_PANEL.body_left() + (HOLD_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(mino, HOLD_PANEL.body_top(), mino_left)?;
+        if let Some(piece) = game.held_piece() {
+            let piece_left =
+                HOLD_PANEL.body_left() + (HOLD_PANEL.body_width - PIECE_DISPLAY_WIDTH) / 2;
+            self.draw_piece_at(piece, HOLD_PANEL.body_top(), piece_left)?;
         }
         Ok(())
     }
 
-    fn draw_next_panel(&mut self, game: &GameUi) -> io::Result<()> {
+    fn draw_next_panel(&mut self, game: &GameSession) -> io::Result<()> {
         NEXT_PANEL.draw_border(&mut self.term)?;
-        for (mino_idx, mino) in game.next_minos().take(7).enumerate() {
-            let mino_top = NEXT_PANEL.body_top() + mino_idx * 3;
-            let mino_left =
-                NEXT_PANEL.body_left() + (NEXT_PANEL.body_width - MINO_DISPLAY_WIDTH) / 2;
-            self.draw_mino_at(mino, mino_top, mino_left)?;
+        for (piece_idx, piece) in game.next_pieces().take(7).enumerate() {
+            let piece_top = NEXT_PANEL.body_top() + piece_idx * 3;
+            let piece_left =
+                NEXT_PANEL.body_left() + (NEXT_PANEL.body_width - PIECE_DISPLAY_WIDTH) / 2;
+            self.draw_piece_at(piece, piece_top, piece_left)?;
         }
         Ok(())
     }
 
-    fn draw_stats_panel(&mut self, game: &GameUi) -> io::Result<()> {
+    fn draw_stats_panel(&mut self, game: &GameSession) -> io::Result<()> {
         STATS_PANEL.draw_border(&mut self.term)?;
         self.term
             .move_to(STATS_PANEL.body_top(), STATS_PANEL.body_left())?
@@ -339,9 +338,9 @@ impl Renderer {
     }
 
     fn draw_overlay(&mut self, bg: Color, fg: Color, message: &str) -> io::Result<()> {
-        let top = FIELD_PANEL.body_top() + (FIELD_PANEL.body_height / 2) - 1;
-        let left = FIELD_PANEL.body_left();
-        let width = FIELD_PANEL.body_width;
+        let top = BOARD_PANEL.body_top() + (BOARD_PANEL.body_height / 2) - 1;
+        let left = BOARD_PANEL.body_left();
+        let width = BOARD_PANEL.body_width;
 
         self.term
             .reset_styles()?
@@ -359,10 +358,10 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_mino_at(&mut self, mino: MinoKind, top: usize, left: usize) -> io::Result<()> {
-        for (row_offset, mino_row) in mino.display_shape().iter().enumerate() {
+    fn draw_piece_at(&mut self, piece: PieceKind, top: usize, left: usize) -> io::Result<()> {
+        for (row_offset, piece_row) in piece.display_shape().iter().enumerate() {
             self.term.move_to(top + row_offset, left)?;
-            for block in mino_row {
+            for block in piece_row {
                 let display = BlockDisplay::from_kind(*block, false);
                 self.term
                     .set_fg(display.fg())?

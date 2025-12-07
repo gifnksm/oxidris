@@ -8,40 +8,40 @@ use rand::{
     seq::SliceRandom,
 };
 
-use crate::{
+use super::{
     block::BlockKind,
-    field::{Field, INIT_MINO_X, INIT_MINO_Y, MAX_X, MAX_Y, MIN_X, MIN_Y},
+    board::{Board, INIT_PIECE_X, INIT_PIECE_Y, MAX_X, MAX_Y, MIN_X, MIN_Y},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Mino {
-    position: MinoPosition,
-    rotation: MinoRotation,
-    kind: MinoKind,
+pub(crate) struct Piece {
+    position: PiecePosition,
+    rotation: PieceRotation,
+    kind: PieceKind,
 }
 
-impl Mino {
-    pub(crate) fn new(kind: MinoKind) -> Self {
+impl Piece {
+    pub(crate) fn new(kind: PieceKind) -> Self {
         Self {
-            position: MinoPosition::INITIAL,
-            rotation: MinoRotation::default(),
+            position: PiecePosition::INITIAL,
+            rotation: PieceRotation::default(),
             kind,
         }
     }
 
-    pub(crate) fn position(&self) -> MinoPosition {
+    pub(crate) fn position(&self) -> PiecePosition {
         self.position
     }
 
-    pub(crate) fn rotation(&self) -> MinoRotation {
+    pub(crate) fn rotation(&self) -> PieceRotation {
         self.rotation
     }
 
-    pub(crate) fn kind(&self) -> MinoKind {
+    pub(crate) fn kind(&self) -> PieceKind {
         self.kind
     }
 
-    pub(crate) fn shape(&self) -> &MinoShape {
+    pub(crate) fn shape(&self) -> &PieceShape {
         self.kind.shape(self.rotation)
     }
 
@@ -97,66 +97,66 @@ impl Mino {
         }
     }
 
-    pub(crate) fn super_rotated_left(self, field: &Field) -> Option<Self> {
-        let mut mino = self.rotated_left();
-        if field.is_colliding(&mino) {
-            mino = super_rotation(field, &mino)?;
+    pub(crate) fn super_rotated_left(self, board: &Board) -> Option<Self> {
+        let mut piece = self.rotated_left();
+        if board.is_colliding(&piece) {
+            piece = super_rotation(board, &piece)?;
         }
-        Some(mino)
+        Some(piece)
     }
 
-    pub(crate) fn super_rotated_right(self, field: &Field) -> Option<Self> {
-        let mut mino = self.rotated_right();
-        if field.is_colliding(&mino) {
-            mino = super_rotation(field, &mino)?;
+    pub(crate) fn super_rotated_right(self, board: &Board) -> Option<Self> {
+        let mut piece = self.rotated_right();
+        if board.is_colliding(&piece) {
+            piece = super_rotation(board, &piece)?;
         }
-        Some(mino)
+        Some(piece)
     }
 
-    pub(crate) fn super_rotations(self, field: &Field) -> ArrayVec<Self, 4> {
+    pub(crate) fn super_rotations(self, board: &Board) -> ArrayVec<Self, 4> {
         let mut rotations = ArrayVec::new();
         rotations.push(self);
-        if self.kind == MinoKind::O {
+        if self.kind == PieceKind::O {
             return rotations;
         }
         let mut prev = self;
         for _ in 0..3 {
-            let Some(mino) = prev.super_rotated_right(field) else {
+            let Some(piece) = prev.super_rotated_right(board) else {
                 break;
             };
-            rotations.push(mino);
-            prev = mino;
+            rotations.push(piece);
+            prev = piece;
         }
         rotations
     }
 
-    pub(crate) fn simulate_drop_position(&self, field: &Field) -> Self {
+    pub(crate) fn simulate_drop_position(&self, board: &Board) -> Self {
         let mut dropped = *self;
-        while let Some(mino) = dropped.down().filter(|m| !field.is_colliding(m)) {
-            dropped = mino;
+        while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(m)) {
+            dropped = piece;
         }
         dropped
     }
 }
 
-fn super_rotation(field: &Field, mino: &Mino) -> Option<Mino> {
-    let minos = [mino.up(), mino.right(), mino.down(), mino.left()];
-    for mino in minos.iter().flatten() {
-        if !field.is_colliding(mino) {
-            return Some(*mino);
+fn super_rotation(board: &Board, piece: &Piece) -> Option<Piece> {
+    let pieces = [piece.up(), piece.right(), piece.down(), piece.left()];
+    for piece in pieces.iter().flatten() {
+        if !board.is_colliding(piece) {
+            return Some(*piece);
         }
     }
     None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct MinoPosition {
+pub(crate) struct PiecePosition {
     x: usize,
     y: usize,
 }
 
-impl MinoPosition {
-    pub(crate) const INITIAL: Self = Self::new(INIT_MINO_X, INIT_MINO_Y);
+impl PiecePosition {
+    pub(crate) const INITIAL: Self = Self::new(INIT_PIECE_X, INIT_PIECE_Y);
 
     pub(crate) const fn new(x: usize, y: usize) -> Self {
         Self { x, y }
@@ -203,19 +203,19 @@ impl MinoPosition {
     }
 }
 
-/// Represents the rotation state of a tetromino.
+/// Represents the rotation state of a piece.
 ///
 /// 0: 0 degrees, 1: 90° right, 2: 180°, 3: 90° left.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct MinoRotation(u8);
+pub(crate) struct PieceRotation(u8);
 
-impl MinoRotation {
+impl PieceRotation {
     pub(crate) fn rotated_right(self) -> Self {
-        MinoRotation((self.0 + 1) % 4)
+        PieceRotation((self.0 + 1) % 4)
     }
 
     pub(crate) fn rotated_left(self) -> Self {
-        MinoRotation((self.0 + 3) % 4)
+        PieceRotation((self.0 + 3) % 4)
     }
 
     const fn as_usize(self) -> usize {
@@ -223,45 +223,45 @@ impl MinoRotation {
     }
 }
 
-/// Enum representing the type of tetromino.
+/// Enum representing the type of piece.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub(crate) enum MinoKind {
-    /// I tetromino.
+pub(crate) enum PieceKind {
+    /// I-piece.
     I = 0,
-    /// O tetromino.
+    /// O-piece.
     O = 1,
-    /// S tetromino.
+    /// S-piece.
     S = 2,
-    /// Z tetromino.
+    /// Z-piece.
     Z = 3,
-    /// J tetromino.
+    /// J-piece.
     J = 4,
-    /// L tetromino.
+    /// L-piece.
     L = 5,
-    /// T tetromino.
+    /// T-piece.
     T = 6,
 }
 
-impl Distribution<MinoKind> for StandardUniform {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> MinoKind {
+impl Distribution<PieceKind> for StandardUniform {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> PieceKind {
         match rng.random_range(0..=6) {
-            0 => MinoKind::I,
-            1 => MinoKind::O,
-            2 => MinoKind::S,
-            3 => MinoKind::Z,
-            4 => MinoKind::J,
-            5 => MinoKind::L,
-            _ => MinoKind::T,
+            0 => PieceKind::I,
+            1 => PieceKind::O,
+            2 => PieceKind::S,
+            3 => PieceKind::Z,
+            4 => PieceKind::J,
+            5 => PieceKind::L,
+            _ => PieceKind::T,
         }
     }
 }
 
-impl MinoKind {
-    /// Number of tetromino types (7).
+impl PieceKind {
+    /// Number of piece types (7).
     pub(crate) const LEN: usize = 7;
 
-    /// Returns the tetromino shape for the given rotation.
+    /// Returns the piece shape for the given rotation.
     ///
     /// # Arguments
     ///
@@ -269,9 +269,9 @@ impl MinoKind {
     ///
     /// # Returns
     ///
-    /// Reference to the tetromino shape.
-    pub(crate) const fn shape(&self, rotation: MinoRotation) -> &MinoShape {
-        &MINOS[*self as usize][rotation.as_usize()]
+    /// Reference to the piece shape.
+    pub(crate) const fn shape(&self, rotation: PieceRotation) -> &PieceShape {
+        &PIECES[*self as usize][rotation.as_usize()]
     }
 
     /// Returns the 2-row shape for NEXT/HOLD display.
@@ -280,14 +280,14 @@ impl MinoKind {
     ///
     /// Reference to a 2-row shape for preview display.
     pub(crate) fn display_shape(&self) -> &[[BlockKind; 4]] {
-        &MINOS[*self as usize][0][..2]
+        &PIECES[*self as usize][0][..2]
     }
 }
 
-/// Tetromino shape (4x4 block array).
-pub(crate) type MinoShape = [[BlockKind; 4]; 4];
+/// Piece shape (4x4 block array).
+pub(crate) type PieceShape = [[BlockKind; 4]; 4];
 
-const fn gen_rotates(size: usize, shape: &MinoShape) -> [MinoShape; 4] {
+const fn gen_rotates(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
     let mut rotates = [*shape; 4];
     let mut i = 1;
     while i < 4 {
@@ -307,91 +307,91 @@ const fn gen_rotates(size: usize, shape: &MinoShape) -> [MinoShape; 4] {
     rotates
 }
 
-const MINOS: [[MinoShape; 4]; MinoKind::LEN] = {
-    use crate::block::BlockKind::Empty as E;
-    const I: BlockKind = BlockKind::Mino(MinoKind::I);
-    const O: BlockKind = BlockKind::Mino(MinoKind::O);
-    const S: BlockKind = BlockKind::Mino(MinoKind::S);
-    const Z: BlockKind = BlockKind::Mino(MinoKind::Z);
-    const J: BlockKind = BlockKind::Mino(MinoKind::J);
-    const L: BlockKind = BlockKind::Mino(MinoKind::L);
-    const T: BlockKind = BlockKind::Mino(MinoKind::T);
+const PIECES: [[PieceShape; 4]; PieceKind::LEN] = {
+    use BlockKind::Empty as E;
+    const I: BlockKind = BlockKind::Piece(PieceKind::I);
+    const O: BlockKind = BlockKind::Piece(PieceKind::O);
+    const S: BlockKind = BlockKind::Piece(PieceKind::S);
+    const Z: BlockKind = BlockKind::Piece(PieceKind::Z);
+    const J: BlockKind = BlockKind::Piece(PieceKind::J);
+    const L: BlockKind = BlockKind::Piece(PieceKind::L);
+    const T: BlockKind = BlockKind::Piece(PieceKind::T);
     const EEEE: [BlockKind; 4] = [E; 4];
     [
-        // I-Mino
+        // I-piece
         gen_rotates(4, &[EEEE, [I, I, I, I], EEEE, EEEE]),
-        // O-Mino
+        // O-piece
         gen_rotates(2, &[[O, O, E, E], [O, O, E, E], EEEE, EEEE]),
-        // S-Mino
+        // S-piece
         gen_rotates(3, &[[E, S, S, E], [S, S, E, E], EEEE, EEEE]),
-        // Z-Mino
+        // Z-piece
         gen_rotates(3, &[[Z, Z, E, E], [E, Z, Z, E], EEEE, EEEE]),
-        // J-Mino
+        // J-piece
         gen_rotates(3, &[[J, E, E, E], [J, J, J, E], EEEE, EEEE]),
-        // L-Mino
+        // L-piece
         gen_rotates(3, &[[E, E, L, E], [L, L, L, E], EEEE, EEEE]),
-        // T-Mino
+        // T-piece
         gen_rotates(3, &[[E, T, E, E], [T, T, T, E], EEEE, EEEE]),
     ]
 };
 
-/// Manages the order and random generation of tetrominoes.
+/// Manages the order and random generation of pieces.
 ///
-/// Supplies tetrominoes using the 7-bag system.
+/// Supplies pieces using the 7-bag system.
 #[derive(Debug, Clone)]
-pub(crate) struct MinoGenerator {
+pub(crate) struct PieceGenerator {
     rng: StdRng,
-    bag: VecDeque<MinoKind>,
+    bag: VecDeque<PieceKind>,
 }
 
-impl MinoGenerator {
-    /// Creates a new [`MinoGenerator`].
+impl PieceGenerator {
+    /// Creates a new [`PieceGenerator`].
     ///
     /// The random seed is initialized from the OS's random data source.
     pub(crate) fn new() -> Self {
         let rng = StdRng::from_os_rng();
-        let bag = VecDeque::with_capacity(MinoKind::LEN * 2);
+        let bag = VecDeque::with_capacity(PieceKind::LEN * 2);
         let mut this = Self { rng, bag };
         this.fill_bag();
         this
     }
 
-    /// Fills the bag with a shuffled set of 7 tetrominoes when needed.
+    /// Fills the bag with a shuffled set of 7 pieces when needed.
     ///
     /// After filling, the bag will always contain at least 8 elements
     /// (so that even after one `pop_next`, there are still 7 left).
     fn fill_bag(&mut self) {
-        while self.bag.len() <= MinoKind::LEN {
+        while self.bag.len() <= PieceKind::LEN {
             let mut new_bag = [
-                MinoKind::I,
-                MinoKind::O,
-                MinoKind::S,
-                MinoKind::Z,
-                MinoKind::J,
-                MinoKind::L,
-                MinoKind::T,
+                PieceKind::I,
+                PieceKind::O,
+                PieceKind::S,
+                PieceKind::Z,
+                PieceKind::J,
+                PieceKind::L,
+                PieceKind::T,
             ];
             new_bag.shuffle(&mut self.rng);
             self.bag.extend(new_bag);
         }
     }
 
-    /// Pops the next tetromino from the bag.
+    /// Pops the next piece from the bag.
     ///
     /// # Panics
     ///
     /// Panics if the bag is empty (should never happen).
-    pub(crate) fn pop_next(&mut self) -> MinoKind {
+    pub(crate) fn pop_next(&mut self) -> PieceKind {
         self.fill_bag();
         self.bag
             .pop_front()
-            .expect("Mino bag should never be empty")
+            .expect("Piece bag should never be empty")
     }
 
-    /// Returns an iterator of upcoming tetrominoes in the bag.
+    /// Returns an iterator of upcoming pieces in the bag.
     ///
     /// The iterator always contains at least 8 elements.
-    pub(crate) fn next_minos(&self) -> impl Iterator<Item = MinoKind> + '_ {
+    pub(crate) fn next_pieces(&self) -> impl Iterator<Item = PieceKind> + '_ {
         self.bag.iter().copied()
     }
 }

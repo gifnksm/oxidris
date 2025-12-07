@@ -1,4 +1,4 @@
-use crate::mino::MinoKind;
+use super::piece::PieceKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
@@ -7,7 +7,7 @@ pub(crate) enum BlockKind {
     Empty,
     Wall,
     Ghost,
-    Mino(MinoKind),
+    Piece(PieceKind),
 }
 
 impl BlockKind {

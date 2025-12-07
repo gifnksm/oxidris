@@ -3,15 +3,10 @@ use std::io;
 use clap::{Parser, ValueEnum};
 
 mod ai;
-mod block;
-mod field;
-mod ga;
-mod game;
-mod input;
-mod mino;
-mod play;
-mod renderer;
-mod terminal;
+mod core;
+mod engine;
+mod modes;
+mod ui;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -34,9 +29,9 @@ enum Mode {
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.mode {
-        Mode::Normal => play::normal()?,
-        Mode::Auto => play::auto()?,
-        Mode::Learning => ga::learning(),
+        Mode::Normal => modes::normal()?,
+        Mode::Auto => modes::auto()?,
+        Mode::Learning => ai::genetic::learning(),
     }
     Ok(())
 }

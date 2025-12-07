@@ -3,19 +3,18 @@ use std::iter;
 use arrayvec::ArrayVec;
 
 use crate::{
-    field::Field,
-    ga::{GenoSeq, GenomeKind},
-    game::GameCore,
-    mino::Mino,
+    ai::genetic::{GenoSeq, GenomeKind},
+    core::{board::Board, piece::Piece},
+    engine::state::GameState,
 };
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Move {
     pub(crate) is_hold_used: bool,
-    pub(crate) mino: Mino,
+    pub(crate) piece: Piece,
 }
 
-pub(crate) fn eval(game: &GameCore, weight: GenoSeq) -> Option<(Move, GameCore)> {
+pub(crate) fn eval(game: &GameState, weight: GenoSeq) -> Option<(Move, GameState)> {
     let mut best_score = f64::MIN;
     let mut best_result = None;
     let init_lines_cleared = game.cleared_lines();
@@ -23,8 +22,8 @@ pub(crate) fn eval(game: &GameCore, weight: GenoSeq) -> Option<(Move, GameCore)>
     for (game, moves) in available_moves(game.clone()) {
         for mv in moves {
             let mut game = game.clone();
-            game.set_falling_mino_unchecked(mv.mino);
-            if game.complete_mino_drop().is_err() {
+            game.set_falling_piece_unchecked(mv.piece);
+            if game.complete_piece_drop().is_err() {
                 let score = compute_score(weight, &game, true, init_lines_cleared);
                 if score > best_score {
                     best_score = score;
@@ -36,8 +35,8 @@ pub(crate) fn eval(game: &GameCore, weight: GenoSeq) -> Option<(Move, GameCore)>
             for (next, moves) in available_moves(game.clone()) {
                 for next_mv in moves {
                     let mut next = next.clone();
-                    next.set_falling_mino_unchecked(next_mv.mino);
-                    let game_over = next.complete_mino_drop().is_err();
+                    next.set_falling_piece_unchecked(next_mv.piece);
+                    let game_over = next.complete_piece_drop().is_err();
                     let score = compute_score(weight, &next, game_over, init_lines_cleared);
                     if score > best_score {
                         best_score = score;
@@ -51,46 +50,49 @@ pub(crate) fn eval(game: &GameCore, weight: GenoSeq) -> Option<(Move, GameCore)>
     best_result
 }
 
-fn available_moves(mut game: GameCore) -> ArrayVec<(GameCore, impl Iterator<Item = Move>), 2> {
+fn available_moves(mut game: GameState) -> ArrayVec<(GameState, impl Iterator<Item = Move>), 2> {
     let mut result = ArrayVec::new();
-    let moves = available_mino_moves(&game);
+    let moves = available_piece_moves(&game);
     result.push((game.clone(), moves));
     if game.try_hold().is_ok() {
-        let moves = available_mino_moves(&game);
+        let moves = available_piece_moves(&game);
         result.push((game, moves));
     }
     result
 }
 
-fn available_mino_moves(game: &GameCore) -> impl Iterator<Item = Move> + use<> {
-    let field = game.field().clone();
+fn available_piece_moves(game: &GameState) -> impl Iterator<Item = Move> + use<> {
+    let board = game.board().clone();
     let is_hold_used = game.is_hold_used();
-    let rotations = game.falling_mino().super_rotations(&field).into_iter();
-    rotations.flat_map(move |mino| {
-        iter::once(mino)
-            .chain(iter::successors(move_left(&mino, &field), |m| {
-                move_left(m, &field)
+    let rotations = game.falling_piece().super_rotations(&board).into_iter();
+    rotations.flat_map(move |piece| {
+        iter::once(piece)
+            .chain(iter::successors(move_left(&piece, &board), |p| {
+                move_left(p, &board)
             }))
-            .chain(iter::successors(move_right(&mino, &field), |m| {
-                move_right(m, &field)
+            .chain(iter::successors(move_right(&piece, &board), |p| {
+                move_right(p, &board)
             }))
-            .map(|mino| mino.simulate_drop_position(&field))
-            .map(move |mino| Move { is_hold_used, mino })
-            .collect::<ArrayVec<_, { Field::BLOCKS_WIDTH }>>()
+            .map(|piece| piece.simulate_drop_position(&board))
+            .map(move |piece| Move {
+                is_hold_used,
+                piece,
+            })
+            .collect::<ArrayVec<_, { Board::BLOCKS_WIDTH }>>()
     })
 }
 
-fn move_left(mino: &Mino, field: &Field) -> Option<Mino> {
-    mino.left().filter(|moved| !field.is_colliding(moved))
+fn move_left(piece: &Piece, board: &Board) -> Option<Piece> {
+    piece.left().filter(|moved| !board.is_colliding(moved))
 }
 
-fn move_right(mino: &Mino, field: &Field) -> Option<Mino> {
-    mino.right().filter(|moved| !field.is_colliding(moved))
+fn move_right(piece: &Piece, board: &Board) -> Option<Piece> {
+    piece.right().filter(|moved| !board.is_colliding(moved))
 }
 
 fn compute_score(
     weight: GenoSeq,
-    game: &GameCore,
+    game: &GameState,
     game_over: bool,
     init_lines_cleared: usize,
 ) -> f64 {
@@ -99,9 +101,9 @@ fn compute_score(
     }
 
     let lines_cleared = u16::try_from(game.cleared_lines() - init_lines_cleared).unwrap();
-    let height_max = field_height_max(game.field());
-    let height_diff = diff_in_height(game.field());
-    let dead_space = dead_space_count(game.field());
+    let height_max = compute_height_max(game.board());
+    let height_diff = compute_height_diff(game.board());
+    let dead_space = compute_dead_space(game.board());
 
     let mut lines_cleared = normalize(f64::from(lines_cleared), 0.0, 8.0);
     let mut height_max = 1.0 - normalize(f64::from(height_max), 0.0, 20.0);
@@ -120,30 +122,30 @@ fn normalize(value: f64, min: f64, max: f64) -> f64 {
     (value - min) / (max - min)
 }
 
-fn field_height(field: &Field, x: usize) -> u16 {
-    let height = field
+fn column_height(board: &Board, x: usize) -> u16 {
+    let height = board
         .block_rows()
         .enumerate()
         .find(|(_y, row)| !row[x].is_empty())
-        .map_or(0, |(y, _row)| Field::BLOCKS_HEIGHT - y);
+        .map_or(0, |(y, _row)| Board::BLOCKS_HEIGHT - y);
 
     u16::try_from(height).unwrap()
 }
 
-fn field_height_max(field: &Field) -> u16 {
-    let max = (0..Field::BLOCKS_HEIGHT)
-        .find(|&y| field.block_row(y).iter().any(|block| !block.is_empty()))
-        .map_or(0, |y| Field::BLOCKS_HEIGHT - y);
+fn compute_height_max(board: &Board) -> u16 {
+    let max = (0..Board::BLOCKS_HEIGHT)
+        .find(|&y| board.block_row(y).iter().any(|block| !block.is_empty()))
+        .map_or(0, |y| Board::BLOCKS_HEIGHT - y);
 
     u16::try_from(max).unwrap()
 }
 
-fn diff_in_height(field: &Field) -> u16 {
+fn compute_height_diff(board: &Board) -> u16 {
     let mut diff = 0;
-    let mut top = [0; Field::BLOCKS_WIDTH];
+    let mut top = [0; Board::BLOCKS_WIDTH];
 
     for (x, top) in top.iter_mut().enumerate() {
-        *top = field_height(field, x);
+        *top = column_height(board, x);
     }
     for i in 0..top.len() - 1 {
         diff += top[i].abs_diff(top[i + 1]);
@@ -152,10 +154,10 @@ fn diff_in_height(field: &Field) -> u16 {
     diff
 }
 
-fn dead_space_count(field: &Field) -> u16 {
-    let count = (0..Field::BLOCKS_WIDTH)
+fn compute_dead_space(board: &Board) -> u16 {
+    let count = (0..Board::BLOCKS_WIDTH)
         .map(|x| {
-            field
+            board
                 .block_rows()
                 .map(|row| row[x])
                 .skip_while(|block| block.is_empty())

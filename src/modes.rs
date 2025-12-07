@@ -6,11 +6,12 @@ use std::{
 use crossterm::event::KeyCode;
 
 use crate::{
-    ai::{self, Move},
-    ga::GenoSeq,
-    game::{GameState, GameUi},
-    input::Input,
-    renderer::Renderer,
+    ai::{
+        evaluator::{self, Move},
+        genetic::GenoSeq,
+    },
+    engine::session::{GameSession, SessionState},
+    ui::{input::Input, renderer::Renderer},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +71,7 @@ impl NormalModeAction {
 const FPS: u64 = 60;
 
 pub(crate) fn normal() -> io::Result<()> {
-    let mut game = GameUi::new(FPS);
+    let mut game = GameSession::new(FPS);
     let mut renderer = Renderer::new(PlayMode::Normal)?;
     renderer.draw(&game)?;
     let mut input = Input::new()?;
@@ -83,8 +84,8 @@ pub(crate) fn normal() -> io::Result<()> {
         // Handle input
         while let Some(key) = input.try_read()? {
             if let Some(action) = NormalModeAction::from_key(key) {
-                match game.state() {
-                    GameState::Playing => match action {
+                match game.session_state() {
+                    SessionState::Playing => match action {
                         NormalModeAction::MoveLeft => _ = game.try_move_left(),
                         NormalModeAction::MoveRight => _ = game.try_move_right(),
                         NormalModeAction::RotateLeft => _ = game.try_rotate_left(),
@@ -95,24 +96,24 @@ pub(crate) fn normal() -> io::Result<()> {
                         NormalModeAction::Pause => game.toggle_pause(),
                         NormalModeAction::Quit => quit = true,
                     },
-                    GameState::Paused => match action {
+                    SessionState::Paused => match action {
                         NormalModeAction::Pause => game.toggle_pause(),
                         NormalModeAction::Quit => quit = true,
                         _ => {}
                     },
-                    GameState::GameOver => unreachable!(),
+                    SessionState::GameOver => unreachable!(),
                 }
             }
         }
 
         // Game progression
-        if !quit && game.state().is_playing() {
+        if !quit && game.session_state().is_playing() {
             game.increment_frame();
         }
 
         renderer.draw(&game)?;
 
-        if game.state().is_game_over() || quit {
+        if game.session_state().is_game_over() || quit {
             break;
         }
 
@@ -129,9 +130,9 @@ pub(crate) fn normal() -> io::Result<()> {
 }
 
 pub(crate) fn auto() -> io::Result<()> {
-    let mut game = GameUi::new(FPS);
-    let mut renderer = Renderer::new(PlayMode::Auto).unwrap();
-    renderer.draw(&game).unwrap();
+    let mut game = GameSession::new(FPS);
+    let mut renderer = Renderer::new(PlayMode::Auto)?;
+    renderer.draw(&game)?;
     let mut input = Input::new()?;
     let mut target_move = None;
 
@@ -148,18 +149,19 @@ pub(crate) fn auto() -> io::Result<()> {
         }
 
         // Game progression
-        if !quit && game.state().is_playing() {
+        if !quit && game.session_state().is_playing() {
             game.increment_frame();
         }
 
         renderer.draw(&game)?;
 
-        if game.state().is_game_over() || quit {
+        if game.session_state().is_game_over() || quit {
             break;
         }
 
         if target_move.is_none()
-            && let Some((mv, _next_game)) = ai::eval(game.core(), GenoSeq([100, 1, 10, 100]))
+            && let Some((mv, _next_game)) =
+                evaluator::eval(game.game_state(), GenoSeq([100, 1, 10, 100]))
         {
             target_move = Some(mv);
         }
@@ -180,24 +182,24 @@ pub(crate) fn auto() -> io::Result<()> {
     Ok(())
 }
 
-fn operate_game(game: &mut GameUi, target: &Move) -> bool {
-    assert!(target.is_hold_used || !game.core().is_hold_used());
-    if target.is_hold_used && !game.core().is_hold_used() {
+fn operate_game(game: &mut GameSession, target: &Move) -> bool {
+    assert!(target.is_hold_used || !game.game_state().is_hold_used());
+    if target.is_hold_used && !game.game_state().is_hold_used() {
         return game.try_hold().is_err();
     }
 
-    let falling_mino = game.core().falling_mino();
-    assert_eq!(target.mino.kind(), falling_mino.kind());
-    if falling_mino.rotation() != target.mino.rotation() {
+    let falling_piece = game.game_state().falling_piece();
+    assert_eq!(target.piece.kind(), falling_piece.kind());
+    if falling_piece.rotation() != target.piece.rotation() {
         return game.try_rotate_right().is_err();
     }
 
-    if falling_mino.position().x() < target.mino.position().x() {
+    if falling_piece.position().x() < target.piece.position().x() {
         return game.try_move_right().is_err();
-    } else if falling_mino.position().x() > target.mino.position().x() {
+    } else if falling_piece.position().x() > target.piece.position().x() {
         return game.try_move_left().is_err();
     }
-    assert_eq!(falling_mino.position().x(), target.mino.position().x());
+    assert_eq!(falling_piece.position().x(), target.piece.position().x());
     game.hard_drop_and_complete();
 
     true
