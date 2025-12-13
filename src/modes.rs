@@ -33,7 +33,7 @@ impl PlayMode {
                 ("p", "Pause"),
                 ("q", "Quit"),
             ],
-            PlayMode::Auto => &[("q", "Quit")],
+            PlayMode::Auto => &[("p", "Pause"), ("q", "Quit")],
         }
     }
 }
