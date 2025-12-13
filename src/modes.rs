@@ -118,8 +118,8 @@ pub(crate) fn normal() -> io::Result<()> {
         }
 
         let elapsed = now.elapsed();
-        if elapsed < frame_duration {
-            thread::sleep(frame_duration - elapsed);
+        if let Some(rest) = frame_duration.checked_sub(elapsed) {
+            thread::sleep(rest);
         }
     }
 
@@ -173,8 +173,8 @@ pub(crate) fn auto() -> io::Result<()> {
         }
 
         let elapsed = now.elapsed();
-        if elapsed < frame_duration {
-            thread::sleep(frame_duration - elapsed);
+        if let Some(rest) = frame_duration.checked_sub(elapsed) {
+            thread::sleep(rest);
         }
     }
     renderer.cleanup()?;
