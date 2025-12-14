@@ -1,4 +1,4 @@
-use std::{iter, mem, ops::Index, thread};
+use std::{array, iter, mem, ops::Index, thread};
 
 use rand::{
     Rng,
@@ -25,8 +25,10 @@ pub(crate) enum GenomeKind {
     DeadSpace,
 }
 
+const GENOME_KIND_COUNT: usize = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct GenoSeq(pub [u16; 4]);
+pub(crate) struct GenoSeq(pub [u16; GENOME_KIND_COUNT]);
 
 impl Index<GenomeKind> for GenoSeq {
     type Output = u16;
@@ -87,10 +89,39 @@ pub(crate) fn learning() {
         let avg_score: usize = inds.iter().map(|i| i.score).sum::<usize>() / POPULATION;
         let max_score = inds.iter().map(|i| i.score).max().unwrap();
         let min_score = inds.iter().map(|i| i.score).min().unwrap();
+        let mean_stddev = mean_weight_stddev(&inds);
+        println!("  Mean Weight Stddev: {mean_stddev}");
         println!("  Avg Score: {avg_score}, Max Score: {max_score}, Min Score: {min_score}");
 
         gen_next_generation(&mut inds);
     }
+}
+
+fn mean_weight_stddev(inds: &[Individual]) -> f64 {
+    let weights: [f64; GENOME_KIND_COUNT] =
+        array::from_fn(|i| relative_stddev(inds.iter().map(|ind| f64::from(ind.geno.0[i]))));
+    mean(weights)
+}
+
+fn mean(values: impl IntoIterator<Item = f64>) -> f64 {
+    let (sum, count) = values
+        .into_iter()
+        .fold((0.0, 0.0), |(sum, count), x| (sum + x, count + 1.0));
+    if count == 0.0 {
+        return f64::NAN;
+    }
+    sum / count
+}
+
+fn mean_stddev(values: impl IntoIterator<Item = f64> + Clone) -> (f64, f64) {
+    let m = mean(values.clone());
+    let variance = mean(values.into_iter().map(|x| (x - m).powi(2)));
+    (m, variance.sqrt())
+}
+
+fn relative_stddev(values: impl IntoIterator<Item = f64> + Clone) -> f64 {
+    let (m, s) = mean_stddev(values);
+    s / m
 }
 
 fn gen_next_generation(inds: &mut [Individual; POPULATION]) {
