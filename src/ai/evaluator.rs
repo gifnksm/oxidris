@@ -104,15 +104,19 @@ fn compute_score(
         return 0.0;
     }
 
-    let lines_cleared = u16::try_from(game.cleared_lines() - init_lines_cleared).unwrap();
-    let height_max = compute_height_max(game.board());
-    let height_diff = compute_height_diff(game.board());
-    let dead_space = compute_dead_space(game.board());
+    let lines_cleared =
+        f64::from(u16::try_from(game.cleared_lines() - init_lines_cleared).unwrap());
+    let height_info = HeightInfo::compute(game.board());
 
-    let mut lines_cleared = normalize(f64::from(lines_cleared), 0.0, 8.0);
-    let mut height_max = 1.0 - normalize(f64::from(height_max), 0.0, 20.0);
-    let mut height_diff = 1.0 - normalize(f64::from(height_diff), 0.0, 200.0);
-    let mut dead_space = 1.0 - normalize(f64::from(dead_space), 0.0, 200.0);
+    let lines_cleared_norm = normalize(lines_cleared, 0.0, 8.0);
+    let max_height_norm = height_info.normalized_max_height();
+    let height_diff_norm = height_info.normalized_height_diff();
+    let dead_space_norm = height_info.normalized_dead_space();
+
+    let mut lines_cleared = lines_cleared_norm;
+    let mut height_max = 1.0 - max_height_norm;
+    let mut height_diff = 1.0 - height_diff_norm;
+    let mut dead_space = 1.0 - dead_space_norm;
 
     lines_cleared *= f64::from(weight[GenomeKind::LinesCleared]);
     height_max *= f64::from(weight[GenomeKind::HeightMax]);
@@ -122,53 +126,74 @@ fn compute_score(
     lines_cleared + height_max + height_diff + dead_space
 }
 
-fn normalize(value: f64, min: f64, max: f64) -> f64 {
+fn normalize(value: impl Into<f64>, min: impl Into<f64>, max: impl Into<f64>) -> f64 {
+    let min = min.into();
+    let max = max.into();
+    let value = value.into();
+    assert!(min <= value && value <= max);
+    let value = value.clamp(min, max);
     (value - min) / (max - min)
 }
 
-fn column_height(board: &BitBoard, x: usize) -> u16 {
-    let height = board
-        .playable_rows()
-        .enumerate()
-        .find(|(_y, row)| row.is_cell_occupied(x))
-        .map_or(0, |(y, _row)| BitBoard::PLAYABLE_HEIGHT - y);
-
-    u16::try_from(height).unwrap()
+#[derive(Debug, Clone, Copy)]
+struct HeightInfo {
+    heights: [u8; BitBoard::PLAYABLE_WIDTH],
+    occupied: [u8; BitBoard::PLAYABLE_WIDTH],
 }
 
-fn compute_height_max(board: &BitBoard) -> u16 {
-    let max = (0..BitBoard::PLAYABLE_HEIGHT)
-        .find(|&y| board.playable_row(y).iter().any(|cell| cell))
-        .map_or(0, |y| BitBoard::PLAYABLE_HEIGHT - y);
-
-    u16::try_from(max).unwrap()
-}
-
-fn compute_height_diff(board: &BitBoard) -> u16 {
-    let mut diff = 0;
-    let mut top = [0; BitBoard::PLAYABLE_WIDTH];
-
-    for (x, top) in top.iter_mut().enumerate() {
-        *top = column_height(board, x);
-    }
-    for i in 0..top.len() - 1 {
-        diff += top[i].abs_diff(top[i + 1]);
-    }
-
-    diff
-}
-
-fn compute_dead_space(board: &BitBoard) -> u16 {
-    let count = (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + BitBoard::PLAYABLE_WIDTH)
-        .map(|x| {
-            board
+impl HeightInfo {
+    fn compute(board: &BitBoard) -> Self {
+        let mut heights = [0; BitBoard::PLAYABLE_WIDTH];
+        let mut occupied = [0; BitBoard::PLAYABLE_WIDTH];
+        for i in 0..BitBoard::PLAYABLE_WIDTH {
+            let x = SENTINEL_MARGIN_LEFT + i;
+            let min_y = board
                 .playable_rows()
-                .map(move |row| row.is_cell_occupied(x))
-                .skip_while(|&cell| !cell)
-                .filter(|&cell| !cell)
-                .count()
-        })
-        .sum::<usize>();
+                .enumerate()
+                .find(|(_y, row)| row.is_cell_occupied(x));
+            let Some((min_y, _)) = min_y else {
+                continue;
+            };
+            heights[i] = u8::try_from(BitBoard::PLAYABLE_HEIGHT - min_y).unwrap();
+            occupied[i] = 1;
+            for y in min_y + 1..BitBoard::PLAYABLE_HEIGHT {
+                let row = board.playable_row(y);
+                if row.is_cell_occupied(x) {
+                    occupied[i] += 1;
+                }
+            }
+        }
+        Self { heights, occupied }
+    }
 
-    u16::try_from(count).unwrap()
+    fn normalized_max_height(&self) -> f64 {
+        const MIN: u8 = 0;
+        #[expect(clippy::cast_possible_truncation)]
+        const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8;
+        let height = *self.heights.iter().max().unwrap();
+        normalize(height, MIN, MAX)
+    }
+
+    fn normalized_height_diff(&self) -> f64 {
+        const MIN: u8 = 0;
+        #[expect(clippy::cast_possible_truncation)]
+        const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
+        let diff = self
+            .heights
+            .iter()
+            .zip(&self.heights[1..])
+            .map(|(&a, &b)| a.abs_diff(b))
+            .sum::<u8>();
+        normalize(diff, MIN, MAX)
+    }
+
+    fn normalized_dead_space(&self) -> f64 {
+        const MIN: u8 = 0;
+        #[expect(clippy::cast_possible_truncation)]
+        const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
+        let dead_space = iter::zip(&self.heights, &self.occupied)
+            .map(|(&h, &occ)| h - occ)
+            .sum::<u8>();
+        normalize(dead_space, MIN, MAX)
+    }
 }

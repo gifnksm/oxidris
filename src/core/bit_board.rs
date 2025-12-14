@@ -69,12 +69,6 @@ impl BitRow {
         let bits = mask << x0;
         self.bits |= bits;
     }
-
-    /// Returns an iterator over the playable cells in the row.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = bool> + '_ {
-        (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH)
-            .map(move |x| self.is_cell_occupied(x))
-    }
 }
 
 /// `BitBoard` for fast collision detection and line clearing.
@@ -279,35 +273,6 @@ mod tests {
         assert!(!is_occupied(&board, x, y));
         occupy_cell(&mut board, x, y);
         assert!(is_occupied(&board, x, y));
-    }
-
-    #[test]
-    fn test_playable_row_access() {
-        let board = BitBoard::INITIAL;
-
-        // Access playable row
-        let playable_row = board.playable_row(0);
-
-        // All cells should be unoccupied in initial state
-        for cell in playable_row.iter() {
-            assert!(!cell);
-        }
-    }
-
-    #[test]
-    fn test_playable_rows_iterator() {
-        let board = BitBoard::INITIAL;
-
-        // Check that we can iterate over playable rows
-        let playable_row_count = board.playable_rows().count();
-        assert_eq!(playable_row_count, PLAYABLE_HEIGHT);
-
-        // All rows should have no occupied cells in playable area
-        for row in board.playable_rows() {
-            for cell in row.iter() {
-                assert!(!cell);
-            }
-        }
     }
 
     #[test]
