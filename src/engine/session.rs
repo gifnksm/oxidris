@@ -54,7 +54,7 @@ impl GameSession {
     }
 
     pub(crate) fn cleared_lines(&self) -> usize {
-        self.game_state.cleared_lines()
+        self.game_state.total_cleared_lines()
     }
 
     pub(crate) fn score(&self) -> usize {

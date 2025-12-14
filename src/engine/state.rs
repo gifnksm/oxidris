@@ -3,7 +3,7 @@ use crate::core::{
     piece::{Piece, PieceGenerator, PieceKind},
 };
 
-const SCORE_TABLE: [usize; 5] = [0, 1, 5, 25, 100];
+const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 
 #[derive(Debug, Clone)]
 pub(crate) struct GameState {
@@ -13,7 +13,9 @@ pub(crate) struct GameState {
     hold_used: bool,
     piece_generator: PieceGenerator,
     score: usize,
-    cleared_lines: usize,
+    completed_pieces: usize,
+    total_cleared_lines: usize,
+    line_cleared_counter: [usize; 5],
 }
 
 impl GameState {
@@ -26,18 +28,28 @@ impl GameState {
             hold_used: false,
             piece_generator: PieceGenerator::new(),
             score: 0,
-            cleared_lines: 0,
+            completed_pieces: 0,
+            total_cleared_lines: 0,
+            line_cleared_counter: [0; 5],
         };
         game.begin_next_piece_fall();
         game
     }
 
     pub(crate) fn level(&self) -> usize {
-        self.cleared_lines / 10
+        self.total_cleared_lines / 10
     }
 
-    pub(crate) fn cleared_lines(&self) -> usize {
-        self.cleared_lines
+    pub(crate) fn total_cleared_lines(&self) -> usize {
+        self.total_cleared_lines
+    }
+
+    pub(crate) fn completed_pieces(&self) -> usize {
+        self.completed_pieces
+    }
+
+    pub(crate) fn line_cleared_counter(&self) -> &[usize; 5] {
+        &self.line_cleared_counter
     }
 
     pub(crate) fn score(&self) -> usize {
@@ -103,7 +115,9 @@ impl GameState {
         self.board.fill_piece(&self.falling_piece);
         let cleared_lines = self.board.clear_lines();
         self.score += SCORE_TABLE[cleared_lines];
-        self.cleared_lines += cleared_lines;
+        self.total_cleared_lines += cleared_lines;
+        self.line_cleared_counter[cleared_lines] += 1;
+        self.completed_pieces += 1;
 
         self.begin_next_piece_fall();
         if self.board.is_colliding(&self.falling_piece) {

@@ -1,4 +1,4 @@
-use std::iter;
+use std::{array, iter};
 
 use arrayvec::ArrayVec;
 
@@ -21,14 +21,14 @@ pub(crate) struct Move {
 pub(crate) fn eval(game: &GameState, weight: GenoSeq) -> Option<(Move, GameState)> {
     let mut best_score = f64::MIN;
     let mut best_result = None;
-    let init_lines_cleared = game.cleared_lines();
+    let init = game;
 
     for (game, moves) in available_moves(game.clone()) {
         for mv in moves {
             let mut game = game.clone();
             game.set_falling_piece_unchecked(mv.piece);
             if game.complete_piece_drop().is_err() {
-                let score = compute_score(weight, &game, true, init_lines_cleared);
+                let score = compute_score(weight, init, &game, true);
                 if score > best_score {
                     best_score = score;
                     best_result = Some((mv, game.clone()));
@@ -41,7 +41,7 @@ pub(crate) fn eval(game: &GameState, weight: GenoSeq) -> Option<(Move, GameState
                     let mut next = next.clone();
                     next.set_falling_piece_unchecked(next_mv.piece);
                     let game_over = next.complete_piece_drop().is_err();
-                    let score = compute_score(weight, &next, game_over, init_lines_cleared);
+                    let score = compute_score(weight, init, &next, game_over);
                     if score > best_score {
                         best_score = score;
                         best_result = Some((mv, game.clone()));
@@ -94,21 +94,15 @@ fn move_right(piece: &Piece, board: &BitBoard) -> Option<Piece> {
     piece.right().filter(|moved| !board.is_colliding(moved))
 }
 
-fn compute_score(
-    weight: GenoSeq,
-    game: &GameState,
-    game_over: bool,
-    init_lines_cleared: usize,
-) -> f64 {
+fn compute_score(weight: GenoSeq, init: &GameState, game: &GameState, game_over: bool) -> f64 {
     if game_over {
         return 0.0;
     }
 
-    let lines_cleared =
-        f64::from(u16::try_from(game.cleared_lines() - init_lines_cleared).unwrap());
+    let line_clear_info = LineClearInfo::compute(init, game);
     let height_info = HeightInfo::compute(game.board());
 
-    let lines_cleared_norm = normalize(lines_cleared, 0.0, 8.0);
+    let lines_cleared_norm = line_clear_info.normalized_lines_cleared();
     let max_height_norm = height_info.normalized_max_height();
     let height_diff_norm = height_info.normalized_height_diff();
     let dead_space_norm = height_info.normalized_dead_space();
@@ -133,6 +127,32 @@ fn normalize(value: impl Into<f64>, min: impl Into<f64>, max: impl Into<f64>) ->
     assert!(min <= value && value <= max);
     let value = value.clamp(min, max);
     (value - min) / (max - min)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LineClearInfo {
+    turns: u8,
+    counter: [u8; 5],
+}
+
+impl LineClearInfo {
+    fn compute(init: &GameState, game: &GameState) -> Self {
+        let turns = u8::try_from(game.completed_pieces() - init.completed_pieces()).unwrap();
+        let counter = array::from_fn(|i| {
+            u8::try_from(game.line_cleared_counter()[i] - init.line_cleared_counter()[i]).unwrap()
+        });
+        Self { turns, counter }
+    }
+
+    fn normalized_lines_cleared(self) -> f64 {
+        const WEIGHT: [u8; 5] = [0, 0, 1, 2, 6];
+        let min = 0;
+        let max = self.turns * WEIGHT[4];
+        let score = iter::zip(self.counter, WEIGHT)
+            .map(|(count, weight)| count * weight)
+            .sum::<u8>();
+        normalize(score, min, max).sqrt()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
