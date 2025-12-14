@@ -5,41 +5,51 @@ use crate::{
     engine::state::GameState,
 };
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-enum Metric {
-    CoveredHoles,
-    SumOfHeights,
-    SurfaceRoughness,
-    DeepWells,
-    LinesCleared,
-    HeightRisk,
+// All evaluation metrics are transformed into a [0.0, 1.0] score,
+// where higher is always better.
+//
+// Normalization ranges are based on practical in-game observations
+// (approximately the 95% percentile), not theoretical maxima.
+// This preserves resolution and stabilizes GA optimization.
+
+#[derive(Debug, Clone)]
+pub(crate) struct Metrics {
+    covered_holes: f32,
+    sum_of_heights: f32,
+    surface_roughness: f32,
+    deep_wells: f32,
+    lines_cleared: f32,
+    height_risk: f32,
 }
 
-pub(crate) const METRIC_COUNT: usize = 6;
+impl Metrics {
+    pub(crate) fn as_array(&self) -> [f32; METRIC_COUNT] {
+        [
+            self.covered_holes,
+            self.sum_of_heights,
+            self.surface_roughness,
+            self.deep_wells,
+            self.lines_cleared,
+            self.height_risk,
+        ]
+    }
 
-pub(crate) fn measure(init: &GameState, game: &GameState) -> [f32; METRIC_COUNT] {
-    let line_clear_info = LineClearInfo::compute(init, game);
-    let height_info = HeightInfo::compute(game.board());
+    pub(crate) fn measure(init: &GameState, game: &GameState) -> Self {
+        let line_clear_info = LineClearInfo::compute(init, game);
+        let height_info = HeightInfo::compute(game.board());
 
-    let mut out = [0.0; METRIC_COUNT];
-
-    // All evaluation metrics are transformed into a [0.0, 1.0] score,
-    // where higher is always better.
-    //
-    // Normalization ranges are based on practical in-game observations
-    // (approximately the 95% percentile), not theoretical maxima.
-    // This preserves resolution and stabilizes GA optimization.
-
-    out[Metric::CoveredHoles as usize] = height_info.covered_holes_score();
-    out[Metric::SumOfHeights as usize] = height_info.sum_of_heights_score();
-    out[Metric::SurfaceRoughness as usize] = height_info.surface_roughness_score();
-    out[Metric::DeepWells as usize] = height_info.deep_wells_score();
-    out[Metric::LinesCleared as usize] = line_clear_info.lines_cleared_score();
-    out[Metric::HeightRisk as usize] = height_info.height_risk_score();
-
-    out
+        Self {
+            covered_holes: height_info.covered_holes_score(),
+            sum_of_heights: height_info.sum_of_heights_score(),
+            surface_roughness: height_info.surface_roughness_score(),
+            deep_wells: height_info.deep_wells_score(),
+            lines_cleared: line_clear_info.lines_cleared_score(),
+            height_risk: height_info.height_risk_score(),
+        }
+    }
 }
+
+pub(crate) const METRIC_COUNT: usize = size_of::<Metrics>() / size_of::<f32>();
 
 #[derive(Debug, Clone, Copy)]
 struct LineClearInfo {

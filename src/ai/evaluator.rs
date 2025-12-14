@@ -2,7 +2,7 @@ use std::iter;
 
 use arrayvec::ArrayVec;
 
-use super::metrics::{self, METRIC_COUNT};
+use super::metrics::{METRIC_COUNT, Metrics};
 use super::weights::WeightSet;
 use crate::core::bit_board::BitBoard;
 use crate::core::piece::Piece;
@@ -36,8 +36,10 @@ impl Evaluator {
             return 0.0;
         }
 
-        let metrics = metrics::measure(init, game);
-        iter::zip(metrics, self.weights.0).map(|(m, w)| m * w).sum()
+        let metrics = Metrics::measure(init, game);
+        iter::zip(metrics.as_array(), self.weights.0)
+            .map(|(m, w)| m * w)
+            .sum()
     }
 
     pub(crate) fn select_move(&self, game: &GameState) -> Option<(Move, GameState)> {
