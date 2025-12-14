@@ -171,7 +171,7 @@ impl HeightInfo {
         #[expect(clippy::cast_possible_truncation)]
         const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8;
         let height = *self.heights.iter().max().unwrap();
-        normalize(height, MIN, MAX)
+        normalize(height, MIN, MAX).powi(2)
     }
 
     fn normalized_height_diff(&self) -> f64 {
@@ -184,7 +184,7 @@ impl HeightInfo {
             .zip(&self.heights[1..])
             .map(|(&a, &b)| a.abs_diff(b))
             .sum::<u8>();
-        normalize(diff, MIN, MAX)
+        normalize(diff, MIN, MAX).powi(2)
     }
 
     fn normalized_dead_space(&self) -> f64 {
@@ -194,6 +194,6 @@ impl HeightInfo {
         let dead_space = iter::zip(&self.heights, &self.occupied)
             .map(|(&h, &occ)| h - occ)
             .sum::<u8>();
-        normalize(dead_space, MIN, MAX)
+        normalize(dead_space, MIN, MAX).sqrt()
     }
 }
