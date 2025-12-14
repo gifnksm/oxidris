@@ -7,8 +7,14 @@ use std::array;
 pub(crate) struct WeightSet<const N: usize>(pub(crate) [f32; N]);
 
 impl WeightSet<{ METRIC_COUNT }> {
-    pub(crate) const BEST: Self =
-        WeightSet([0.075_561_01, 0.196_294_75, 0.175_390_68, 0.162_211_33]);
+    pub(crate) const BEST: Self = WeightSet([
+        0.449_621_17,
+        0.053_529_74,
+        0.034_155_026,
+        0.261_863_26,
+        0.362_473_7,
+        0.099_927_254,
+    ]);
 }
 
 impl<const N: usize> WeightSet<N> {

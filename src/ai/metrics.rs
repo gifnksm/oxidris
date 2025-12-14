@@ -1,3 +1,5 @@
+use std::iter;
+
 use crate::{
     core::bit_board::{BitBoard, SENTINEL_MARGIN_LEFT},
     engine::state::GameState,
@@ -6,13 +8,15 @@ use crate::{
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 enum Metric {
-    LinesCleared = 0,
-    HeightMax = 1,
-    HeightDiff = 2,
-    Holes = 3,
+    CoveredHoles,
+    SumOfHeights,
+    SurfaceRoughness,
+    DeepWells,
+    LinesCleared,
+    HeightRisk,
 }
 
-pub(crate) const METRIC_COUNT: usize = 4;
+pub(crate) const METRIC_COUNT: usize = 6;
 
 pub(crate) fn measure(init: &GameState, game: &GameState) -> [f32; METRIC_COUNT] {
     let line_clear_info = LineClearInfo::compute(init, game);
@@ -20,10 +24,19 @@ pub(crate) fn measure(init: &GameState, game: &GameState) -> [f32; METRIC_COUNT]
 
     let mut out = [0.0; METRIC_COUNT];
 
-    out[Metric::LinesCleared as usize] = line_clear_info.normalized_lines_cleared();
-    out[Metric::HeightMax as usize] = 1.0 - height_info.normalized_max_height();
-    out[Metric::HeightDiff as usize] = 1.0 - height_info.normalized_height_diff();
-    out[Metric::Holes as usize] = 1.0 - height_info.normalized_holes();
+    // All evaluation metrics are transformed into a [0.0, 1.0] score,
+    // where higher is always better.
+    //
+    // Normalization ranges are based on practical in-game observations
+    // (approximately the 95% percentile), not theoretical maxima.
+    // This preserves resolution and stabilizes GA optimization.
+
+    out[Metric::CoveredHoles as usize] = height_info.covered_holes_score();
+    out[Metric::SumOfHeights as usize] = height_info.sum_of_heights_score();
+    out[Metric::SurfaceRoughness as usize] = height_info.surface_roughness_score();
+    out[Metric::DeepWells as usize] = height_info.deep_wells_score();
+    out[Metric::LinesCleared as usize] = line_clear_info.lines_cleared_score();
+    out[Metric::HeightRisk as usize] = height_info.height_risk_score();
 
     out
 }
@@ -43,14 +56,24 @@ impl LineClearInfo {
         Self { turns, counter }
     }
 
-    fn normalized_lines_cleared(self) -> f32 {
-        const WEIGHT: [u8; 5] = [0, 0, 1, 2, 6];
-        let min = 0u8;
-        let max = self.turns * WEIGHT[4];
-        let score = core::iter::zip(self.counter, WEIGHT)
-            .map(|(count, weight)| count * weight)
-            .sum::<u8>();
-        normalize(score, min, max).sqrt()
+    fn lines_cleared_score(self) -> f32 {
+        // Lines cleared represent forward progress and efficiency.
+        // Weights strongly favor tetrises (4-line clears).
+        //
+        // Weighted score per N moves:
+        //   mostly singles : ~0–N
+        //   mixed clears   : ~2N–4N
+        //   frequent tetrises : up to 6N
+        //
+        // sqrt() is applied to reduce variance and prevent domination
+        // by rare high-reward events.
+        const WEIGHT: [f32; 5] = [0.0, 0.0, 1.0, 2.0, 6.0];
+        let raw = iter::zip(self.counter, WEIGHT)
+            .map(|(count, weight)| f32::from(count) * weight)
+            .sum::<f32>();
+        let turns = f32::from(self.turns);
+        let norm = normalize(raw.sqrt(), (turns * 6.0).sqrt());
+        positive_metrics_score(norm)
     }
 }
 
@@ -85,50 +108,145 @@ impl HeightInfo {
         Self { heights, occupied }
     }
 
+    pub(crate) fn covered_holes(&self) -> u16 {
+        core::iter::zip(&self.heights, &self.occupied)
+            .map(|(&h, &occ)| u16::from(h - occ))
+            .sum()
+    }
+
+    pub(crate) fn covered_holes_score(&self) -> f32 {
+        // Covered holes are one of the strongest losing factors.
+        // raw = holes^1.5 emphasizes the first few holes.
+        //
+        // Typical ranges (raw holes count):
+        //   0–3   : very good, board is clean
+        //   4–7   : dangerous, recovery becomes difficult
+        //   10+   : almost losing position
+        //
+        // The normalization max (≈60) corresponds to ~15 holes,
+        // which is a practical upper bound in real games.
+        let raw = f32::from(self.covered_holes()).powf(1.5);
+        let norm = normalize(raw, 60.0);
+        negative_metrics_score(norm)
+    }
+
+    fn sum_of_heights_score(&self) -> f32 {
+        // Sum of column heights represents overall board pressure.
+        // It correlates with reduced mobility and imminent top-out.
+        //
+        // Typical ranges (sum of heights, 10x20 board):
+        //   40–60   : early game, very safe
+        //   80–120  : mid game, manageable
+        //   140+    : near top-out, highly dangerous
+        //
+        // max = 160 is chosen as a "95% practical limit",
+        // not the theoretical maximum.
+        let raw = self.heights.into_iter().map(f32::from).sum::<f32>();
+        let norm = normalize(raw, 160.0);
+        negative_metrics_score(norm)
+    }
+
+    fn surface_roughness_score(&self) -> f32 {
+        // Surface roughness measures how uneven the board surface is.
+        // High roughness often leads to future holes.
+        //
+        // Typical ranges:
+        //   0–5    : flat or well-structured surface
+        //   10–20  : normal mid-game roughness
+        //   30+    : chaotic surface, high hole risk
+        //
+        // This metric is kept linear to avoid over-amplifying noise.
+        let raw = self
+            .heights
+            .windows(3)
+            .map(|w| {
+                let left = i16::from(w[0]);
+                let mid = i16::from(w[1]);
+                let right = i16::from(w[2]);
+                ((right - mid) - (mid - left)).unsigned_abs()
+            })
+            .sum::<u16>();
+        let raw = f32::from(raw);
+        let norm = normalize(raw, 40.0);
+        negative_metrics_score(norm)
+    }
+
+    fn deep_wells_score(&self) -> f32 {
+        // Deep wells detect excessively deep vertical gaps (width = 1).
+        // Controlled shallow wells are intentionally ignored to allow
+        // I-well (Tetris) strategies.
+        //
+        // Only wells deeper than 5 are considered dangerous.
+        //
+        // raw = sum of (well_depth^2) for dangerous wells
+        // This aggressively penalizes over-committed vertical structures.
+        //
+        // Typical interpretation (10x20 board):
+        //   raw ≈ 0      : no dangerous wells (safe or controlled I-wells)
+        //   raw ≈ 10–20  : risky but potentially recoverable
+        //   raw ≥ 50     : highly unstable, near-fatal structure
+        //
+        // This metric is NOT a positive reward.
+        // It acts purely as a safety penalty using exponential decay,
+        // while preserving freedom to build shallow I-wells.
+        let raw = self
+            .heights
+            .windows(3)
+            .map(|w| {
+                let left = u16::from(w[0]);
+                let mid = u16::from(w[1]);
+                let right = u16::from(w[2]);
+                if mid >= left || mid >= right {
+                    return 0;
+                }
+                let well_depth = u16::min(left, right) - mid;
+                if well_depth < 6 {
+                    return 0;
+                }
+                well_depth * well_depth
+            })
+            .sum::<u16>();
+
+        let raw = f32::from(raw);
+        let norm = normalize(raw, 50.0);
+        // do not use negative_metrics_score here
+        (-norm).exp()
+    }
+
     pub(crate) fn max_height(&self) -> u8 {
         *self.heights.iter().max().unwrap()
     }
 
-    fn normalized_max_height(&self) -> f32 {
-        const MIN: u8 = 0;
-        #[allow(clippy::cast_possible_truncation)]
-        const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8;
-        let height = self.max_height();
-        normalize(height, MIN, MAX).powi(2)
-    }
-
-    fn normalized_height_diff(&self) -> f32 {
-        const MIN: u8 = 0;
-        #[allow(clippy::cast_possible_truncation)]
-        const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
-        let diff = self
-            .heights
-            .iter()
-            .zip(&self.heights[1..])
-            .map(|(&a, &b)| a.abs_diff(b))
-            .sum::<u8>();
-        normalize(diff, MIN, MAX).powi(2)
-    }
-
-    pub(crate) fn holes(&self) -> u8 {
-        core::iter::zip(&self.heights, &self.occupied)
-            .map(|(&h, &occ)| h - occ)
-            .sum::<u8>()
-    }
-
-    fn normalized_holes(&self) -> f32 {
-        const MIN: u8 = 0;
-        #[allow(clippy::cast_possible_truncation)]
-        const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
-        let holes = self.holes();
-        normalize(holes, MIN, MAX).sqrt()
+    fn height_risk_score(&self) -> f32 {
+        // Height risk captures how close the highest column is
+        // to the board ceiling.
+        //
+        // The exponential transform reflects the fact that
+        // danger increases non-linearly near the top.
+        //
+        // max_height / board_height:
+        //   < 0.6 : safe, low risk
+        //   0.7–0.8 : critical region
+        //   ≥ 0.9 : imminent top-out
+        //
+        // Exponential scaling ensures strong penalty near the ceiling.
+        let max_height = f32::from(self.max_height());
+        #[expect(clippy::cast_precision_loss)]
+        let board_height = BitBoard::PLAYABLE_HEIGHT as f32;
+        let raw = (max_height / board_height).exp();
+        let norm = normalize(raw, 1.0f32.exp());
+        negative_metrics_score(norm)
     }
 }
 
-#[inline]
-fn normalize(value: impl Into<f32>, min: impl Into<f32>, max: impl Into<f32>) -> f32 {
-    let min = min.into();
-    let max = max.into();
-    let value = value.into().clamp(min, max);
-    (value - min) / (max - min)
+fn normalize(value: f32, max: f32) -> f32 {
+    (value / max).clamp(0.0, 1.0)
+}
+
+fn positive_metrics_score(norm: f32) -> f32 {
+    norm
+}
+
+fn negative_metrics_score(norm: f32) -> f32 {
+    1.0 - norm
 }

@@ -97,7 +97,7 @@ impl Individual {
             let cleared_lines = i32::try_from(game.total_cleared_lines()).unwrap();
             let piece_survived = i32::try_from(game.completed_pieces()).unwrap();
             let max_height = i32::from(height_info.max_height());
-            let holes = i32::from(height_info.holes());
+            let holes = i32::from(height_info.covered_holes());
             self.score += cleared_lines * LINE_SCORE + piece_survived
                 - max_height * HEIGHT_PENALTY
                 - holes * HOLE_PENALTY;
