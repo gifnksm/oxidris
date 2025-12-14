@@ -53,8 +53,16 @@ impl GameSession {
         self.game_state.level()
     }
 
-    pub(crate) fn cleared_lines(&self) -> usize {
+    pub(crate) fn total_cleared_lines(&self) -> usize {
         self.game_state.total_cleared_lines()
+    }
+
+    pub(crate) fn completed_pieces(&self) -> usize {
+        self.game_state.completed_pieces()
+    }
+
+    pub(crate) fn line_cleared_counter(&self) -> &[usize; 5] {
+        self.game_state.line_cleared_counter()
     }
 
     pub(crate) fn score(&self) -> usize {

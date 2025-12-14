@@ -161,7 +161,7 @@ pub(crate) fn auto() -> io::Result<()> {
 
         if target_move.is_none()
             && let Some((mv, _next_game)) =
-                evaluator::eval(game.game_state(), GenoSeq([100, 1, 10, 100]))
+                evaluator::eval(game.game_state(), GenoSeq([40865, 559, 59765, 51848]))
         {
             target_move = Some(mv);
         }

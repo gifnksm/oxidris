@@ -40,7 +40,7 @@ const STATS_PANEL: Panel = Panel {
     top: HOLD_PANEL.bottom() + 1,
     left: COMPONENT_LEFT,
     body_width: LEFT_PANE_BODY_WIDTH,
-    body_height: 7,
+    body_height: 13,
     title: "STATS",
 };
 
@@ -321,8 +321,38 @@ impl Renderer {
             .move_to(STATS_PANEL.body_top() + 6, STATS_PANEL.body_left())?
             .write(format_args!(
                 "LINES: {:>width$}",
-                game.cleared_lines(),
+                game.total_cleared_lines(),
                 width = STATS_PANEL.body_width - 7
+            ))?
+            .move_to(STATS_PANEL.body_top() + 8, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "PIECES: {:>width$}",
+                game.completed_pieces(),
+                width = STATS_PANEL.body_width - 7
+            ))?
+            .move_to(STATS_PANEL.body_top() + 9, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "SINGLES: {:>width$}",
+                game.line_cleared_counter()[1],
+                width = STATS_PANEL.body_width - 8
+            ))?
+            .move_to(STATS_PANEL.body_top() + 10, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "DOUBLES: {:>width$}",
+                game.line_cleared_counter()[2],
+                width = STATS_PANEL.body_width - 8
+            ))?
+            .move_to(STATS_PANEL.body_top() + 11, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "TRIPLES: {:>width$}",
+                game.line_cleared_counter()[3],
+                width = STATS_PANEL.body_width - 8
+            ))?
+            .move_to(STATS_PANEL.body_top() + 12, STATS_PANEL.body_left())?
+            .write(format_args!(
+                "TETRISES: {:>width$}",
+                game.line_cleared_counter()[4],
+                width = STATS_PANEL.body_width - 9
             ))?;
         Ok(())
     }
