@@ -1,13 +1,16 @@
-use std::{array, iter, mem, ops::Index, thread};
+use std::{array, iter, mem, thread};
 
 use rand::{
     Rng,
     distr::StandardUniform,
-    prelude::Distribution,
-    seq::{IndexedMutRandom, SliceRandom},
+    prelude::{Distribution, IndexedMutRandom},
+    seq::SliceRandom,
 };
 
-use crate::{ai::evaluator, engine::state::GameState};
+use crate::{
+    ai::{evaluator::Evaluator, metrics::METRIC_COUNT, weights::WeightSet},
+    engine::state::GameState,
+};
 
 const GAME_COUNT: usize = 5;
 const POPULATION: usize = 30;
@@ -17,43 +20,16 @@ const MUTATION_RATE: u32 = 20;
 const SELECTION_RATE: u32 = 20;
 const SELECTION_LEN: usize = POPULATION * (SELECTION_RATE as usize) / 100;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum GenomeKind {
-    LinesCleared,
-    HeightMax,
-    HeightDiff,
-    DeadSpace,
-}
-
-const GENOME_KIND_COUNT: usize = 4;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct GenoSeq(pub [u16; GENOME_KIND_COUNT]);
-
-impl Index<GenomeKind> for GenoSeq {
-    type Output = u16;
-
-    fn index(&self, kind: GenomeKind) -> &Self::Output {
-        &self.0[kind as usize]
-    }
-}
-
-impl Distribution<GenoSeq> for StandardUniform {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenoSeq {
-        GenoSeq(rng.random())
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct Individual {
-    geno: GenoSeq,
+    weights: WeightSet<METRIC_COUNT>,
     score: usize,
 }
 
 impl Distribution<Individual> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Individual {
         Individual {
-            geno: rng.random(),
+            weights: rng.random(),
             score: 0,
         }
     }
@@ -68,12 +44,13 @@ pub(crate) fn learning() {
             .collect::<Vec<_>>();
         thread::scope(|s| {
             for (i, ind) in inds.iter_mut().enumerate() {
+                let evaluator = Evaluator::new(ind.weights.clone());
                 let games = &games;
                 s.spawn(move || {
                     ind.score = 0;
                     for mut game in games.iter().cloned() {
                         for _ in 0..PIECE_COUNT {
-                            let Some((_, next_game)) = evaluator::eval(&game, ind.geno) else {
+                            let Some((_, next_game)) = evaluator.select_move(&game) else {
                                 break;
                             };
                             game = next_game;
@@ -81,7 +58,7 @@ pub(crate) fn learning() {
                         ind.score += game.score();
                     }
                     ind.score /= GAME_COUNT;
-                    println!("  {i:2}: {:?} => {}", ind.geno.0, ind.score);
+                    println!("  {i:2}: {:?} => {}", ind.weights.0, ind.score);
                 });
             }
         });
@@ -98,8 +75,8 @@ pub(crate) fn learning() {
 }
 
 fn mean_weight_stddev(inds: &[Individual]) -> f64 {
-    let weights: [f64; GENOME_KIND_COUNT] =
-        array::from_fn(|i| relative_stddev(inds.iter().map(|ind| f64::from(ind.geno.0[i]))));
+    let weights: [f64; METRIC_COUNT] =
+        array::from_fn(|i| relative_stddev(inds.iter().map(|ind| f64::from(ind.weights.0[i]))));
     mean(weights)
 }
 
@@ -140,7 +117,7 @@ fn gen_next_generation(inds: &mut [Individual; POPULATION]) {
     mutation(selected_inds);
     next_inds.extend_from_slice(selected_inds);
 
-    inds.copy_from_slice(&next_inds);
+    inds.clone_from_slice(&next_inds);
 }
 
 fn crossover(inds: &mut [Individual]) {
@@ -149,16 +126,16 @@ fn crossover(inds: &mut [Individual]) {
     for [i1, i2] in inds.as_chunks_mut().0 {
         let mut idx = [0, 1, 2, 3];
         idx.shuffle(&mut rng);
-        mem::swap(&mut i1.geno.0[idx[0]], &mut i2.geno.0[idx[0]]);
-        mem::swap(&mut i1.geno.0[idx[1]], &mut i2.geno.0[idx[1]]);
+        mem::swap(&mut i1.weights.0[idx[0]], &mut i2.weights.0[idx[0]]);
+        mem::swap(&mut i1.weights.0[idx[1]], &mut i2.weights.0[idx[1]]);
     }
 }
 
 fn mutation(inds: &mut [Individual]) {
     let mut rng = rand::rng();
     for ind in inds.iter_mut() {
-        if rand::random_ratio(MUTATION_RATE, 1000) {
-            *ind.geno.0.choose_mut(&mut rng).unwrap() = rand::random();
+        if rng.random_ratio(MUTATION_RATE, 1000) {
+            *ind.weights.0.choose_mut(&mut rng).unwrap() = rng.random();
         }
     }
 }

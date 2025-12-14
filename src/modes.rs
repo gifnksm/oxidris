@@ -6,10 +6,7 @@ use std::{
 use crossterm::event::KeyCode;
 
 use crate::{
-    ai::{
-        evaluator::{self, Move},
-        genetic::GenoSeq,
-    },
+    ai::evaluator::{Evaluator, Move},
     engine::session::{GameSession, SessionState},
     ui::{input::Input, renderer::Renderer},
 };
@@ -137,6 +134,8 @@ pub(crate) fn auto() -> io::Result<()> {
     let mut input = Input::new()?;
     let mut target_move = None;
 
+    let evaluator = Evaluator::default();
+
     let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
     loop {
         let now = Instant::now();
@@ -161,8 +160,7 @@ pub(crate) fn auto() -> io::Result<()> {
         }
 
         if target_move.is_none()
-            && let Some((mv, _next_game)) =
-                evaluator::eval(game.game_state(), GenoSeq([40865, 559, 59765, 51848]))
+            && let Some((mv, _next_game)) = evaluator.select_move(game.game_state())
         {
             target_move = Some(mv);
         }
