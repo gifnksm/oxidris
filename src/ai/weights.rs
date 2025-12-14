@@ -1,67 +1,49 @@
 use super::metrics::METRIC_COUNT;
-use rand::{Rng, distr::StandardUniform, prelude::Distribution};
-use std::fmt;
-
-#[derive(Clone, Copy)]
-pub(crate) struct Weight(pub(crate) f32);
-
-impl fmt::Debug for Weight {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.2e}", self.0)
-    }
-}
-
-impl Distribution<Weight> for StandardUniform {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Weight {
-        Weight(rng.random_range(0.0..0.5))
-    }
-}
+use rand::Rng;
+use rand_distr::Normal;
+use std::array;
 
 #[derive(Debug, Clone)]
-pub(crate) struct WeightSet<const N: usize>(pub(crate) [Weight; N]);
+pub(crate) struct WeightSet<const N: usize>(pub(crate) [f32; N]);
 
-impl Default for WeightSet<{ METRIC_COUNT }> {
-    fn default() -> Self {
-        Self([
-            Weight(0.149_261_53),
-            Weight(0.135_986_27),
-            Weight(0.746_309_46),
-            Weight(0.556_209_2),
-        ])
-    }
-}
-
-impl<const N: usize> Distribution<WeightSet<N>> for StandardUniform {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> WeightSet<N> {
-        WeightSet(rng.random())
-    }
+impl WeightSet<{ METRIC_COUNT }> {
+    pub(crate) const BEST: Self =
+        WeightSet([0.075_561_01, 0.196_294_75, 0.175_390_68, 0.162_211_33]);
 }
 
 impl<const N: usize> WeightSet<N> {
-    pub(crate) fn two_point_crossover<R>(parent1: &Self, parent2: &Self, rng: &mut R) -> [Self; 2]
+    pub(crate) fn random<R>(rng: &mut R, max_w: f32) -> Self
     where
         R: Rng + ?Sized,
     {
-        let mut child1 = parent1.0;
-        let mut child2 = parent2.0;
-        let p1 = rng.random_range(0..N);
-        let p2 = rng.random_range(0..N);
-        let (start, end) = if p1 < p2 { (p1, p2) } else { (p2, p1) };
-        child1[start..end].copy_from_slice(&parent2.0[start..end]);
-        child2[start..end].copy_from_slice(&parent1.0[start..end]);
-        [Self(child1), Self(child2)]
+        Self(array::from_fn(|_| rng.random_range(0.0..=max_w)))
     }
 
-    pub(crate) fn mutation<R>(&self, rng: &mut R, mutation_rate: f64) -> Self
+    pub(crate) fn blx_alpha<R>(p1: &Self, p2: &Self, alpha: f32, max_w: f32, rng: &mut R) -> Self
     where
         R: Rng + ?Sized,
     {
-        Self(self.0.map(|weight| {
-            if rng.random_bool(mutation_rate) {
-                rng.random()
-            } else {
-                weight
-            }
+        Self(array::from_fn(|i| {
+            let x1 = p1.0[i];
+            let x2 = p2.0[i];
+            let min = f32::min(x1, x2);
+            let max = f32::max(x1, x2);
+            let d = max - min;
+            let lower = min - alpha * d;
+            let upper = max + alpha * d;
+            rng.random_range(lower..=upper).clamp(0.0, max_w)
         }))
+    }
+
+    pub(crate) fn mutate<R>(&mut self, sigma: f32, max_w: f32, rate: f64, rng: &mut R)
+    where
+        R: Rng + ?Sized,
+    {
+        let normal = Normal::new(0.0, sigma).unwrap();
+        for w in &mut self.0 {
+            if rng.random_bool(rate) {
+                *w = (*w + rng.sample(normal)).clamp(0.0, max_w);
+            }
+        }
     }
 }

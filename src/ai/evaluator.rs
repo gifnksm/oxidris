@@ -14,9 +14,15 @@ pub(crate) struct Move {
     pub(crate) piece: Piece,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct Evaluator {
     weights: WeightSet<{ METRIC_COUNT }>,
+}
+
+impl Default for Evaluator {
+    fn default() -> Self {
+        Self::new(WeightSet::BEST)
+    }
 }
 
 impl Evaluator {
@@ -31,9 +37,7 @@ impl Evaluator {
         }
 
         let metrics = metrics::measure(init, game);
-        iter::zip(metrics, self.weights.0)
-            .map(|(m, w)| m * w.0)
-            .sum()
+        iter::zip(metrics, self.weights.0).map(|(m, w)| m * w).sum()
     }
 
     pub(crate) fn select_move(&self, game: &GameState) -> Option<(Move, GameState)> {

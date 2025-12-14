@@ -9,7 +9,7 @@ enum Metric {
     LinesCleared = 0,
     HeightMax = 1,
     HeightDiff = 2,
-    DeadSpace = 3,
+    Holes = 3,
 }
 
 pub(crate) const METRIC_COUNT: usize = 4;
@@ -23,7 +23,7 @@ pub(crate) fn measure(init: &GameState, game: &GameState) -> [f32; METRIC_COUNT]
     out[Metric::LinesCleared as usize] = line_clear_info.normalized_lines_cleared();
     out[Metric::HeightMax as usize] = 1.0 - height_info.normalized_max_height();
     out[Metric::HeightDiff as usize] = 1.0 - height_info.normalized_height_diff();
-    out[Metric::DeadSpace as usize] = 1.0 - height_info.normalized_dead_space();
+    out[Metric::Holes as usize] = 1.0 - height_info.normalized_holes();
 
     out
 }
@@ -55,13 +55,13 @@ impl LineClearInfo {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct HeightInfo {
+pub(crate) struct HeightInfo {
     heights: [u8; BitBoard::PLAYABLE_WIDTH],
     occupied: [u8; BitBoard::PLAYABLE_WIDTH],
 }
 
 impl HeightInfo {
-    fn compute(board: &BitBoard) -> Self {
+    pub(crate) fn compute(board: &BitBoard) -> Self {
         let mut heights = [0; BitBoard::PLAYABLE_WIDTH];
         let mut occupied = [0; BitBoard::PLAYABLE_WIDTH];
         for i in 0..BitBoard::PLAYABLE_WIDTH {
@@ -85,11 +85,15 @@ impl HeightInfo {
         Self { heights, occupied }
     }
 
+    pub(crate) fn max_height(&self) -> u8 {
+        *self.heights.iter().max().unwrap()
+    }
+
     fn normalized_max_height(&self) -> f32 {
         const MIN: u8 = 0;
         #[allow(clippy::cast_possible_truncation)]
         const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8;
-        let height = *self.heights.iter().max().unwrap();
+        let height = self.max_height();
         normalize(height, MIN, MAX).powi(2)
     }
 
@@ -106,14 +110,18 @@ impl HeightInfo {
         normalize(diff, MIN, MAX).powi(2)
     }
 
-    fn normalized_dead_space(&self) -> f32 {
+    pub(crate) fn holes(&self) -> u8 {
+        core::iter::zip(&self.heights, &self.occupied)
+            .map(|(&h, &occ)| h - occ)
+            .sum::<u8>()
+    }
+
+    fn normalized_holes(&self) -> f32 {
         const MIN: u8 = 0;
         #[allow(clippy::cast_possible_truncation)]
         const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
-        let dead_space = core::iter::zip(&self.heights, &self.occupied)
-            .map(|(&h, &occ)| h - occ)
-            .sum::<u8>();
-        normalize(dead_space, MIN, MAX).sqrt()
+        let holes = self.holes();
+        normalize(holes, MIN, MAX).sqrt()
     }
 }
 
