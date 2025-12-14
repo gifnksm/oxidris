@@ -27,26 +27,11 @@ pub(crate) fn eval(game: &GameState, weight: GenoSeq) -> Option<(Move, GameState
         for mv in moves {
             let mut game = game.clone();
             game.set_falling_piece_unchecked(mv.piece);
-            if game.complete_piece_drop().is_err() {
-                let score = compute_score(weight, init, &game, true);
-                if score > best_score {
-                    best_score = score;
-                    best_result = Some((mv, game.clone()));
-                }
-                continue;
-            }
-
-            for (next, moves) in available_moves(game.clone()) {
-                for next_mv in moves {
-                    let mut next = next.clone();
-                    next.set_falling_piece_unchecked(next_mv.piece);
-                    let game_over = next.complete_piece_drop().is_err();
-                    let score = compute_score(weight, init, &next, game_over);
-                    if score > best_score {
-                        best_score = score;
-                        best_result = Some((mv, game.clone()));
-                    }
-                }
+            let game_over = game.complete_piece_drop().is_err();
+            let score = compute_score(weight, init, &game, game_over);
+            if score > best_score {
+                best_score = score;
+                best_result = Some((mv, game.clone()));
             }
         }
     }
