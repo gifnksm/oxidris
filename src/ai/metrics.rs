@@ -14,7 +14,7 @@ enum Metric {
 
 pub(crate) const METRIC_COUNT: usize = 4;
 
-pub(crate) fn measure(init: &GameState, game: &GameState) -> [f64; METRIC_COUNT] {
+pub(crate) fn measure(init: &GameState, game: &GameState) -> [f32; METRIC_COUNT] {
     let line_clear_info = LineClearInfo::compute(init, game);
     let height_info = HeightInfo::compute(game.board());
 
@@ -43,9 +43,9 @@ impl LineClearInfo {
         Self { turns, counter }
     }
 
-    fn normalized_lines_cleared(self) -> f64 {
+    fn normalized_lines_cleared(self) -> f32 {
         const WEIGHT: [u8; 5] = [0, 0, 1, 2, 6];
-        let min = 0;
+        let min = 0u8;
         let max = self.turns * WEIGHT[4];
         let score = core::iter::zip(self.counter, WEIGHT)
             .map(|(count, weight)| count * weight)
@@ -85,7 +85,7 @@ impl HeightInfo {
         Self { heights, occupied }
     }
 
-    fn normalized_max_height(&self) -> f64 {
+    fn normalized_max_height(&self) -> f32 {
         const MIN: u8 = 0;
         #[allow(clippy::cast_possible_truncation)]
         const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8;
@@ -93,7 +93,7 @@ impl HeightInfo {
         normalize(height, MIN, MAX).powi(2)
     }
 
-    fn normalized_height_diff(&self) -> f64 {
+    fn normalized_height_diff(&self) -> f32 {
         const MIN: u8 = 0;
         #[allow(clippy::cast_possible_truncation)]
         const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
@@ -106,7 +106,7 @@ impl HeightInfo {
         normalize(diff, MIN, MAX).powi(2)
     }
 
-    fn normalized_dead_space(&self) -> f64 {
+    fn normalized_dead_space(&self) -> f32 {
         const MIN: u8 = 0;
         #[allow(clippy::cast_possible_truncation)]
         const MAX: u8 = BitBoard::PLAYABLE_HEIGHT as u8 * BitBoard::PLAYABLE_WIDTH as u8;
@@ -118,7 +118,7 @@ impl HeightInfo {
 }
 
 #[inline]
-fn normalize(value: impl Into<f64>, min: impl Into<f64>, max: impl Into<f64>) -> f64 {
+fn normalize(value: impl Into<f32>, min: impl Into<f32>, max: impl Into<f32>) -> f32 {
     let min = min.into();
     let max = max.into();
     let value = value.into().clamp(min, max);

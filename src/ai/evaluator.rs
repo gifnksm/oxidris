@@ -25,19 +25,19 @@ impl Evaluator {
     }
 
     #[inline]
-    pub(crate) fn score(&self, init: &GameState, game: &GameState, game_over: bool) -> f64 {
+    pub(crate) fn score(&self, init: &GameState, game: &GameState, game_over: bool) -> f32 {
         if game_over {
             return 0.0;
         }
 
         let metrics = metrics::measure(init, game);
         iter::zip(metrics, self.weights.0)
-            .map(|(m, w)| m * f64::from(w))
+            .map(|(m, w)| m * w.0)
             .sum()
     }
 
     pub(crate) fn select_move(&self, game: &GameState) -> Option<(Move, GameState)> {
-        let mut best_score = f64::MIN;
+        let mut best_score = f32::MIN;
         let mut best_result = None;
         let init = game;
 

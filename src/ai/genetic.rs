@@ -1,11 +1,6 @@
-use std::{array, iter, mem, thread};
+use std::{array, iter, thread};
 
-use rand::{
-    Rng,
-    distr::StandardUniform,
-    prelude::{Distribution, IndexedMutRandom},
-    seq::SliceRandom,
-};
+use rand::{Rng, distr::StandardUniform, prelude::Distribution, seq::SliceRandom};
 
 use crate::{
     ai::{evaluator::Evaluator, metrics::METRIC_COUNT, weights::WeightSet},
@@ -16,7 +11,7 @@ const GAME_COUNT: usize = 5;
 const POPULATION: usize = 30;
 const GENERATION_MAX: usize = 30;
 const PIECE_COUNT: usize = 500;
-const MUTATION_RATE: u32 = 20;
+const MUTATION_RATE: f64 = 0.02;
 const SELECTION_RATE: u32 = 20;
 const SELECTION_LEN: usize = POPULATION * (SELECTION_RATE as usize) / 100;
 
@@ -58,7 +53,7 @@ pub(crate) fn learning() {
                         ind.score += game.score();
                     }
                     ind.score /= GAME_COUNT;
-                    println!("  {i:2}: {:?} => {}", ind.weights.0, ind.score);
+                    println!("  {i:2}: {:?} => {}", ind.weights, ind.score);
                 });
             }
         });
@@ -72,31 +67,37 @@ pub(crate) fn learning() {
 
         gen_next_generation(&mut inds);
     }
+
+    println!("Best Individuals:");
+    inds.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    for (i, ind) in inds.iter().take(5).enumerate() {
+        println!("  {i:2}: {:?} => {}", ind.weights.0, ind.score);
+    }
 }
 
-fn mean_weight_stddev(inds: &[Individual]) -> f64 {
-    let weights: [f64; METRIC_COUNT] =
-        array::from_fn(|i| relative_stddev(inds.iter().map(|ind| f64::from(ind.weights.0[i]))));
+fn mean_weight_stddev(inds: &[Individual]) -> f32 {
+    let weights: [f32; METRIC_COUNT] =
+        array::from_fn(|i| relative_stddev(inds.iter().map(|ind| ind.weights.0[i].0)));
     mean(weights)
 }
 
-fn mean(values: impl IntoIterator<Item = f64>) -> f64 {
+fn mean(values: impl IntoIterator<Item = f32>) -> f32 {
     let (sum, count) = values
         .into_iter()
         .fold((0.0, 0.0), |(sum, count), x| (sum + x, count + 1.0));
     if count == 0.0 {
-        return f64::NAN;
+        return f32::NAN;
     }
     sum / count
 }
 
-fn mean_stddev(values: impl IntoIterator<Item = f64> + Clone) -> (f64, f64) {
+fn mean_stddev(values: impl IntoIterator<Item = f32> + Clone) -> (f32, f32) {
     let m = mean(values.clone());
     let variance = mean(values.into_iter().map(|x| (x - m).powi(2)));
     (m, variance.sqrt())
 }
 
-fn relative_stddev(values: impl IntoIterator<Item = f64> + Clone) -> f64 {
+fn relative_stddev(values: impl IntoIterator<Item = f32> + Clone) -> f32 {
     let (m, s) = mean_stddev(values);
     s / m
 }
@@ -124,18 +125,14 @@ fn crossover(inds: &mut [Individual]) {
     let mut rng = rand::rng();
     inds.shuffle(&mut rng);
     for [i1, i2] in inds.as_chunks_mut().0 {
-        let mut idx = [0, 1, 2, 3];
-        idx.shuffle(&mut rng);
-        mem::swap(&mut i1.weights.0[idx[0]], &mut i2.weights.0[idx[0]]);
-        mem::swap(&mut i1.weights.0[idx[1]], &mut i2.weights.0[idx[1]]);
+        [i1.weights, i2.weights] =
+            WeightSet::two_point_crossover(&i1.weights, &i2.weights, &mut rng);
     }
 }
 
 fn mutation(inds: &mut [Individual]) {
     let mut rng = rand::rng();
     for ind in inds.iter_mut() {
-        if rng.random_ratio(MUTATION_RATE, 1000) {
-            *ind.weights.0.choose_mut(&mut rng).unwrap() = rng.random();
-        }
+        ind.weights = ind.weights.mutation(&mut rng, MUTATION_RATE);
     }
 }
