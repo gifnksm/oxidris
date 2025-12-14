@@ -1,4 +1,4 @@
-use std::io;
+use std::{fmt, io};
 
 use crate::{
     core::{
@@ -132,6 +132,98 @@ impl Panel {
             .write("┘")?;
 
         Ok(())
+    }
+}
+
+struct BodyWriter<'a> {
+    term: &'a mut Terminal,
+    panel: Panel,
+    label_width: usize,
+    current_row: usize,
+}
+
+impl BodyWriter<'_> {
+    fn new(term: &mut Terminal, panel: Panel, label_width: usize) -> BodyWriter<'_> {
+        BodyWriter {
+            term,
+            panel,
+            label_width,
+            current_row: 0,
+        }
+    }
+
+    fn skip_rows(&mut self, n: usize) -> &mut Self {
+        assert!(self.current_row + n <= self.panel.body_height);
+        self.current_row += n;
+        self
+    }
+
+    fn write_text(&mut self, content: impl fmt::Display) -> io::Result<&mut Self> {
+        assert!(self.current_row < self.panel.body_height);
+        self.term
+            .move_to(
+                self.panel.body_top() + self.current_row,
+                self.panel.body_left(),
+            )?
+            .write(format_args!(
+                "{:<width$}",
+                content,
+                width = self.panel.body_width
+            ))?;
+        self.current_row += 1;
+        Ok(self)
+    }
+
+    fn write_number(&mut self, number: impl fmt::Display) -> io::Result<&mut Self> {
+        assert!(self.current_row < self.panel.body_height);
+        self.term
+            .move_to(
+                self.panel.body_top() + self.current_row,
+                self.panel.body_left(),
+            )?
+            .write(format_args!(
+                "{:>width$}",
+                number,
+                width = self.panel.body_width
+            ))?;
+        self.current_row += 1;
+        Ok(self)
+    }
+
+    fn write_labeled_number(
+        &mut self,
+        label: impl fmt::Display,
+        number: impl fmt::Display,
+    ) -> io::Result<&mut Self> {
+        assert!(self.current_row < self.panel.body_height);
+        let label_width = self.label_width;
+        let number_width = self.panel.body_width - label_width;
+        self.term
+            .move_to(
+                self.panel.body_top() + self.current_row,
+                self.panel.body_left(),
+            )?
+            .write(format_args!("{label:<label_width$}{number:>number_width$}"))?;
+        self.current_row += 1;
+        Ok(self)
+    }
+
+    fn write_labeled_text(
+        &mut self,
+        label: impl fmt::Display,
+        text: impl fmt::Display,
+    ) -> io::Result<&mut Self> {
+        assert!(self.current_row < self.panel.body_height);
+        let label_width = self.label_width;
+        let text_width = self.panel.body_width - label_width;
+        self.term
+            .move_to(
+                self.panel.body_top() + self.current_row,
+                self.panel.body_left(),
+            )?
+            .write(format_args!("{label:<label_width$}{text:<text_width$}"))?;
+        self.current_row += 1;
+        Ok(self)
     }
 }
 
@@ -290,82 +382,35 @@ impl Renderer {
 
     fn draw_stats_panel(&mut self, game: &GameSession) -> io::Result<()> {
         STATS_PANEL.draw_border(&mut self.term)?;
-        self.term
-            .move_to(STATS_PANEL.body_top(), STATS_PANEL.body_left())?
-            .write(format_args!("SCORE:",))?
-            .move_to(STATS_PANEL.body_top() + 1, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "{:>width$}",
-                game.score(),
-                width = STATS_PANEL.body_width
+        let mut writer = BodyWriter::new(&mut self.term, STATS_PANEL, 10);
+        writer
+            .write_text("SCORE:")?
+            .write_number(game.score())?
+            .write_text("TIME:")?
+            .write_number(format!(
+                "{:0}:{:0>2}.{:0>2}",
+                game.duration().as_secs() / 60,
+                game.duration().as_secs() % 60,
+                game.duration().subsec_millis() / 10,
             ))?
-            .move_to(STATS_PANEL.body_top() + 2, STATS_PANEL.body_left())?
-            .write(format_args!("TIME:",))?
-            .move_to(STATS_PANEL.body_top() + 3, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "{:>width$}",
-                format!(
-                    "{:0}:{:0>2}.{:0>2}",
-                    game.duration().as_secs() / 60,
-                    game.duration().as_secs() % 60,
-                    game.duration().subsec_millis() / 10,
-                ),
-                width = STATS_PANEL.body_width
-            ))?
-            .move_to(STATS_PANEL.body_top() + 5, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "LEVEL: {:>width$}",
-                game.level(),
-                width = STATS_PANEL.body_width - 7
-            ))?
-            .move_to(STATS_PANEL.body_top() + 6, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "LINES: {:>width$}",
-                game.total_cleared_lines(),
-                width = STATS_PANEL.body_width - 7
-            ))?
-            .move_to(STATS_PANEL.body_top() + 8, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "PIECES: {:>width$}",
-                game.completed_pieces(),
-                width = STATS_PANEL.body_width - 7
-            ))?
-            .move_to(STATS_PANEL.body_top() + 9, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "SINGLES: {:>width$}",
-                game.line_cleared_counter()[1],
-                width = STATS_PANEL.body_width - 8
-            ))?
-            .move_to(STATS_PANEL.body_top() + 10, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "DOUBLES: {:>width$}",
-                game.line_cleared_counter()[2],
-                width = STATS_PANEL.body_width - 8
-            ))?
-            .move_to(STATS_PANEL.body_top() + 11, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "TRIPLES: {:>width$}",
-                game.line_cleared_counter()[3],
-                width = STATS_PANEL.body_width - 8
-            ))?
-            .move_to(STATS_PANEL.body_top() + 12, STATS_PANEL.body_left())?
-            .write(format_args!(
-                "TETRISES: {:>width$}",
-                game.line_cleared_counter()[4],
-                width = STATS_PANEL.body_width - 9
-            ))?;
+            .skip_rows(1)
+            .write_labeled_number("LEVEL:", game.level())?
+            .write_labeled_number("LINES:", game.total_cleared_lines())?
+            .skip_rows(1)
+            .write_labeled_number("PIECES:", game.completed_pieces())?
+            .write_labeled_number("SINGLES:", game.line_cleared_counter()[1])?
+            .write_labeled_number("DOUBLES:", game.line_cleared_counter()[2])?
+            .write_labeled_number("TRIPLES:", game.line_cleared_counter()[3])?
+            .write_labeled_number("TETRISES:", game.line_cleared_counter()[4])?;
+
         Ok(())
     }
 
     fn draw_controls_panel(&mut self) -> io::Result<()> {
         CONTROLS_PANEL.draw_border(&mut self.term)?;
-        for (line_offset, (key, description)) in self.mode.controls().iter().enumerate() {
-            self.term
-                .move_to(
-                    CONTROLS_PANEL.body_top() + line_offset + 1,
-                    CONTROLS_PANEL.body_left(),
-                )?
-                .write(format_args!("{key:<12} : {description}"))?;
+        let mut writer = BodyWriter::new(&mut self.term, CONTROLS_PANEL, 8);
+        for (key, description) in self.mode.controls() {
+            writer.write_labeled_text(key, description)?;
         }
         Ok(())
     }

@@ -24,7 +24,8 @@ impl PlayMode {
     pub(crate) fn controls(self) -> &'static [(&'static str, &'static str)] {
         match self {
             PlayMode::Normal => &[
-                ("Left/Right", "Move left/right"),
+                ("Left", "Move left"),
+                ("Right", "Move right"),
                 ("Down", "Soft drop"),
                 ("Up", "Hard drop"),
                 ("z", "Rotate left"),
