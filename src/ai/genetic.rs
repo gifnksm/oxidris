@@ -1,4 +1,4 @@
-use std::{array, thread};
+use std::{array, iter, thread};
 
 use arrayvec::ArrayVec;
 use rand::{
@@ -8,19 +8,12 @@ use rand::{
 };
 
 use crate::{
-    ai::{
-        evaluator::Evaluator,
-        metrics::{HeightInfo, METRIC_COUNT},
-        weights::WeightSet,
-    },
+    ai::{evaluator::Evaluator, metrics::METRIC_COUNT, weights::WeightSet},
     engine::state::GameState,
 };
 
 const GAMES_PER_INDIVIDUALS: usize = 3;
 const MAX_PIECES_PER_GAME: usize = 800;
-const LINE_SCORE: i32 = 10;
-const HEIGHT_PENALTY: i32 = 5;
-const HOLE_PENALTY: i32 = 8;
 
 const POPULATION_COUNT: usize = 30;
 
@@ -69,7 +62,7 @@ const BLX_ALPHA: f32 = 0.2;
 #[derive(Debug, Clone)]
 struct Individual {
     weights: WeightSet<METRIC_COUNT>,
-    score: i32,
+    fitness: f32,
 }
 
 impl Distribution<Individual> for StandardUniform {
@@ -77,15 +70,17 @@ impl Distribution<Individual> for StandardUniform {
         let max_w = max_weight_by_phase(EvolutaionPhase::Exploration);
         Individual {
             weights: WeightSet::random(rng, max_w),
-            score: i32::MIN,
+            fitness: f32::MIN,
         }
     }
 }
 
+const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
+
 impl Individual {
     fn evaluate(&mut self, games: &[GameState]) {
         let evaluator = Evaluator::new(self.weights.clone());
-        self.score = 0;
+        self.fitness = 0.0;
         for mut game in games.iter().cloned() {
             for _ in 0..MAX_PIECES_PER_GAME {
                 let Some((_, next_game)) = evaluator.select_move(&game) else {
@@ -93,14 +88,19 @@ impl Individual {
                 };
                 game = next_game;
             }
-            let height_info = HeightInfo::compute(game.board());
-            let cleared_lines = i32::try_from(game.total_cleared_lines()).unwrap();
-            let piece_survived = i32::try_from(game.completed_pieces()).unwrap();
-            let max_height = i32::from(height_info.max_height());
-            let holes = i32::from(height_info.covered_holes());
-            self.score += cleared_lines * LINE_SCORE + piece_survived
-                - max_height * HEIGHT_PENALTY
-                - holes * HOLE_PENALTY;
+
+            #[expect(clippy::cast_precision_loss)]
+            let survived = game.completed_pieces() as f32;
+            #[expect(clippy::cast_precision_loss)]
+            let max_pieces = MAX_PIECES_PER_GAME as f32;
+            let survived_ratio = survived / max_pieces;
+            let survival_bonus = 2.0 * survived_ratio * survived_ratio;
+            #[expect(clippy::cast_precision_loss)]
+            let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, game.line_cleared_counter())
+                .map(|(w, c)| f32::from(w) * (*c as f32))
+                .sum::<f32>();
+            let efficiency = weighted_line_count / survived.max(1.0);
+            self.fitness += survival_bonus + efficiency * survived_ratio;
         }
     }
 }
@@ -116,10 +116,13 @@ pub(crate) fn learning() {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
                     ind.evaluate(games);
-                    println!("  {i:2}: {:.3?} => {}", ind.weights, ind.score);
+                    println!("  {i:2}: {:.3?} => {}", ind.weights, ind.fitness);
                 });
             }
         });
+
+        #[expect(clippy::cast_precision_loss)]
+        let population_count = POPULATION_COUNT as f32;
 
         let weights = |i| population.iter().map(move |ind| ind.weights.0[i]);
         let weights_min = WeightSet::<METRIC_COUNT>(array::from_fn(|i| min(weights(i))));
@@ -128,18 +131,31 @@ pub(crate) fn learning() {
         let weights_stddev =
             WeightSet::<METRIC_COUNT>(array::from_fn(|i| relative_stddev(weights(i))));
         let mean_stddev = mean_weight_stddev(&population);
-        let score_mean = population.iter().map(|i| i.score).sum::<i32>()
-            / i32::try_from(POPULATION_COUNT).unwrap();
-        let score_max = population.iter().map(|i| i.score).max().unwrap();
-        let score_min = population.iter().map(|i| i.score).min().unwrap();
-        println!("  Weights Min:       {:.3?}", weights_min.0);
-        println!("  Weights Max:       {:.3?}", weights_max.0);
-        println!("  Weights Mean:      {:.3?}", weights_mean.0);
+
+        let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
+        let fitness_max = population
+            .iter()
+            .map(|i| i.fitness)
+            .max_by(f32::total_cmp)
+            .unwrap();
+        let fitness_min = population
+            .iter()
+            .map(|i| i.fitness)
+            .min_by(f32::total_cmp)
+            .unwrap();
+
+        println!("  Weights Stats:");
+        println!("    Min:       {:.3?}", weights_min.0);
+        println!("    Max:       {:.3?}", weights_max.0);
+        println!("    Mean:      {:.3?}", weights_mean.0);
         println!(
-            "  Weights RelStddev: {:.3?} => {mean_stddev:.3}",
+            "    RelStddev: {:.3?} => {mean_stddev:.3}",
             weights_stddev.0
         );
-        println!("  Avg Score: {score_mean}, Max Score: {score_max}, Min Score: {score_min}");
+        println!("  Fitness Stats:");
+        println!("    Min:  {fitness_min:.3}");
+        println!("    Max:  {fitness_max:.3}");
+        println!("    Mean: {fitness_mean:.3}");
 
         if generation + 1 < MAX_GENERATIONS {
             gen_next_generation(&mut population, phase, &mut rng);
@@ -147,9 +163,9 @@ pub(crate) fn learning() {
     }
 
     println!("Best Individuals:");
-    population.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
     for (i, ind) in population.iter().take(5).enumerate() {
-        println!("  {i:2}: {:?} => {}", ind.weights.0, ind.score);
+        println!("  {i:2}: {:?} => {}", ind.weights.0, ind.fitness);
     }
 }
 
@@ -201,7 +217,7 @@ fn gen_next_generation<R>(
     let mut next = ArrayVec::<Individual, POPULATION_COUNT>::new();
 
     // elite selection
-    population.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
     next.extend(population[..ELITE_COUNT].iter().cloned());
 
     // generate the rest individuals
@@ -214,7 +230,7 @@ fn gen_next_generation<R>(
 
         next.push(Individual {
             weights: child,
-            score: 0,
+            fitness: 0.0,
         });
     }
 
@@ -229,5 +245,5 @@ where
     const _: () = assert!(TOURNAMENT_SIZE == 2);
     let a = population.choose(rng).unwrap();
     let b = population.choose(rng).unwrap();
-    if a.score >= b.score { a } else { b }
+    if a.fitness >= b.fitness { a } else { b }
 }
