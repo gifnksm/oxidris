@@ -128,9 +128,9 @@ pub(crate) fn learning() {
         let weights_min = WeightSet::<METRIC_COUNT>(array::from_fn(|i| min(weights(i))));
         let weights_max = WeightSet::<METRIC_COUNT>(array::from_fn(|i| max(weights(i))));
         let weights_mean = WeightSet::<METRIC_COUNT>(array::from_fn(|i| mean(weights(i))));
-        let weights_stddev =
-            WeightSet::<METRIC_COUNT>(array::from_fn(|i| relative_stddev(weights(i))));
-        let mean_stddev = mean_weight_stddev(&population);
+        let weights_norm_stddev =
+            WeightSet::<METRIC_COUNT>(array::from_fn(|i| normalized_stddev(weights(i))));
+        let weights_norm_stddev_mean = mean(weights_norm_stddev.0);
 
         let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
         let fitness_max = population
@@ -145,13 +145,11 @@ pub(crate) fn learning() {
             .unwrap();
 
         println!("  Weights Stats:");
-        println!("    Min:       {:.3?}", weights_min.0);
-        println!("    Max:       {:.3?}", weights_max.0);
-        println!("    Mean:      {:.3?}", weights_mean.0);
-        println!(
-            "    RelStddev: {:.3?} => {mean_stddev:.3}",
-            weights_stddev.0
-        );
+        println!("    Min:        {:.3?}", weights_min.0);
+        println!("    Max:        {:.3?}", weights_max.0);
+        println!("    Mean:       {:.3?}", weights_mean.0);
+        println!("    NormStddev: {:.3?}", weights_norm_stddev.0);
+        println!("    => Mean:    {weights_norm_stddev_mean:.3}");
         println!("  Fitness Stats:");
         println!("    Min:  {fitness_min:.3}");
         println!("    Max:  {fitness_max:.3}");
@@ -167,12 +165,6 @@ pub(crate) fn learning() {
     for (i, ind) in population.iter().take(5).enumerate() {
         println!("  {i:2}: {:?} => {}", ind.weights.0, ind.fitness);
     }
-}
-
-fn mean_weight_stddev(inds: &[Individual]) -> f32 {
-    let weights: [f32; METRIC_COUNT] =
-        array::from_fn(|i| relative_stddev(inds.iter().map(|ind| ind.weights.0[i])));
-    mean(weights)
 }
 
 fn mean(values: impl IntoIterator<Item = f32>) -> f32 {
@@ -193,15 +185,19 @@ fn min(values: impl IntoIterator<Item = f32>) -> f32 {
     values.into_iter().min_by(f32::total_cmp).unwrap()
 }
 
-fn mean_stddev(values: impl IntoIterator<Item = f32> + Clone) -> (f32, f32) {
+fn normalized_stddev(values: impl IntoIterator<Item = f32> + Clone) -> f32 {
     let m = mean(values.clone());
-    let variance = mean(values.into_iter().map(|x| (x - m).powi(2)));
-    (m, variance.sqrt())
-}
+    let variance = mean(values.clone().into_iter().map(|x| (x - m).powi(2)));
+    let stddev = variance.sqrt();
 
-fn relative_stddev(values: impl IntoIterator<Item = f32> + Clone) -> f32 {
-    let (m, s) = mean_stddev(values);
-    s / m
+    let max_v = max(values.clone());
+    let min_v = min(values);
+
+    let range = max_v - min_v;
+    if range.abs() < f32::EPSILON {
+        return 0.0;
+    }
+    stddev / range
 }
 
 fn gen_next_generation<R>(
