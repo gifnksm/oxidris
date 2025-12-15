@@ -69,6 +69,15 @@ impl BitRow {
         let bits = mask << x0;
         self.bits |= bits;
     }
+
+    /// Iterates over all playable cells in the row, returning their occupied status.
+    #[inline]
+    pub(crate) fn iter_playable_cells(self) -> impl Iterator<Item = bool> {
+        (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH).map(move |x| {
+            let bit = 1 << x;
+            (self.bits & bit) != 0
+        })
+    }
 }
 
 /// `BitBoard` for fast collision detection and line clearing.

@@ -15,22 +15,26 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(crate) struct Metrics {
     covered_holes: f32,
-    sum_of_heights: f32,
+    row_transitions: f32,
+    column_transitions: f32,
     surface_roughness: f32,
-    deep_wells: f32,
-    lines_cleared: f32,
     height_risk: f32,
+    deep_wells: f32,
+    sum_of_heights: f32,
+    lines_cleared: f32,
 }
 
 impl Metrics {
     pub(crate) fn as_array(&self) -> [f32; METRIC_COUNT] {
         [
             self.covered_holes,
-            self.sum_of_heights,
+            self.row_transitions,
+            self.column_transitions,
             self.surface_roughness,
-            self.deep_wells,
-            self.lines_cleared,
             self.height_risk,
+            self.deep_wells,
+            self.sum_of_heights,
+            self.lines_cleared,
         ]
     }
 
@@ -40,11 +44,13 @@ impl Metrics {
 
         Self {
             covered_holes: height_info.covered_holes_score(),
-            sum_of_heights: height_info.sum_of_heights_score(),
+            row_transitions: row_transitions_score(game.board()),
+            column_transitions: column_transitions_score(game.board()),
             surface_roughness: height_info.surface_roughness_score(),
-            deep_wells: height_info.deep_wells_score(),
-            lines_cleared: line_clear_info.lines_cleared_score(),
             height_risk: height_info.height_risk_score(),
+            deep_wells: height_info.deep_wells_score(),
+            sum_of_heights: height_info.sum_of_heights_score(),
+            lines_cleared: line_clear_info.lines_cleared_score(),
         }
     }
 }
@@ -125,16 +131,16 @@ impl HeightInfo {
     }
 
     pub(crate) fn covered_holes_score(&self) -> f32 {
-        // Covered holes are one of the strongest losing factors.
-        // raw = holes^1.5 emphasizes the first few holes.
+        // Covered holes are empty cells with at least one block above them.
+        // They are one of the strongest losing factors.
         //
-        // Typical ranges (raw holes count):
-        //   0–3   : very good, board is clean
+        // Typical ranges (raw hole count):
+        //   0–3   : very clean board
         //   4–7   : dangerous, recovery becomes difficult
-        //   10+   : almost losing position
+        //   10+   : near-losing position
         //
-        // The normalization max (≈60) corresponds to ~15 holes,
-        // which is a practical upper bound in real games.
+        // A power transform (holes^1.5) emphasizes early hole creation.
+        // The normalization max (~60) corresponds to ~15 practical holes.
         let raw = f32::from(self.covered_holes()).powf(1.5);
         let norm = normalize(raw, 60.0);
         negative_metrics_score(norm)
@@ -157,15 +163,18 @@ impl HeightInfo {
     }
 
     fn surface_roughness_score(&self) -> f32 {
-        // Surface roughness measures how uneven the board surface is.
-        // High roughness often leads to future holes.
+        // Surface roughness measures local curvature of the board surface
+        // using second-order height differences.
+        //
+        // Unlike row transitions, this metric remains sensitive
+        // when the overall stack is low.
         //
         // Typical ranges:
-        //   0–5    : flat or well-structured surface
+        //   0–5    : flat or well-shaped surface
         //   10–20  : normal mid-game roughness
-        //   30+    : chaotic surface, high hole risk
+        //   30+    : chaotic surface with high hole risk
         //
-        // This metric is kept linear to avoid over-amplifying noise.
+        // This metric complements row transitions rather than replacing it.
         let raw = self
             .heights
             .windows(3)
@@ -244,9 +253,82 @@ impl HeightInfo {
         #[expect(clippy::cast_precision_loss)]
         let board_height = BitBoard::PLAYABLE_HEIGHT as f32;
         let raw = (max_height / board_height).exp();
-        let norm = normalize(raw, 1.0f32.exp());
+        let norm = normalize(raw, std::f32::consts::E);
         negative_metrics_score(norm)
     }
+}
+
+fn row_transitions(board: &BitBoard) -> u16 {
+    let mut transitions = 0;
+    for row in board.playable_rows() {
+        let mut prev_occupied = true; // left wall
+        for occupied in row.iter_playable_cells() {
+            if occupied != prev_occupied {
+                transitions += 1;
+            }
+            prev_occupied = occupied;
+        }
+        if !prev_occupied {
+            transitions += 1; // right wall
+        }
+    }
+    transitions
+}
+
+fn row_transitions_score(board: &BitBoard) -> f32 {
+    // Row transitions count horizontal occupancy changes per row,
+    // treating both left and right walls as occupied cells.
+    //
+    // This models the board as a closed container and penalizes
+    // narrow gaps and fragmented horizontal structures.
+    //
+    // Typical ranges (10x20 board):
+    //   40–60   : very clean surface
+    //   80–120  : normal mid-game structure
+    //   150+    : highly fragmented, unstable board
+    //
+    // The normalization max represents a practical upper bound
+    // rather than the theoretical maximum.
+    let raw = f32::from(row_transitions(board));
+    let norm = normalize(raw, 160.0);
+    negative_metrics_score(norm)
+}
+
+fn column_transitions(board: &BitBoard) -> u16 {
+    let mut transitions = 0;
+    for x in SENTINEL_MARGIN_LEFT..(SENTINEL_MARGIN_LEFT + BitBoard::PLAYABLE_WIDTH) {
+        let mut prev_occupied = board.playable_row(0).is_cell_occupied(x); // top cell
+        for y in 1..BitBoard::PLAYABLE_HEIGHT {
+            let occupied = board.playable_row(y).is_cell_occupied(x);
+            if occupied != prev_occupied {
+                transitions += 1;
+            }
+            prev_occupied = occupied;
+        }
+        if !prev_occupied {
+            transitions += 1; // bottom wall
+        }
+    }
+    transitions
+}
+
+fn column_transitions_score(board: &BitBoard) -> f32 {
+    // Column transitions count vertical occupancy changes per column,
+    // treating covered holes as empty cells.
+    //
+    // This metric captures vertical fragmentation that is not always
+    // visible from row transitions alone.
+    //
+    // Typical ranges (10x20 board):
+    //   20–40   : clean vertical structure
+    //   60–100  : normal mid-game fragmentation
+    //   120+    : severe vertical instability
+    //
+    // Covered holes are intentionally treated as empty here,
+    // since they are already penalized by a dedicated metric.
+    let raw = f32::from(column_transitions(board));
+    let norm = normalize(raw, 120.0);
+    negative_metrics_score(norm)
 }
 
 fn normalize(value: f32, max: f32) -> f32 {
