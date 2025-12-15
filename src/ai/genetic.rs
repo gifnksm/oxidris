@@ -68,6 +68,7 @@ struct Individual {
 const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
 
 impl Individual {
+    #[expect(clippy::cast_precision_loss)]
     fn evaluate(&mut self, games: &[GameState]) {
         let evaluator = Evaluator::new(self.weights.clone());
         self.fitness = 0.0;
@@ -79,22 +80,21 @@ impl Individual {
                 game = next_game;
             }
 
-            #[expect(clippy::cast_precision_loss)]
             let survived = game.completed_pieces() as f32;
-            #[expect(clippy::cast_precision_loss)]
             let max_pieces = MAX_PIECES_PER_GAME as f32;
             let survived_ratio = survived / max_pieces;
             let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-            #[expect(clippy::cast_precision_loss)]
             let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, game.line_cleared_counter())
                 .map(|(w, c)| f32::from(w) * (*c as f32))
                 .sum::<f32>();
             let efficiency = weighted_line_count / survived.max(1.0);
             self.fitness += survival_bonus + efficiency * survived_ratio;
         }
+        self.fitness /= games.len() as f32;
     }
 }
 
+#[expect(clippy::cast_precision_loss)]
 pub(crate) fn learning() {
     let mut rng = rand::rng();
     let mut population = gen_first_generation(&mut rng);
@@ -106,12 +106,11 @@ pub(crate) fn learning() {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
                     ind.evaluate(games);
-                    println!("  {i:2}: {:.3?} => {}", ind.weights, ind.fitness);
+                    println!("  {i:2}: {:.3?} => {:.3}", ind.weights.0, ind.fitness);
                 });
             }
         });
 
-        #[expect(clippy::cast_precision_loss)]
         let population_count = POPULATION_COUNT as f32;
 
         let weights = |i| population.iter().map(move |ind| ind.weights.0[i]);
