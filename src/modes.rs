@@ -143,8 +143,10 @@ pub(crate) fn auto() -> io::Result<()> {
 
         // Handle input
         while let Some(key) = input.try_read()? {
-            if key == KeyCode::Char('q') {
-                quit = true;
+            match key {
+                KeyCode::Char('q') => quit = true,
+                KeyCode::Char('p') => game.toggle_pause(),
+                _ => {}
             }
         }
 
@@ -159,16 +161,19 @@ pub(crate) fn auto() -> io::Result<()> {
             break;
         }
 
-        if target_move.is_none()
-            && let Some((mv, _next_game)) = evaluator.select_move(game.game_state())
-        {
-            target_move = Some(mv);
-        }
+        // AI move selection and operation
+        if game.session_state().is_playing() {
+            if target_move.is_none()
+                && let Some((mv, _next_game)) = evaluator.select_move(game.game_state())
+            {
+                target_move = Some(mv);
+            }
 
-        if let Some(tmv) = &target_move
-            && operate_game(&mut game, tmv)
-        {
-            target_move = None;
+            if let Some(tmv) = &target_move
+                && operate_game(&mut game, tmv)
+            {
+                target_move = None;
+            }
         }
 
         let elapsed = now.elapsed();
