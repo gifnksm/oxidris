@@ -237,24 +237,24 @@ impl HeightInfo {
     }
 
     fn height_risk_score(&self) -> f32 {
-        // Height risk captures how close the highest column is
-        // to the board ceiling.
-        //
-        // The exponential transform reflects the fact that
-        // danger increases non-linearly near the top.
-        //
-        // max_height / board_height:
-        //   < 0.6 : safe, low risk
-        //   0.7–0.8 : critical region
-        //   ≥ 0.9 : imminent top-out
-        //
-        // Exponential scaling ensures strong penalty near the ceiling.
+        // Height risk represents imminent top-out danger.
+        // Heights below the safe threshold are intentionally ignored,
+        // as moderate stacking is often necessary for line clears
+        // and I-well construction.
+        // A sharp exponential penalty is applied only near the ceiling
+        // to model the irreversible nature of top-out.
+        const SAFE_THRESHOLD: f32 = 0.7;
+
         let max_height = f32::from(self.max_height());
         #[expect(clippy::cast_precision_loss)]
         let board_height = BitBoard::PLAYABLE_HEIGHT as f32;
-        let raw = (max_height / board_height).exp();
-        let norm = normalize(raw, std::f32::consts::E);
-        negative_metrics_score(norm)
+        let h = max_height / board_height;
+        let raw = if h <= SAFE_THRESHOLD {
+            0.0
+        } else {
+            (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)
+        };
+        (-4.0 * raw).exp()
     }
 }
 
