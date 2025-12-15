@@ -8,14 +8,14 @@ pub(crate) struct WeightSet<const N: usize>(pub(crate) [f32; N]);
 
 impl WeightSet<{ METRIC_COUNT }> {
     pub(crate) const BEST: Self = WeightSet([
-        0.338_017_6,
-        0.207_819_72,
-        0.246_744_5,
+        0.192_736_97,
+        0.281_804_47,
+        0.222_217_63,
         0.0,
-        0.374_429_97,
-        0.130_379_56,
+        0.092_958_4,
+        0.196_356_31,
         0.0,
-        0.311_487_7,
+        0.013_926_165,
     ]);
 }
 
@@ -51,6 +51,15 @@ impl<const N: usize> WeightSet<N> {
         for w in &mut self.0 {
             if rng.random_bool(rate) {
                 *w = (*w + rng.sample(normal)).clamp(0.0, max_w);
+            }
+        }
+    }
+
+    pub(crate) fn normalize_l1(&mut self) {
+        let sum: f32 = self.0.iter().copied().sum();
+        if sum > 0.0 {
+            for w in &mut self.0 {
+                *w /= sum;
             }
         }
     }

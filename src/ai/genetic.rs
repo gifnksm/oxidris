@@ -65,16 +65,6 @@ struct Individual {
     fitness: f32,
 }
 
-impl Distribution<Individual> for StandardUniform {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Individual {
-        let max_w = max_weight_by_phase(EvolutaionPhase::Exploration);
-        Individual {
-            weights: WeightSet::random(rng, max_w),
-            fitness: f32::MIN,
-        }
-    }
-}
-
 const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
 
 impl Individual {
@@ -107,7 +97,7 @@ impl Individual {
 
 pub(crate) fn learning() {
     let mut rng = rand::rng();
-    let mut population = rng.random::<[Individual; POPULATION_COUNT]>();
+    let mut population = gen_first_generation(&mut rng);
     for generation in 0..MAX_GENERATIONS {
         let phase = EvolutaionPhase::from_generation(generation);
         println!("Generation #{generation} ({phase:?}):");
@@ -200,6 +190,25 @@ fn normalized_stddev(values: impl IntoIterator<Item = f32> + Clone) -> f32 {
     stddev / range
 }
 
+impl Distribution<Individual> for StandardUniform {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Individual {
+        let max_w = max_weight_by_phase(EvolutaionPhase::Exploration);
+        let mut weights = WeightSet::random(rng, max_w);
+        weights.normalize_l1();
+        Individual {
+            weights,
+            fitness: f32::MIN,
+        }
+    }
+}
+
+fn gen_first_generation<R>(rng: &mut R) -> [Individual; POPULATION_COUNT]
+where
+    R: Rng + ?Sized,
+{
+    rng.random::<[Individual; POPULATION_COUNT]>()
+}
+
 fn gen_next_generation<R>(
     population: &mut [Individual; POPULATION_COUNT],
     phase: EvolutaionPhase,
@@ -223,6 +232,7 @@ fn gen_next_generation<R>(
 
         let mut child = WeightSet::blx_alpha(&p1.weights, &p2.weights, BLX_ALPHA, max_w, rng);
         child.mutate(sigma, max_w, MUTATION_RATE, rng);
+        child.normalize_l1();
 
         next.push(Individual {
             weights: child,
