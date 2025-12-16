@@ -106,7 +106,7 @@ pub(crate) fn learning() {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
                     ind.evaluate(games);
-                    println!("  {i:2}: {:.3?} => {:.3}", ind.weights.0, ind.fitness);
+                    println!("  {i:2}: {:.3?} => {:.3}", ind.weights, ind.fitness);
                 });
             }
         });
@@ -134,10 +134,10 @@ pub(crate) fn learning() {
             .unwrap();
 
         println!("  Weights Stats:");
-        println!("    Min:        {:.3?}", weights_min.0);
-        println!("    Max:        {:.3?}", weights_max.0);
-        println!("    Mean:       {:.3?}", weights_mean.0);
-        println!("    NormStddev: {:.3?}", weights_norm_stddev.0);
+        println!("    Min:        {weights_min:.3?}");
+        println!("    Max:        {weights_max:.3?}");
+        println!("    Mean:       {weights_mean:.3?}");
+        println!("    NormStddev: {weights_norm_stddev:.3?}");
         println!("    => Mean:    {weights_norm_stddev_mean:.3}");
         println!("  Fitness Stats:");
         println!("    Min:  {fitness_min:.3}");

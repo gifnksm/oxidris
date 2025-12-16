@@ -1,10 +1,16 @@
 use super::metrics::METRIC_COUNT;
 use rand::Rng;
 use rand_distr::Normal;
-use std::array;
+use std::{array, fmt};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct WeightSet<const N: usize>(pub(crate) [f32; N]);
+
+impl<const N: usize> fmt::Debug for WeightSet<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
 
 impl WeightSet<{ METRIC_COUNT }> {
     pub(crate) const BEST: Self = WeightSet([
