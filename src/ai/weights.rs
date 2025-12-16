@@ -13,15 +13,25 @@ impl<const N: usize> fmt::Debug for WeightSet<N> {
 }
 
 impl WeightSet<{ METRIC_COUNT }> {
-    pub(crate) const BEST: Self = WeightSet([
-        0.192_736_97,
-        0.281_804_47,
-        0.222_217_63,
+    pub(crate) const AGGRO: Self = WeightSet([
+        0.274_366_4,
+        0.152_744_11,
+        0.148_963_84,
         0.0,
-        0.092_958_4,
-        0.196_356_31,
+        0.123_221_82,
+        0.300_703_76,
         0.0,
-        0.013_926_165,
+        0.0,
+    ]);
+    pub(crate) const DEFENSIVE: Self = WeightSet([
+        0.117_032_89,
+        0.070_271_97,
+        0.319_794_8,
+        0.056_014_13,
+        0.039_437_704,
+        0.043_507_893,
+        0.285_814,
+        0.068_126_6,
     ]);
 }
 

@@ -4,6 +4,7 @@ use arrayvec::ArrayVec;
 
 use super::metrics::{METRIC_COUNT, Metrics};
 use super::weights::WeightSet;
+use crate::AiType;
 use crate::core::bit_board::BitBoard;
 use crate::core::piece::Piece;
 use crate::engine::state::GameState;
@@ -19,13 +20,26 @@ pub(crate) struct TurnEvaluator {
     weights: WeightSet<{ METRIC_COUNT }>,
 }
 
-impl Default for TurnEvaluator {
-    fn default() -> Self {
-        Self::new(WeightSet::BEST)
-    }
-}
-
 impl TurnEvaluator {
+    pub(crate) fn aggro() -> Self {
+        Self {
+            weights: WeightSet::AGGRO,
+        }
+    }
+
+    pub(crate) fn defensive() -> Self {
+        Self {
+            weights: WeightSet::DEFENSIVE,
+        }
+    }
+
+    pub(crate) fn by_ai_type(ai: AiType) -> Self {
+        match ai {
+            AiType::Aggro => Self::aggro(),
+            AiType::Defensive => Self::defensive(),
+        }
+    }
+
     pub(crate) fn new(weights: WeightSet<{ METRIC_COUNT }>) -> Self {
         Self { weights }
     }

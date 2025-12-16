@@ -8,9 +8,12 @@ use rand::{
 };
 
 use crate::{
+    AiType,
     ai::{metrics::METRIC_COUNT, turn_evaluator::TurnEvaluator, weights::WeightSet},
     engine::state::GameState,
 };
+
+use super::metrics::HeightInfo;
 
 const GAMES_PER_INDIVIDUALS: usize = 3;
 const MAX_PIECES_PER_GAME: usize = 800;
@@ -65,11 +68,9 @@ struct Individual {
     fitness: f32,
 }
 
-const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
-
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&mut self, games: &[GameState]) {
+    fn evaluate(&mut self, games: &[GameState], fitness_evaluator: &dyn FitnessEvaluator) {
         let turn_evaluator = TurnEvaluator::new(self.weights.clone());
         self.fitness = 0.0;
         for mut game in games.iter().cloned() {
@@ -80,22 +81,60 @@ impl Individual {
                 game = next_game;
             }
 
-            let survived = game.completed_pieces() as f32;
-            let max_pieces = MAX_PIECES_PER_GAME as f32;
-            let survived_ratio = survived / max_pieces;
-            let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-            let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, game.line_cleared_counter())
-                .map(|(w, c)| f32::from(w) * (*c as f32))
-                .sum::<f32>();
-            let efficiency = weighted_line_count / survived.max(1.0);
-            self.fitness += survival_bonus + efficiency * survived_ratio;
+            self.fitness += fitness_evaluator.evaluate(&game);
         }
         self.fitness /= games.len() as f32;
     }
 }
 
+trait FitnessEvaluator: Send + Sync {
+    fn evaluate(&self, game: &GameState) -> f32;
+}
+
+#[derive(Debug)]
+struct AggroFitnessEvaluator;
+
+impl FitnessEvaluator for AggroFitnessEvaluator {
+    #[expect(clippy::cast_precision_loss)]
+    fn evaluate(&self, game: &GameState) -> f32 {
+        const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
+
+        let survived = game.completed_pieces() as f32;
+        let max_pieces = MAX_PIECES_PER_GAME as f32;
+        let survived_ratio = survived / max_pieces;
+        let survival_bonus = 2.0 * survived_ratio * survived_ratio;
+        let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, game.line_cleared_counter())
+            .map(|(w, c)| f32::from(w) * (*c as f32))
+            .sum::<f32>();
+        let efficiency = weighted_line_count / survived.max(1.0);
+        survival_bonus + efficiency * survived_ratio
+    }
+}
+
+#[derive(Debug)]
+struct DefensiveFitnessEvaluator;
+
+impl FitnessEvaluator for DefensiveFitnessEvaluator {
+    #[expect(clippy::cast_precision_loss)]
+    fn evaluate(&self, game: &GameState) -> f32 {
+        let height_info = HeightInfo::compute(game.board());
+        let survived = game.completed_pieces() as f32;
+        let max_pieces = MAX_PIECES_PER_GAME as f32;
+        let survived_ratio = survived / max_pieces;
+        let survival_bonus = 2.0 * survived_ratio * survived_ratio;
+        let line_count = game.total_cleared_lines() as f32;
+        let efficiency = line_count / survived.max(1.0);
+        let height_penalty = f32::from(height_info.max_height()) / 20.0;
+        survival_bonus + efficiency * survived_ratio - height_penalty
+    }
+}
+
 #[expect(clippy::cast_precision_loss)]
-pub(crate) fn learning() {
+pub(crate) fn learning(ai: AiType) {
+    let fitness_evaluator = match ai {
+        AiType::Aggro => &AggroFitnessEvaluator as &dyn FitnessEvaluator,
+        AiType::Defensive => &DefensiveFitnessEvaluator as &dyn FitnessEvaluator,
+    };
     let mut rng = rand::rng();
     let mut population = gen_first_generation(&mut rng);
     for generation in 0..MAX_GENERATIONS {
@@ -105,7 +144,7 @@ pub(crate) fn learning() {
         thread::scope(|s| {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
-                    ind.evaluate(games);
+                    ind.evaluate(games, fitness_evaluator);
                     println!("  {i:2}: {:.3?} => {:.3}", ind.weights, ind.fitness);
                 });
             }

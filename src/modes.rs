@@ -6,6 +6,7 @@ use std::{
 use crossterm::event::KeyCode;
 
 use crate::{
+    AiType,
     ai::turn_evaluator::{TurnEvaluator, TurnPlan},
     engine::session::{GameSession, SessionState},
     ui::{input::Input, renderer::Renderer},
@@ -127,14 +128,14 @@ pub(crate) fn normal() -> io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn auto() -> io::Result<()> {
+pub(crate) fn auto(ai: AiType) -> io::Result<()> {
     let mut game = GameSession::new(FPS);
     let mut renderer = Renderer::new(PlayMode::Auto)?;
     renderer.draw(&game)?;
     let mut input = Input::new()?;
     let mut best_turn = None;
 
-    let turn_evaluator = TurnEvaluator::default();
+    let turn_evaluator = TurnEvaluator::by_ai_type(ai);
 
     let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
     loop {
