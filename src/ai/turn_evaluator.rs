@@ -9,23 +9,23 @@ use crate::core::piece::Piece;
 use crate::engine::state::GameState;
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Move {
-    pub(crate) is_hold_used: bool,
-    pub(crate) piece: Piece,
+pub(crate) struct TurnPlan {
+    pub(crate) use_hold: bool,
+    pub(crate) placement: Piece,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Evaluator {
+pub(crate) struct TurnEvaluator {
     weights: WeightSet<{ METRIC_COUNT }>,
 }
 
-impl Default for Evaluator {
+impl Default for TurnEvaluator {
     fn default() -> Self {
         Self::new(WeightSet::BEST)
     }
 }
 
-impl Evaluator {
+impl TurnEvaluator {
     pub(crate) fn new(weights: WeightSet<{ METRIC_COUNT }>) -> Self {
         Self { weights }
     }
@@ -42,20 +42,20 @@ impl Evaluator {
             .sum()
     }
 
-    pub(crate) fn select_move(&self, game: &GameState) -> Option<(Move, GameState)> {
+    pub(crate) fn select_best_turn(&self, game: &GameState) -> Option<(TurnPlan, GameState)> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
         let init = game;
 
-        for (game, moves) in available_moves(game.clone()) {
-            for mv in moves {
+        for (game, turns) in available_turns(game.clone()) {
+            for turn in turns {
                 let mut game = game.clone();
-                game.set_falling_piece_unchecked(mv.piece);
+                game.set_falling_piece_unchecked(turn.placement);
                 let game_over = game.complete_piece_drop().is_err();
                 let score = self.score(init, &game, game_over);
                 if score > best_score {
                     best_score = score;
-                    best_result = Some((mv, game.clone()));
+                    best_result = Some((turn, game.clone()));
                 }
             }
         }
@@ -64,20 +64,28 @@ impl Evaluator {
     }
 }
 
-fn available_moves(mut game: GameState) -> ArrayVec<(GameState, impl Iterator<Item = Move>), 2> {
+fn available_turns(
+    mut game: GameState,
+) -> ArrayVec<(GameState, impl Iterator<Item = TurnPlan>), 2> {
     let mut result = ArrayVec::new();
-    let moves = available_piece_moves(&game);
-    result.push((game.clone(), moves));
+    let placement2turn = |use_hold| {
+        move |placement| TurnPlan {
+            use_hold,
+            placement,
+        }
+    };
+
+    let turns = available_placement(&game);
+    result.push((game.clone(), turns.map(placement2turn(false))));
     if game.try_hold().is_ok() {
-        let moves = available_piece_moves(&game);
-        result.push((game, moves));
+        let turns = available_placement(&game).map(placement2turn(true));
+        result.push((game, turns));
     }
     result
 }
 
-fn available_piece_moves(game: &GameState) -> impl Iterator<Item = Move> + use<> {
+fn available_placement(game: &GameState) -> impl Iterator<Item = Piece> + use<> {
     let board = game.board().clone();
-    let is_hold_used = game.is_hold_used();
     let rotations = game.falling_piece().super_rotations(&board).into_iter();
     rotations.flat_map(move |piece| {
         iter::once(piece)
@@ -88,10 +96,6 @@ fn available_piece_moves(game: &GameState) -> impl Iterator<Item = Move> + use<>
                 move_right(p, &board)
             }))
             .map(|piece| piece.simulate_drop_position(&board))
-            .map(move |piece| Move {
-                is_hold_used,
-                piece,
-            })
             .collect::<ArrayVec<_, { BitBoard::PLAYABLE_WIDTH }>>()
     })
 }

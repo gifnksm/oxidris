@@ -8,7 +8,7 @@ use rand::{
 };
 
 use crate::{
-    ai::{evaluator::Evaluator, metrics::METRIC_COUNT, weights::WeightSet},
+    ai::{metrics::METRIC_COUNT, turn_evaluator::TurnEvaluator, weights::WeightSet},
     engine::state::GameState,
 };
 
@@ -70,11 +70,11 @@ const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
     fn evaluate(&mut self, games: &[GameState]) {
-        let evaluator = Evaluator::new(self.weights.clone());
+        let turn_evaluator = TurnEvaluator::new(self.weights.clone());
         self.fitness = 0.0;
         for mut game in games.iter().cloned() {
             for _ in 0..MAX_PIECES_PER_GAME {
-                let Some((_, next_game)) = evaluator.select_move(&game) else {
+                let Some((_, next_game)) = turn_evaluator.select_best_turn(&game) else {
                     break;
                 };
                 game = next_game;

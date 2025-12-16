@@ -6,7 +6,7 @@ use std::{
 use crossterm::event::KeyCode;
 
 use crate::{
-    ai::evaluator::{Evaluator, Move},
+    ai::turn_evaluator::{TurnEvaluator, TurnPlan},
     engine::session::{GameSession, SessionState},
     ui::{input::Input, renderer::Renderer},
 };
@@ -132,9 +132,9 @@ pub(crate) fn auto() -> io::Result<()> {
     let mut renderer = Renderer::new(PlayMode::Auto)?;
     renderer.draw(&game)?;
     let mut input = Input::new()?;
-    let mut target_move = None;
+    let mut best_turn = None;
 
-    let evaluator = Evaluator::default();
+    let turn_evaluator = TurnEvaluator::default();
 
     let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
     loop {
@@ -163,16 +163,16 @@ pub(crate) fn auto() -> io::Result<()> {
 
         // AI move selection and operation
         if game.session_state().is_playing() {
-            if target_move.is_none()
-                && let Some((mv, _next_game)) = evaluator.select_move(game.game_state())
+            if best_turn.is_none()
+                && let Some((turn, _next_game)) = turn_evaluator.select_best_turn(game.game_state())
             {
-                target_move = Some(mv);
+                best_turn = Some(turn);
             }
 
-            if let Some(tmv) = &target_move
-                && operate_game(&mut game, tmv)
+            if let Some(target) = &best_turn
+                && operate_game(&mut game, target)
             {
-                target_move = None;
+                best_turn = None;
             }
         }
 
@@ -186,24 +186,27 @@ pub(crate) fn auto() -> io::Result<()> {
     Ok(())
 }
 
-fn operate_game(game: &mut GameSession, target: &Move) -> bool {
-    assert!(target.is_hold_used || !game.game_state().is_hold_used());
-    if target.is_hold_used && !game.game_state().is_hold_used() {
+fn operate_game(game: &mut GameSession, target: &TurnPlan) -> bool {
+    assert!(target.use_hold || !game.game_state().is_hold_used());
+    if target.use_hold && !game.game_state().is_hold_used() {
         return game.try_hold().is_err();
     }
 
     let falling_piece = game.game_state().falling_piece();
-    assert_eq!(target.piece.kind(), falling_piece.kind());
-    if falling_piece.rotation() != target.piece.rotation() {
+    assert_eq!(target.placement.kind(), falling_piece.kind());
+    if falling_piece.rotation() != target.placement.rotation() {
         return game.try_rotate_right().is_err();
     }
 
-    if falling_piece.position().x() < target.piece.position().x() {
+    if falling_piece.position().x() < target.placement.position().x() {
         return game.try_move_right().is_err();
-    } else if falling_piece.position().x() > target.piece.position().x() {
+    } else if falling_piece.position().x() > target.placement.position().x() {
         return game.try_move_left().is_err();
     }
-    assert_eq!(falling_piece.position().x(), target.piece.position().x());
+    assert_eq!(
+        falling_piece.position().x(),
+        target.placement.position().x()
+    );
     game.hard_drop_and_complete();
 
     true
