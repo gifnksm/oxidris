@@ -1,10 +1,8 @@
 use std::io;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
+use oxidris_ai::AiType;
 
-mod ai;
-mod core;
-mod engine;
 mod modes;
 mod ui;
 
@@ -32,19 +30,12 @@ enum Mode {
     },
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum AiType {
-    #[default]
-    Aggro,
-    Defensive,
-}
-
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.mode.unwrap_or(Mode::Normal) {
         Mode::Normal => modes::normal()?,
         Mode::Auto { ai } => modes::auto(ai)?,
-        Mode::Learning { ai } => ai::genetic::learning(ai),
+        Mode::Learning { ai } => oxidris_ai::genetic::learning(ai),
     }
     Ok(())
 }

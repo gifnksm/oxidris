@@ -1,13 +1,9 @@
+use oxidris_engine::{
+    GameSession, PieceKind, PieceRotation, RenderBoard, RenderCell, SessionState,
+};
 use std::{fmt, io};
 
-use crate::{
-    core::{
-        piece::{PieceKind, PieceRotation},
-        render_board::{RenderBoard, RenderCell},
-    },
-    engine::session::{GameSession, SessionState},
-    modes::PlayMode,
-};
+use crate::modes::PlayMode;
 
 use super::terminal::{Color, Terminal};
 

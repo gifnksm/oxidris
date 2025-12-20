@@ -4,11 +4,11 @@ use std::{
 };
 
 use crossterm::event::KeyCode;
+use oxidris_ai::{TurnEvaluator, TurnPlan};
+use oxidris_engine::{GameSession, SessionState};
 
 use crate::{
     AiType,
-    ai::turn_evaluator::{TurnEvaluator, TurnPlan},
-    engine::session::{GameSession, SessionState},
     ui::{input::Input, renderer::Renderer},
 };
 

@@ -14,14 +14,14 @@ use super::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Piece {
+pub struct Piece {
     position: PiecePosition,
     rotation: PieceRotation,
     kind: PieceKind,
 }
 
 impl Piece {
-    pub(crate) fn new(kind: PieceKind) -> Self {
+    pub fn new(kind: PieceKind) -> Self {
         Self {
             position: PiecePosition::SPAWN_POSITION,
             rotation: PieceRotation::default(),
@@ -29,29 +29,29 @@ impl Piece {
         }
     }
 
-    pub(crate) fn position(&self) -> PiecePosition {
+    pub fn position(&self) -> PiecePosition {
         self.position
     }
 
-    pub(crate) fn rotation(&self) -> PieceRotation {
+    pub fn rotation(&self) -> PieceRotation {
         self.rotation
     }
 
-    pub(crate) fn kind(&self) -> PieceKind {
+    pub fn kind(&self) -> PieceKind {
         self.kind
     }
 
-    pub(crate) fn mask(&self) -> PieceMask {
+    pub fn mask(&self) -> PieceMask {
         self.kind.mask(self.rotation)
     }
 
-    pub(crate) fn occupied_positions(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+    pub fn occupied_positions(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         self.kind
             .occupied_positions(self.rotation)
             .map(move |(dx, dy)| (self.position.x() + dx, self.position.y() + dy))
     }
 
-    pub(crate) fn left(&self) -> Option<Self> {
+    pub fn left(&self) -> Option<Self> {
         let new_pos = self.position.left()?;
         Some(Self {
             position: new_pos,
@@ -60,7 +60,7 @@ impl Piece {
         })
     }
 
-    pub(crate) fn right(&self) -> Option<Self> {
+    pub fn right(&self) -> Option<Self> {
         let new_pos = self.position.right()?;
         Some(Self {
             position: new_pos,
@@ -69,7 +69,7 @@ impl Piece {
         })
     }
 
-    pub(crate) fn up(&self) -> Option<Self> {
+    pub fn up(&self) -> Option<Self> {
         let new_pos = self.position.up()?;
         Some(Self {
             position: new_pos,
@@ -78,7 +78,7 @@ impl Piece {
         })
     }
 
-    pub(crate) fn down(&self) -> Option<Self> {
+    pub fn down(&self) -> Option<Self> {
         let new_pos = self.position.down()?;
         Some(Self {
             position: new_pos,
@@ -87,7 +87,7 @@ impl Piece {
         })
     }
 
-    pub(crate) fn rotated_right(&self) -> Self {
+    pub fn rotated_right(&self) -> Self {
         Self {
             position: self.position,
             rotation: self.rotation.rotated_right(),
@@ -95,7 +95,7 @@ impl Piece {
         }
     }
 
-    pub(crate) fn rotated_left(&self) -> Self {
+    pub fn rotated_left(&self) -> Self {
         Self {
             position: self.position,
             rotation: self.rotation.rotated_left(),
@@ -103,7 +103,7 @@ impl Piece {
         }
     }
 
-    pub(crate) fn super_rotated_left(self, board: &BitBoard) -> Option<Self> {
+    pub fn super_rotated_left(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_left();
         if board.is_colliding(&piece) {
             piece = super_rotation(board, &piece)?;
@@ -111,7 +111,7 @@ impl Piece {
         Some(piece)
     }
 
-    pub(crate) fn super_rotated_right(self, board: &BitBoard) -> Option<Self> {
+    pub fn super_rotated_right(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_right();
         if board.is_colliding(&piece) {
             piece = super_rotation(board, &piece)?;
@@ -119,7 +119,7 @@ impl Piece {
         Some(piece)
     }
 
-    pub(crate) fn super_rotations(self, board: &BitBoard) -> ArrayVec<Self, 4> {
+    pub fn super_rotations(self, board: &BitBoard) -> ArrayVec<Self, 4> {
         let mut rotations = ArrayVec::new();
         rotations.push(self);
         if self.kind == PieceKind::O {
@@ -136,7 +136,7 @@ impl Piece {
         rotations
     }
 
-    pub(crate) fn simulate_drop_position(&self, board: &BitBoard) -> Self {
+    pub fn simulate_drop_position(&self, board: &BitBoard) -> Self {
         let mut dropped = *self;
         while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(m)) {
             dropped = piece;
@@ -156,27 +156,27 @@ fn super_rotation(board: &BitBoard, piece: &Piece) -> Option<Piece> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct PiecePosition {
+pub struct PiecePosition {
     x: usize,
     y: usize,
 }
 
 impl PiecePosition {
-    const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
+    pub const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
 
-    const fn new(x: usize, y: usize) -> Self {
+    pub const fn new(x: usize, y: usize) -> Self {
         Self { x, y }
     }
 
-    pub(crate) fn x(self) -> usize {
+    pub fn x(self) -> usize {
         self.x
     }
 
-    pub(crate) fn y(self) -> usize {
+    pub fn y(self) -> usize {
         self.y
     }
 
-    const fn left(&self) -> Option<Self> {
+    pub const fn left(&self) -> Option<Self> {
         if self.x == 0 {
             None
         } else {
@@ -184,7 +184,7 @@ impl PiecePosition {
         }
     }
 
-    const fn right(&self) -> Option<Self> {
+    pub const fn right(&self) -> Option<Self> {
         if self.x >= BitBoard::TOTAL_WIDTH - 1 {
             None
         } else {
@@ -192,7 +192,7 @@ impl PiecePosition {
         }
     }
 
-    const fn up(&self) -> Option<Self> {
+    pub const fn up(&self) -> Option<Self> {
         if self.y == 0 {
             None
         } else {
@@ -200,7 +200,7 @@ impl PiecePosition {
         }
     }
 
-    const fn down(&self) -> Option<Self> {
+    pub const fn down(&self) -> Option<Self> {
         if self.y >= BitBoard::TOTAL_HEIGHT - 1 {
             None
         } else {
@@ -213,14 +213,14 @@ impl PiecePosition {
 ///
 /// 0: 0 degrees, 1: 90° right, 2: 180°, 3: 90° left.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct PieceRotation(u8);
+pub struct PieceRotation(u8);
 
 impl PieceRotation {
-    pub(crate) fn rotated_right(self) -> Self {
+    pub fn rotated_right(self) -> Self {
         PieceRotation((self.0 + 1) % 4)
     }
 
-    pub(crate) fn rotated_left(self) -> Self {
+    pub fn rotated_left(self) -> Self {
         PieceRotation((self.0 + 3) % 4)
     }
 
@@ -232,7 +232,7 @@ impl PieceRotation {
 /// Enum representing the type of piece.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub(crate) enum PieceKind {
+pub enum PieceKind {
     /// I-piece.
     I = 0,
     /// O-piece.
@@ -272,7 +272,7 @@ impl PieceKind {
     }
 
     /// Returns an iterator of occupied positions for the piece in the given rotation.
-    pub(crate) fn occupied_positions(
+    pub fn occupied_positions(
         &self,
         rotation: PieceRotation,
     ) -> impl Iterator<Item = (usize, usize)> + '_ {

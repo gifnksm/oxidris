@@ -1,51 +1,49 @@
 use std::iter;
 
 use arrayvec::ArrayVec;
+use oxidris_engine::{BitBoard, GameState, Piece};
 
 use super::metrics::{METRIC_COUNT, Metrics};
 use super::weights::WeightSet;
 use crate::AiType;
-use crate::core::bit_board::BitBoard;
-use crate::core::piece::Piece;
-use crate::engine::state::GameState;
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct TurnPlan {
-    pub(crate) use_hold: bool,
-    pub(crate) placement: Piece,
+pub struct TurnPlan {
+    pub use_hold: bool,
+    pub placement: Piece,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct TurnEvaluator {
+pub struct TurnEvaluator {
     weights: WeightSet<{ METRIC_COUNT }>,
 }
 
 impl TurnEvaluator {
-    pub(crate) fn aggro() -> Self {
+    pub fn aggro() -> Self {
         Self {
             weights: WeightSet::AGGRO,
         }
     }
 
-    pub(crate) fn defensive() -> Self {
+    pub fn defensive() -> Self {
         Self {
             weights: WeightSet::DEFENSIVE,
         }
     }
 
-    pub(crate) fn by_ai_type(ai: AiType) -> Self {
+    pub fn by_ai_type(ai: AiType) -> Self {
         match ai {
             AiType::Aggro => Self::aggro(),
             AiType::Defensive => Self::defensive(),
         }
     }
 
-    pub(crate) fn new(weights: WeightSet<{ METRIC_COUNT }>) -> Self {
+    pub fn new(weights: WeightSet<{ METRIC_COUNT }>) -> Self {
         Self { weights }
     }
 
     #[inline]
-    pub(crate) fn score(&self, init: &GameState, game: &GameState, game_over: bool) -> f32 {
+    fn score(&self, init: &GameState, game: &GameState, game_over: bool) -> f32 {
         if game_over {
             return 0.0;
         }
@@ -56,7 +54,7 @@ impl TurnEvaluator {
             .sum()
     }
 
-    pub(crate) fn select_best_turn(&self, game: &GameState) -> Option<(TurnPlan, GameState)> {
+    pub fn select_best_turn(&self, game: &GameState) -> Option<(TurnPlan, GameState)> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
         let init = game;

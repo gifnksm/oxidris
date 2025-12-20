@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::core::piece::Piece;
 
 pub(super) const PLAYABLE_WIDTH: usize = 10;
@@ -13,7 +15,7 @@ pub(super) const TOTAL_HEIGHT: usize =
 
 pub(super) const SENTINEL_MARGIN_TOP: usize = 2;
 pub(super) const SENTINEL_MARGIN_BOTTOM: usize = 2;
-pub(crate) const SENTINEL_MARGIN_LEFT: usize = 2;
+pub(super) const SENTINEL_MARGIN_LEFT: usize = 2;
 pub(super) const SENTINEL_MARGIN_RIGHT: usize = 2;
 
 // Bit masks for sentinel regions
@@ -31,27 +33,27 @@ const PLAYABLE_MASK: u16 = FULL_ROW_MASK & !SENTINEL_MASK;
 /// Single row in the bit board representation.
 /// Stores one row of the board as a u16 bitmask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct BitRow {
+pub struct BitRow {
     bits: u16,
 }
 
 impl BitRow {
-    const EMPTY: Self = Self {
+    pub const EMPTY: Self = Self {
         bits: SENTINEL_MASK,
     };
-    const FULL_SENTINEL: Self = Self {
+    pub const FULL_SENTINEL: Self = Self {
         bits: FULL_ROW_MASK,
     };
 
     /// Checks if the playable area is completely filled.
     #[inline]
-    fn is_playable_filled(self) -> bool {
+    pub fn is_playable_filled(self) -> bool {
         (self.bits & PLAYABLE_MASK) == PLAYABLE_MASK
     }
 
     /// Checks if a cell at the given x-coordinate (in playable area) is occupied.
     #[inline]
-    pub(crate) fn is_cell_occupied(self, x: usize) -> bool {
+    pub fn is_cell_occupied(self, x: usize) -> bool {
         let bit = 1 << x;
         (self.bits & bit) != 0
     }
@@ -72,7 +74,7 @@ impl BitRow {
 
     /// Iterates over all playable cells in the row, returning their occupied status.
     #[inline]
-    pub(crate) fn iter_playable_cells(self) -> impl Iterator<Item = bool> {
+    pub fn iter_playable_cells(self) -> impl Iterator<Item = bool> {
         (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH).map(move |x| {
             let bit = 1 << x;
             (self.bits & bit) != 0
@@ -130,17 +132,21 @@ impl BitRow {
 ///
 /// This allows full movement range while maintaining 4x4 grid collision detection.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BitBoard {
+pub struct BitBoard {
     rows: [BitRow; TOTAL_HEIGHT],
 }
 
 impl BitBoard {
-    pub(crate) const TOTAL_WIDTH: usize = TOTAL_WIDTH;
-    pub(crate) const TOTAL_HEIGHT: usize = TOTAL_HEIGHT;
-    pub(crate) const PLAYABLE_WIDTH: usize = PLAYABLE_WIDTH;
-    pub(crate) const PLAYABLE_HEIGHT: usize = PLAYABLE_HEIGHT;
+    pub const TOTAL_WIDTH: usize = TOTAL_WIDTH;
+    pub const TOTAL_HEIGHT: usize = TOTAL_HEIGHT;
+    pub const PLAYABLE_WIDTH: usize = PLAYABLE_WIDTH;
+    pub const PLAYABLE_HEIGHT: usize = PLAYABLE_HEIGHT;
+    pub const PLAYABLE_X_RANGE: Range<usize> =
+        SENTINEL_MARGIN_LEFT..(SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH);
+    pub const PLAYABLE_Y_RANGE: Range<usize> =
+        SENTINEL_MARGIN_TOP..(SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT);
 
-    pub(crate) const INITIAL: Self = {
+    pub const INITIAL: Self = {
         Self {
             rows: [
                 // Top sentinel rows (only side sentinels, allow pieces to spawn above playable area)
@@ -175,19 +181,19 @@ impl BitBoard {
     };
 
     /// Returns a reference to a playable row by index.
-    pub(crate) fn playable_row(&self, y: usize) -> BitRow {
+    pub fn playable_row(&self, y: usize) -> BitRow {
         self.rows[y + SENTINEL_MARGIN_TOP]
     }
 
     /// Returns an iterator over the playable rows.
-    pub(crate) fn playable_rows(&self) -> impl Iterator<Item = BitRow> + '_ {
+    pub fn playable_rows(&self) -> impl Iterator<Item = BitRow> + '_ {
         self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT]
             .iter()
             .copied()
     }
 
     /// Checks if the piece collides with occupied cells.
-    pub(crate) fn is_colliding(&self, piece: &Piece) -> bool {
+    pub fn is_colliding(&self, piece: &Piece) -> bool {
         let x0 = piece.position().x();
         let y0 = piece.position().y();
         for (mask, row) in piece.mask().into_iter().zip(&self.rows[y0..]) {
@@ -199,7 +205,7 @@ impl BitBoard {
     }
 
     /// Fills the piece cells on the board.
-    pub(crate) fn fill_piece(&mut self, piece: &Piece) {
+    pub fn fill_piece(&mut self, piece: &Piece) {
         let x0 = piece.position().x();
         let y0 = piece.position().y();
         for (mask, row) in piece.mask().into_iter().zip(&mut self.rows[y0..]) {
@@ -210,7 +216,7 @@ impl BitBoard {
     /// Clears filled lines and returns the number of lines cleared.
     ///
     /// A line is considered filled when all playable cells are occupied.
-    pub(crate) fn clear_lines(&mut self) -> usize {
+    pub fn clear_lines(&mut self) -> usize {
         let playable_rows = &mut self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT];
         let mut count = 0;
 

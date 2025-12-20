@@ -7,11 +7,9 @@ use rand::{
     seq::IndexedRandom,
 };
 
-use crate::{
-    AiType,
-    ai::{metrics::METRIC_COUNT, turn_evaluator::TurnEvaluator, weights::WeightSet},
-    engine::state::GameState,
-};
+use oxidris_engine::GameState;
+
+use crate::{AiType, metrics::METRIC_COUNT, turn_evaluator::TurnEvaluator, weights::WeightSet};
 
 use super::metrics::HeightInfo;
 
@@ -130,7 +128,7 @@ impl FitnessEvaluator for DefensiveFitnessEvaluator {
 }
 
 #[expect(clippy::cast_precision_loss)]
-pub(crate) fn learning(ai: AiType) {
+pub fn learning(ai: AiType) {
     let fitness_evaluator = match ai {
         AiType::Aggro => &AggroFitnessEvaluator as &dyn FitnessEvaluator,
         AiType::Defensive => &DefensiveFitnessEvaluator as &dyn FitnessEvaluator,

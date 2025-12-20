@@ -1,9 +1,5 @@
+use oxidris_engine::{BitBoard, GameState};
 use std::iter;
-
-use crate::{
-    core::bit_board::{BitBoard, SENTINEL_MARGIN_LEFT},
-    engine::state::GameState,
-};
 
 // All evaluation metrics are transformed into a [0.0, 1.0] score,
 // where higher is always better.
@@ -103,8 +99,7 @@ impl HeightInfo {
     pub(crate) fn compute(board: &BitBoard) -> Self {
         let mut heights = [0; BitBoard::PLAYABLE_WIDTH];
         let mut occupied = [0; BitBoard::PLAYABLE_WIDTH];
-        for i in 0..BitBoard::PLAYABLE_WIDTH {
-            let x = SENTINEL_MARGIN_LEFT + i;
+        for (i, x) in BitBoard::PLAYABLE_X_RANGE.enumerate() {
             let min_y = board
                 .playable_rows()
                 .enumerate()
@@ -296,7 +291,7 @@ fn row_transitions_score(board: &BitBoard) -> f32 {
 
 fn column_transitions(board: &BitBoard) -> u16 {
     let mut transitions = 0;
-    for x in SENTINEL_MARGIN_LEFT..(SENTINEL_MARGIN_LEFT + BitBoard::PLAYABLE_WIDTH) {
+    for x in BitBoard::PLAYABLE_X_RANGE {
         let mut prev_occupied = board.playable_row(0).is_cell_occupied(x); // top cell
         for y in 1..BitBoard::PLAYABLE_HEIGHT {
             let occupied = board.playable_row(y).is_cell_occupied(x);

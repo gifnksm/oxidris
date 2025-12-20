@@ -1,0 +1,16 @@
+[package]
+name = "oxidris-cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+clap.workspace = true
+crossterm.workspace = true
+oxidris-ai.workspace = true
+oxidris-engine.workspace = true
+rand.workspace = true
+rand_distr.workspace = true
+
+[lints]
+workspace = true

@@ -290,6 +290,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "oxidris-ai"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "derive_more",
+ "oxidris-engine",
+ "rand",
+ "rand_distr",
+]
+
+[[package]]
+name = "oxidris-cli"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "clap",
+ "crossterm",
+ "oxidris-ai",
+ "oxidris-engine",
+ "rand",
+ "rand_distr",
+]
+
+[[package]]
+name = "oxidris-engine"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "derive_more",
+ "rand",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,18 +496,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "tetris"
-version = "0.1.0"
-dependencies = [
- "arrayvec",
- "clap",
- "crossterm",
- "derive_more",
- "rand",
- "rand_distr",
 ]
 
 [[package]]

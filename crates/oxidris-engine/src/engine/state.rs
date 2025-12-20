@@ -6,7 +6,7 @@ use crate::core::{
 const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 
 #[derive(Debug, Clone)]
-pub(crate) struct GameState {
+pub struct GameState {
     board: BitBoard,
     falling_piece: Piece,
     held_piece: Option<PieceKind>,
@@ -18,8 +18,14 @@ pub(crate) struct GameState {
     line_cleared_counter: [usize; 5],
 }
 
+impl Default for GameState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GameState {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let first_piece = PieceKind::I; // dummy initial value
         let mut game = Self {
             board: BitBoard::INITIAL,
@@ -36,35 +42,35 @@ impl GameState {
         game
     }
 
-    pub(crate) fn level(&self) -> usize {
+    pub fn level(&self) -> usize {
         self.total_cleared_lines / 10
     }
 
-    pub(crate) fn total_cleared_lines(&self) -> usize {
+    pub fn total_cleared_lines(&self) -> usize {
         self.total_cleared_lines
     }
 
-    pub(crate) fn completed_pieces(&self) -> usize {
+    pub fn completed_pieces(&self) -> usize {
         self.completed_pieces
     }
 
-    pub(crate) fn line_cleared_counter(&self) -> &[usize; 5] {
+    pub fn line_cleared_counter(&self) -> &[usize; 5] {
         &self.line_cleared_counter
     }
 
-    pub(crate) fn score(&self) -> usize {
+    pub fn score(&self) -> usize {
         self.score
     }
 
-    pub(crate) fn board(&self) -> &BitBoard {
+    pub fn board(&self) -> &BitBoard {
         &self.board
     }
 
-    pub(crate) fn falling_piece(&self) -> &Piece {
+    pub fn falling_piece(&self) -> &Piece {
         &self.falling_piece
     }
 
-    pub(crate) fn set_falling_piece(&mut self, piece: Piece) -> Result<(), ()> {
+    pub fn set_falling_piece(&mut self, piece: Piece) -> Result<(), ()> {
         if self.board.is_colliding(&piece) {
             return Err(());
         }
@@ -72,27 +78,27 @@ impl GameState {
         Ok(())
     }
 
-    pub(crate) fn set_falling_piece_unchecked(&mut self, piece: Piece) {
+    pub fn set_falling_piece_unchecked(&mut self, piece: Piece) {
         self.falling_piece = piece;
     }
 
-    pub(crate) fn held_piece(&self) -> Option<PieceKind> {
+    pub fn held_piece(&self) -> Option<PieceKind> {
         self.held_piece
     }
 
-    pub(crate) fn is_hold_used(&self) -> bool {
+    pub fn is_hold_used(&self) -> bool {
         self.hold_used
     }
 
-    pub(crate) fn next_pieces(&self) -> impl Iterator<Item = PieceKind> + '_ {
+    pub fn next_pieces(&self) -> impl Iterator<Item = PieceKind> + '_ {
         self.piece_generator.next_pieces()
     }
 
-    pub(crate) fn simulate_drop_position(&self) -> Piece {
+    pub fn simulate_drop_position(&self) -> Piece {
         self.falling_piece.simulate_drop_position(&self.board)
     }
 
-    pub(crate) fn try_hold(&mut self) -> Result<(), ()> {
+    pub fn try_hold(&mut self) -> Result<(), ()> {
         if self.hold_used {
             return Err(());
         }
@@ -111,7 +117,7 @@ impl GameState {
         Ok(())
     }
 
-    pub(crate) fn complete_piece_drop(&mut self) -> Result<usize, ()> {
+    pub fn complete_piece_drop(&mut self) -> Result<usize, ()> {
         self.board.fill_piece(&self.falling_piece);
         let cleared_lines = self.board.clear_lines();
         self.score += SCORE_TABLE[cleared_lines];

@@ -1,0 +1,12 @@
+[package]
+name = "oxidris-engine"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+derive_more = {workspace = true, features = ["is_variant"] }
+rand.workspace = true
+
+[lints]
+workspace = true

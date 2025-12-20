@@ -1,0 +1,14 @@
+[package]
+name = "oxidris-ai"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+derive_more = { workspace = true, features = ["from_str"] }
+oxidris-engine.workspace = true
+rand.workspace = true
+rand_distr.workspace = true
+
+[lints]
+workspace = true

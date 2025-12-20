@@ -10,7 +10,7 @@ use super::piece::PieceKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
-pub(crate) enum RenderCell {
+pub enum RenderCell {
     #[default]
     Empty,
     Wall,
@@ -19,13 +19,13 @@ pub(crate) enum RenderCell {
 }
 
 impl RenderCell {
-    pub(crate) fn is_empty(self) -> bool {
+    pub fn is_empty(self) -> bool {
         self == RenderCell::Empty
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct RenderRow {
+pub struct RenderRow {
     cells: [RenderCell; TOTAL_WIDTH],
 }
 
@@ -55,18 +55,18 @@ impl RenderRow {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RenderBoard {
+pub struct RenderBoard {
     rows: [RenderRow; TOTAL_HEIGHT],
 }
 
 impl RenderBoard {
-    pub(crate) const PLAYABLE_WIDTH: usize = PLAYABLE_WIDTH;
-    pub(crate) const PLAYABLE_HEIGHT: usize = PLAYABLE_HEIGHT;
+    pub const PLAYABLE_WIDTH: usize = PLAYABLE_WIDTH;
+    pub const PLAYABLE_HEIGHT: usize = PLAYABLE_HEIGHT;
 
     // Initial board layout matches BitBoard structure for coordinate compatibility.
     // Top sentinels use RenderRow::TOP (side walls only) to allow piece spawning.
     // Bottom sentinels use RenderRow::BOTTOM (fully occupied) to block downward movement.
-    pub(crate) const INITIAL: Self = {
+    pub const INITIAL: Self = {
         assert!(SENTINEL_MARGIN_TOP == 2);
         assert!(SENTINEL_MARGIN_BOTTOM == 2);
         Self {
@@ -102,25 +102,25 @@ impl RenderBoard {
         }
     };
 
-    pub(crate) fn playable_rows(&self) -> impl Iterator<Item = &[RenderCell; PLAYABLE_WIDTH]> {
+    pub fn playable_rows(&self) -> impl Iterator<Item = &[RenderCell; PLAYABLE_WIDTH]> {
         self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT]
             .iter()
             .map(RenderRow::playable_cells)
     }
 
-    pub(crate) fn fill_piece(&mut self, piece: &Piece) {
+    pub fn fill_piece(&mut self, piece: &Piece) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = RenderCell::Piece(piece.kind());
         }
     }
 
-    pub(crate) fn fill_piece_as(&mut self, piece: &Piece, cell: RenderCell) {
+    pub fn fill_piece_as(&mut self, piece: &Piece, cell: RenderCell) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = cell;
         }
     }
 
-    pub(crate) fn clear_lines(&mut self) -> usize {
+    pub fn clear_lines(&mut self) -> usize {
         let playable_rows = &mut self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT];
         let mut count = 0;
         for y in (0..PLAYABLE_HEIGHT).rev() {

@@ -4,7 +4,7 @@ use rand_distr::Normal;
 use std::{array, fmt};
 
 #[derive(Clone)]
-pub(crate) struct WeightSet<const N: usize>(pub(crate) [f32; N]);
+pub struct WeightSet<const N: usize>(pub(crate) [f32; N]);
 
 impl<const N: usize> fmt::Debug for WeightSet<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -13,7 +13,7 @@ impl<const N: usize> fmt::Debug for WeightSet<N> {
 }
 
 impl WeightSet<{ METRIC_COUNT }> {
-    pub(crate) const AGGRO: Self = WeightSet([
+    pub const AGGRO: Self = WeightSet([
         0.274_366_4,
         0.152_744_11,
         0.148_963_84,
@@ -23,7 +23,7 @@ impl WeightSet<{ METRIC_COUNT }> {
         0.0,
         0.0,
     ]);
-    pub(crate) const DEFENSIVE: Self = WeightSet([
+    pub const DEFENSIVE: Self = WeightSet([
         0.117_032_89,
         0.070_271_97,
         0.319_794_8,
