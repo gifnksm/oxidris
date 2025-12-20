@@ -19,6 +19,7 @@ pub enum RenderCell {
 }
 
 impl RenderCell {
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self == RenderCell::Empty
     }

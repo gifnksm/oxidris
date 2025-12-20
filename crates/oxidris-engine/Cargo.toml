@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 arrayvec.workspace = true
-derive_more = {workspace = true, features = ["is_variant"] }
+derive_more = { workspace = true, features = ["display", "error", "is_variant"] }
 rand.workspace = true
 
 [lints]

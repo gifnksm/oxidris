@@ -181,6 +181,7 @@ impl BitBoard {
     };
 
     /// Returns a reference to a playable row by index.
+    #[must_use]
     pub fn playable_row(&self, y: usize) -> BitRow {
         self.rows[y + SENTINEL_MARGIN_TOP]
     }
@@ -193,6 +194,7 @@ impl BitBoard {
     }
 
     /// Checks if the piece collides with occupied cells.
+    #[must_use]
     pub fn is_colliding(&self, piece: &Piece) -> bool {
         let x0 = piece.position().x();
         let y0 = piece.position().y();

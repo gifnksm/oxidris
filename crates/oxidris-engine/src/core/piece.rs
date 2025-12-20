@@ -21,6 +21,7 @@ pub struct Piece {
 }
 
 impl Piece {
+    #[must_use]
     pub fn new(kind: PieceKind) -> Self {
         Self {
             position: PiecePosition::SPAWN_POSITION,
@@ -29,18 +30,22 @@ impl Piece {
         }
     }
 
+    #[must_use]
     pub fn position(&self) -> PiecePosition {
         self.position
     }
 
+    #[must_use]
     pub fn rotation(&self) -> PieceRotation {
         self.rotation
     }
 
+    #[must_use]
     pub fn kind(&self) -> PieceKind {
         self.kind
     }
 
+    #[must_use]
     pub fn mask(&self) -> PieceMask {
         self.kind.mask(self.rotation)
     }
@@ -51,6 +56,7 @@ impl Piece {
             .map(move |(dx, dy)| (self.position.x() + dx, self.position.y() + dy))
     }
 
+    #[must_use]
     pub fn left(&self) -> Option<Self> {
         let new_pos = self.position.left()?;
         Some(Self {
@@ -60,6 +66,7 @@ impl Piece {
         })
     }
 
+    #[must_use]
     pub fn right(&self) -> Option<Self> {
         let new_pos = self.position.right()?;
         Some(Self {
@@ -69,6 +76,7 @@ impl Piece {
         })
     }
 
+    #[must_use]
     pub fn up(&self) -> Option<Self> {
         let new_pos = self.position.up()?;
         Some(Self {
@@ -78,6 +86,7 @@ impl Piece {
         })
     }
 
+    #[must_use]
     pub fn down(&self) -> Option<Self> {
         let new_pos = self.position.down()?;
         Some(Self {
@@ -87,6 +96,7 @@ impl Piece {
         })
     }
 
+    #[must_use]
     pub fn rotated_right(&self) -> Self {
         Self {
             position: self.position,
@@ -95,6 +105,7 @@ impl Piece {
         }
     }
 
+    #[must_use]
     pub fn rotated_left(&self) -> Self {
         Self {
             position: self.position,
@@ -103,6 +114,7 @@ impl Piece {
         }
     }
 
+    #[must_use]
     pub fn super_rotated_left(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_left();
         if board.is_colliding(&piece) {
@@ -111,6 +123,7 @@ impl Piece {
         Some(piece)
     }
 
+    #[must_use]
     pub fn super_rotated_right(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_right();
         if board.is_colliding(&piece) {
@@ -119,6 +132,7 @@ impl Piece {
         Some(piece)
     }
 
+    #[must_use]
     pub fn super_rotations(self, board: &BitBoard) -> ArrayVec<Self, 4> {
         let mut rotations = ArrayVec::new();
         rotations.push(self);
@@ -136,6 +150,7 @@ impl Piece {
         rotations
     }
 
+    #[must_use]
     pub fn simulate_drop_position(&self, board: &BitBoard) -> Self {
         let mut dropped = *self;
         while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(m)) {
@@ -216,10 +231,12 @@ impl PiecePosition {
 pub struct PieceRotation(u8);
 
 impl PieceRotation {
+    #[must_use]
     pub fn rotated_right(self) -> Self {
         PieceRotation((self.0 + 1) % 4)
     }
 
+    #[must_use]
     pub fn rotated_left(self) -> Self {
         PieceRotation((self.0 + 3) % 4)
     }

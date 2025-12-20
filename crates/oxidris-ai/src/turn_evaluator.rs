@@ -19,18 +19,21 @@ pub struct TurnEvaluator {
 }
 
 impl TurnEvaluator {
+    #[must_use]
     pub fn aggro() -> Self {
         Self {
             weights: WeightSet::AGGRO,
         }
     }
 
+    #[must_use]
     pub fn defensive() -> Self {
         Self {
             weights: WeightSet::DEFENSIVE,
         }
     }
 
+    #[must_use]
     pub fn by_ai_type(ai: AiType) -> Self {
         match ai {
             AiType::Aggro => Self::aggro(),
@@ -38,6 +41,7 @@ impl TurnEvaluator {
         }
     }
 
+    #[must_use]
     pub fn new(weights: WeightSet<{ METRIC_COUNT }>) -> Self {
         Self { weights }
     }
@@ -54,6 +58,7 @@ impl TurnEvaluator {
             .sum()
     }
 
+    #[must_use]
     pub fn select_best_turn(&self, game: &GameState) -> Option<(TurnPlan, GameState)> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
