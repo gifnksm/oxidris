@@ -1,6 +1,6 @@
 use crate::core::bit_board::SENTINEL_MARGIN_BOTTOM;
 use crate::core::piece::Piece;
-use RenderCell::{Empty as E, Wall as W};
+use Block::{Empty as E, Wall as W};
 
 use super::bit_board::{
     PLAYABLE_HEIGHT, PLAYABLE_WIDTH, SENTINEL_MARGIN_LEFT, SENTINEL_MARGIN_RIGHT,
@@ -10,7 +10,7 @@ use super::piece::PieceKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
-pub enum RenderCell {
+pub enum Block {
     #[default]
     Empty,
     Wall,
@@ -18,33 +18,33 @@ pub enum RenderCell {
     Piece(PieceKind),
 }
 
-impl RenderCell {
+impl Block {
     #[must_use]
     pub fn is_empty(self) -> bool {
-        self == RenderCell::Empty
+        self == Block::Empty
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RenderRow {
-    cells: [RenderCell; TOTAL_WIDTH],
+pub struct BlockRow {
+    cells: [Block; TOTAL_WIDTH],
 }
 
-impl RenderRow {
+impl BlockRow {
     // Sentinel border layout matches BitBoard for coordinate compatibility.
     // See BitBoard documentation for detailed explanation of the 2-cell sentinel design.
     const TOP: Self = {
         assert!(SENTINEL_MARGIN_LEFT == 2);
         assert!(SENTINEL_MARGIN_RIGHT == 2);
-        RenderRow {
+        BlockRow {
             cells: [W, W, E, E, E, E, E, E, E, E, E, E, W, W],
         }
     };
-    const BOTTOM: Self = RenderRow {
+    const BOTTOM: Self = BlockRow {
         cells: [W; TOTAL_WIDTH],
     };
 
-    fn playable_cells(&self) -> &[RenderCell; PLAYABLE_WIDTH] {
+    fn playable_cells(&self) -> &[Block; PLAYABLE_WIDTH] {
         self.cells[SENTINEL_MARGIN_LEFT..][..PLAYABLE_WIDTH]
             .try_into()
             .unwrap()
@@ -56,11 +56,11 @@ impl RenderRow {
 }
 
 #[derive(Debug, Clone)]
-pub struct RenderBoard {
-    rows: [RenderRow; TOTAL_HEIGHT],
+pub struct BlockBoard {
+    rows: [BlockRow; TOTAL_HEIGHT],
 }
 
-impl RenderBoard {
+impl BlockBoard {
     pub const PLAYABLE_WIDTH: usize = PLAYABLE_WIDTH;
     pub const PLAYABLE_HEIGHT: usize = PLAYABLE_HEIGHT;
 
@@ -73,49 +73,49 @@ impl RenderBoard {
         Self {
             rows: [
                 // Top sentinel rows
-                RenderRow::TOP,
-                RenderRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
                 // Playable area rows
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
-                RenderRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
+                BlockRow::TOP,
                 // Bottom sentinel rows
-                RenderRow::BOTTOM,
-                RenderRow::BOTTOM,
+                BlockRow::BOTTOM,
+                BlockRow::BOTTOM,
             ],
         }
     };
 
-    pub fn playable_rows(&self) -> impl Iterator<Item = &[RenderCell; PLAYABLE_WIDTH]> {
+    pub fn playable_rows(&self) -> impl Iterator<Item = &[Block; PLAYABLE_WIDTH]> {
         self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT]
             .iter()
-            .map(RenderRow::playable_cells)
+            .map(BlockRow::playable_cells)
     }
 
     pub fn fill_piece(&mut self, piece: &Piece) {
         for (x, y) in piece.occupied_positions() {
-            self.rows[y].cells[x] = RenderCell::Piece(piece.kind());
+            self.rows[y].cells[x] = Block::Piece(piece.kind());
         }
     }
 
-    pub fn fill_piece_as(&mut self, piece: &Piece, cell: RenderCell) {
+    pub fn fill_piece_as(&mut self, piece: &Piece, cell: Block) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = cell;
         }
@@ -133,7 +133,7 @@ impl RenderBoard {
                 playable_rows[y + count] = playable_rows[y];
             }
         }
-        playable_rows[..count].fill(RenderRow::TOP);
+        playable_rows[..count].fill(BlockRow::TOP);
         count
     }
 }
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_initial_board() {
-        let board = RenderBoard::INITIAL;
+        let board = BlockBoard::INITIAL;
 
         for y in 0..TOTAL_HEIGHT {
             for x in 0..TOTAL_WIDTH {
@@ -152,7 +152,7 @@ mod tests {
                 if y >= SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT {
                     assert_eq!(
                         cell,
-                        RenderCell::Wall,
+                        Block::Wall,
                         "Bottom sentinels should be walls, got {cell:?} at ({x}, {y})",
                     );
                     continue;
@@ -160,14 +160,14 @@ mod tests {
                 if !(SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH).contains(&x) {
                     assert_eq!(
                         cell,
-                        RenderCell::Wall,
+                        Block::Wall,
                         "Side sentinels should be walls, got {cell:?} at ({x}, {y})",
                     );
                     continue;
                 }
                 assert_eq!(
                     cell,
-                    RenderCell::Empty,
+                    Block::Empty,
                     "Playable area should be empty, got {cell:?} at ({x}, {y})",
                 );
             }
@@ -176,20 +176,20 @@ mod tests {
 
     #[test]
     fn test_set_and_check_cell() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Set a cell in the playable area
         let x = SENTINEL_MARGIN_LEFT;
         let y = SENTINEL_MARGIN_TOP;
 
-        assert_eq!(board.rows[y].cells[x], RenderCell::Empty);
-        board.rows[y].cells[x] = RenderCell::Piece(PieceKind::I);
-        assert_eq!(board.rows[y].cells[x], RenderCell::Piece(PieceKind::I));
+        assert_eq!(board.rows[y].cells[x], Block::Empty);
+        board.rows[y].cells[x] = Block::Piece(PieceKind::I);
+        assert_eq!(board.rows[y].cells[x], Block::Piece(PieceKind::I));
     }
 
     #[test]
     fn test_render_row_playable_cells() {
-        let row = RenderRow::TOP;
+        let row = BlockRow::TOP;
 
         // Get playable cells
         let playable_cells = row.playable_cells();
@@ -197,19 +197,19 @@ mod tests {
 
         // All playable cells should be empty in TOP row
         for cell in playable_cells {
-            assert_eq!(*cell, RenderCell::Empty);
+            assert_eq!(*cell, Block::Empty);
         }
     }
 
     #[test]
     fn test_render_row_is_filled() {
-        let mut row = RenderRow::TOP;
+        let mut row = BlockRow::TOP;
         // TOP row has empty playable area, so not filled
         assert!(!row.is_filled());
 
         // Fill playable area
         for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH {
-            row.cells[x] = RenderCell::Piece(PieceKind::I);
+            row.cells[x] = Block::Piece(PieceKind::I);
         }
         // Now it should be filled
         assert!(row.is_filled());
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_fill_piece_basic() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
         // Create a simple test piece at known position
         // This test verifies fill_piece_as works correctly
 
@@ -225,22 +225,22 @@ mod tests {
         let x = SENTINEL_MARGIN_LEFT;
 
         // Manually set a cell and verify fill_piece_as
-        board.rows[y].cells[x] = RenderCell::Empty;
-        assert_eq!(board.rows[y].cells[x], RenderCell::Empty);
+        board.rows[y].cells[x] = Block::Empty;
+        assert_eq!(board.rows[y].cells[x], Block::Empty);
 
         // Using fill_piece_as would require a Piece, which requires testing at a higher level
         // For now, verify the cell can be set
-        board.rows[y].cells[x] = RenderCell::Piece(PieceKind::O);
-        assert_eq!(board.rows[y].cells[x], RenderCell::Piece(PieceKind::O));
+        board.rows[y].cells[x] = Block::Piece(PieceKind::O);
+        assert_eq!(board.rows[y].cells[x], Block::Piece(PieceKind::O));
     }
 
     #[test]
     fn test_clear_lines_basic() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Fill first playable line
         for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH {
-            board.rows[SENTINEL_MARGIN_TOP].cells[x] = RenderCell::Piece(PieceKind::I);
+            board.rows[SENTINEL_MARGIN_TOP].cells[x] = Block::Piece(PieceKind::I);
         }
 
         // Clear lines should remove the filled line
@@ -250,19 +250,19 @@ mod tests {
         // The cleared line should now be empty (TOP row)
         let playable_cells = board.rows[SENTINEL_MARGIN_TOP].playable_cells();
         for cell in playable_cells {
-            assert_eq!(*cell, RenderCell::Empty);
+            assert_eq!(*cell, Block::Empty);
         }
     }
 
     #[test]
     fn test_clear_lines_multiple_consecutive() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Fill three consecutive lines
         for i in 0..3 {
             let y = SENTINEL_MARGIN_TOP + i;
             for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH {
-                board.rows[y].cells[x] = RenderCell::Piece(PieceKind::I);
+                board.rows[y].cells[x] = Block::Piece(PieceKind::I);
             }
         }
 
@@ -275,19 +275,19 @@ mod tests {
             let y = SENTINEL_MARGIN_TOP + i;
             let playable_cells = board.rows[y].playable_cells();
             for cell in playable_cells {
-                assert_eq!(*cell, RenderCell::Empty);
+                assert_eq!(*cell, Block::Empty);
             }
         }
     }
 
     #[test]
     fn test_clear_lines_with_partial_lines() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Fill only part of the first line (not all playable cells)
         let y = SENTINEL_MARGIN_TOP;
         for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH - 1 {
-            board.rows[y].cells[x] = RenderCell::Piece(PieceKind::I);
+            board.rows[y].cells[x] = Block::Piece(PieceKind::I);
         }
         // Leave one cell empty
 
@@ -307,12 +307,12 @@ mod tests {
 
     #[test]
     fn test_clear_lines_bottom_line() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Fill the last playable line
         let y = SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT - 1;
         for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH {
-            board.rows[y].cells[x] = RenderCell::Piece(PieceKind::I);
+            board.rows[y].cells[x] = Block::Piece(PieceKind::I);
         }
 
         // Clear lines
@@ -322,18 +322,18 @@ mod tests {
         // The cleared line should be empty
         let playable_cells = board.rows[y].playable_cells();
         for cell in playable_cells {
-            assert_eq!(*cell, RenderCell::Empty);
+            assert_eq!(*cell, Block::Empty);
         }
     }
 
     #[test]
     fn test_clear_lines_all_filled() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Fill all playable lines
         for y in SENTINEL_MARGIN_TOP..SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT {
             for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH {
-                board.rows[y].cells[x] = RenderCell::Piece(PieceKind::I);
+                board.rows[y].cells[x] = Block::Piece(PieceKind::I);
             }
         }
 
@@ -345,19 +345,19 @@ mod tests {
         for y in SENTINEL_MARGIN_TOP..SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT {
             let playable_cells = board.rows[y].playable_cells();
             for cell in playable_cells {
-                assert_eq!(*cell, RenderCell::Empty);
+                assert_eq!(*cell, Block::Empty);
             }
         }
     }
 
     #[test]
     fn test_clear_lines_preserves_sentinels() {
-        let mut board = RenderBoard::INITIAL;
+        let mut board = BlockBoard::INITIAL;
 
         // Fill first playable line
         let y = SENTINEL_MARGIN_TOP;
         for x in SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH {
-            board.rows[y].cells[x] = RenderCell::Piece(PieceKind::I);
+            board.rows[y].cells[x] = Block::Piece(PieceKind::I);
         }
 
         // Clear lines
@@ -365,10 +365,10 @@ mod tests {
 
         // Verify sentinels are still intact
         for y in SENTINEL_MARGIN_TOP..SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT {
-            assert_eq!(board.rows[y].cells[0], RenderCell::Wall);
-            assert_eq!(board.rows[y].cells[1], RenderCell::Wall);
-            assert_eq!(board.rows[y].cells[TOTAL_WIDTH - 2], RenderCell::Wall);
-            assert_eq!(board.rows[y].cells[TOTAL_WIDTH - 1], RenderCell::Wall);
+            assert_eq!(board.rows[y].cells[0], Block::Wall);
+            assert_eq!(board.rows[y].cells[1], Block::Wall);
+            assert_eq!(board.rows[y].cells[TOTAL_WIDTH - 2], Block::Wall);
+            assert_eq!(board.rows[y].cells[TOTAL_WIDTH - 1], Block::Wall);
         }
     }
 }

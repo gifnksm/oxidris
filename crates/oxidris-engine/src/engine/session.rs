@@ -3,8 +3,8 @@ use std::time::Duration;
 use crate::{
     HoldError, PieceCollisionError,
     core::{
+        block_board::BlockBoard,
         piece::{Piece, PieceKind},
-        render_board::RenderBoard,
     },
 };
 
@@ -20,7 +20,7 @@ pub enum SessionState {
 #[derive(Debug, Clone)]
 pub struct GameSession {
     game_state: GameState,
-    render_board: RenderBoard,
+    render_board: BlockBoard,
     session_state: SessionState,
     fps: u64,
     total_frames: u64,
@@ -37,7 +37,7 @@ impl GameSession {
     pub fn new(fps: u64) -> Self {
         Self {
             game_state: GameState::new(),
-            render_board: RenderBoard::INITIAL,
+            render_board: BlockBoard::INITIAL,
             session_state: SessionState::Playing,
             fps,
             total_frames: 0,
@@ -97,7 +97,7 @@ impl GameSession {
     }
 
     #[must_use]
-    pub fn render_board(&self) -> &RenderBoard {
+    pub fn render_board(&self) -> &BlockBoard {
         &self.render_board
     }
 

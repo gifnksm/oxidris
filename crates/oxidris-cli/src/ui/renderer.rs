@@ -1,6 +1,4 @@
-use oxidris_engine::{
-    GameSession, PieceKind, PieceRotation, RenderBoard, RenderCell, SessionState,
-};
+use oxidris_engine::{Block, BlockBoard, GameSession, PieceKind, PieceRotation, SessionState};
 use std::{fmt, io};
 
 use crate::modes::PlayMode;
@@ -43,8 +41,8 @@ const STATS_PANEL: Panel = Panel {
 const BOARD_PANEL: Panel = Panel {
     top: COMPONENT_TOP,
     left: HOLD_PANEL.right() + 2,
-    body_width: CHARS_PER_CELL * RenderBoard::PLAYABLE_WIDTH,
-    body_height: RenderBoard::PLAYABLE_HEIGHT,
+    body_width: CHARS_PER_CELL * BlockBoard::PLAYABLE_WIDTH,
+    body_height: BlockBoard::PLAYABLE_HEIGHT,
     title: "",
 };
 
@@ -242,13 +240,13 @@ struct CellDisplay {
 }
 
 impl CellDisplay {
-    const fn from_kind(kind: RenderCell, show_dots: bool) -> Self {
+    const fn from_kind(kind: Block, show_dots: bool) -> Self {
         let dot = if show_dots { " ." } else { "  " };
         match kind {
-            RenderCell::Empty => Self::new(Color::GRAY, Color::BLACK, dot),
-            RenderCell::Wall => Self::new(Color::GRAY, Color::GRAY, dot),
-            RenderCell::Ghost => Self::new(Color::WHITE, Color::BLACK, "[]"),
-            RenderCell::Piece(piece) => Self::new(piece_color(piece), piece_color(piece), "  "),
+            Block::Empty => Self::new(Color::GRAY, Color::BLACK, dot),
+            Block::Wall => Self::new(Color::GRAY, Color::GRAY, dot),
+            Block::Ghost => Self::new(Color::WHITE, Color::BLACK, "[]"),
+            Block::Piece(piece) => Self::new(piece_color(piece), piece_color(piece), "  "),
         }
     }
 
@@ -328,7 +326,7 @@ impl Renderer {
         // Show ghost piece only in normal mode
         if self.mode == PlayMode::Normal {
             let dropped = game.simulate_drop_position();
-            board_buf.fill_piece_as(&dropped, RenderCell::Ghost);
+            board_buf.fill_piece_as(&dropped, Block::Ghost);
         }
         board_buf.fill_piece(falling_piece);
 
@@ -434,7 +432,7 @@ impl Renderer {
 
     fn draw_piece_at(&mut self, piece: PieceKind, top: usize, left: usize) -> io::Result<()> {
         for dy in 0..PIECE_DISPLAY_HEIGHT {
-            let display = CellDisplay::from_kind(RenderCell::Empty, false);
+            let display = CellDisplay::from_kind(Block::Empty, false);
             self.term.move_to(top + dy, left)?;
             for _ in 0..PIECE_DISPLAY_WIDTH / CHARS_PER_CELL {
                 self.term
@@ -446,7 +444,7 @@ impl Renderer {
         for (dx, dy) in piece.occupied_positions(PieceRotation::default()) {
             assert!(dx < PIECE_DISPLAY_WIDTH / CHARS_PER_CELL);
             assert!(dy < PIECE_DISPLAY_HEIGHT);
-            let display = CellDisplay::from_kind(RenderCell::Piece(piece), false);
+            let display = CellDisplay::from_kind(Block::Piece(piece), false);
             self.term
                 .move_to(top + dy, left + dx * CHARS_PER_CELL)?
                 .set_fg(display.fg())?

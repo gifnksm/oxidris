@@ -10,7 +10,7 @@ use rand::{
 
 use super::{
     bit_board::{BitBoard, PIECE_SPAWN_X, PIECE_SPAWN_Y},
-    render_board::RenderCell,
+    block_board::Block,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -368,13 +368,13 @@ const PIECE_MASKS: [[PieceMask; 4]; PieceKind::LEN] = {
 };
 
 /// Piece shape (4x4 cell array).
-type PieceShape = [[RenderCell; 4]; 4];
+type PieceShape = [[Block; 4]; 4];
 
 const fn shape_rotations(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
     let mut rotates = [*shape; 4];
     let mut i = 1;
     while i < 4 {
-        let mut new_shape = [[RenderCell::Empty; 4]; 4];
+        let mut new_shape = [[Block::Empty; 4]; 4];
         let mut y = 0;
         while y < size {
             let mut x = 0;
@@ -391,15 +391,15 @@ const fn shape_rotations(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
 }
 
 const PIECE_SHAPES: [[PieceShape; 4]; PieceKind::LEN] = {
-    use RenderCell::Empty as E;
-    const I: RenderCell = RenderCell::Piece(PieceKind::I);
-    const O: RenderCell = RenderCell::Piece(PieceKind::O);
-    const S: RenderCell = RenderCell::Piece(PieceKind::S);
-    const Z: RenderCell = RenderCell::Piece(PieceKind::Z);
-    const J: RenderCell = RenderCell::Piece(PieceKind::J);
-    const L: RenderCell = RenderCell::Piece(PieceKind::L);
-    const T: RenderCell = RenderCell::Piece(PieceKind::T);
-    const EEEE: [RenderCell; 4] = [E; 4];
+    use Block::Empty as E;
+    const I: Block = Block::Piece(PieceKind::I);
+    const O: Block = Block::Piece(PieceKind::O);
+    const S: Block = Block::Piece(PieceKind::S);
+    const Z: Block = Block::Piece(PieceKind::Z);
+    const J: Block = Block::Piece(PieceKind::J);
+    const L: Block = Block::Piece(PieceKind::L);
+    const T: Block = Block::Piece(PieceKind::T);
+    const EEEE: [Block; 4] = [E; 4];
     [
         // I-piece
         shape_rotations(4, &[EEEE, [I, I, I, I], EEEE, EEEE]),
