@@ -256,36 +256,39 @@ impl HeightInfo {
 fn row_transitions(board: &BitBoard) -> u16 {
     let mut transitions = 0;
     for row in board.playable_rows() {
-        let mut prev_occupied = true; // left wall
-        for occupied in row.iter_playable_cells() {
+        let mut cells = row.iter_playable_cells();
+        let mut prev_occupied = cells.next().unwrap(); // left wall
+        for occupied in cells {
             if occupied != prev_occupied {
                 transitions += 1;
             }
             prev_occupied = occupied;
-        }
-        if !prev_occupied {
-            transitions += 1; // right wall
         }
     }
     transitions
 }
 
 fn row_transitions_score(board: &BitBoard) -> f32 {
-    // Row transitions count horizontal occupancy changes per row,
-    // treating both left and right walls as occupied cells.
+    // Row transitions measure how fragmented each row is by counting
+    // horizontal changes between occupied and empty cells.
     //
-    // This models the board as a closed container and penalizes
-    // narrow gaps and fragmented horizontal structures.
+    // Only transitions *within* the playable area are counted.
+    // Board walls are intentionally ignored to avoid artificial
+    // incentives for stacking against the edges.
     //
-    // Typical ranges (10x20 board):
-    //   40–60   : very clean surface
-    //   80–120  : normal mid-game structure
-    //   150+    : highly fragmented, unstable board
+    // This metric penalizes:
+    //   - fragmented horizontal structures
+    //   - narrow gaps and broken surfaces
+    //   - layouts that are difficult to clear efficiently
     //
-    // The normalization max represents a practical upper bound
-    // rather than the theoretical maximum.
+    // Typical ranges (10x20 board, wall-ignored):
+    //   20–40   : very clean and flat structure
+    //   60–90   : normal mid-game roughness
+    //   120+    : highly fragmented, unstable board
+    //
+    // This is a negative metric; lower transition counts are better.
     let raw = f32::from(row_transitions(board));
-    let norm = normalize(raw, 160.0);
+    let norm = normalize(raw, 120.0);
     negative_metrics_score(norm)
 }
 
