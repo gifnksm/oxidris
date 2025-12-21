@@ -47,12 +47,18 @@ impl TurnEvaluator {
     }
 
     #[inline]
-    fn score(&self, init: &GameState, game: &GameState, game_over: bool) -> f32 {
+    fn score(
+        &self,
+        init: &GameState,
+        game: &GameState,
+        last_placement: Piece,
+        game_over: bool,
+    ) -> f32 {
         if game_over {
             return 0.0;
         }
 
-        let metrics = Metrics::measure(init, game);
+        let metrics = Metrics::measure(init, game, last_placement);
         iter::zip(metrics.as_array(), self.weights.0)
             .map(|(m, w)| m * w)
             .sum()
@@ -69,7 +75,7 @@ impl TurnEvaluator {
                 let mut game = game.clone();
                 game.set_falling_piece_unchecked(turn.placement);
                 let game_over = game.complete_piece_drop().is_err();
-                let score = self.score(init, &game, game_over);
+                let score = self.score(init, &game, turn.placement, game_over);
                 if score > best_score {
                     best_score = score;
                     best_result = Some((turn, game.clone()));

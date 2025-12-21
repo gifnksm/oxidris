@@ -1,4 +1,4 @@
-use oxidris_engine::{BitBoard, GameState};
+use oxidris_engine::{BitBoard, GameState, Piece, PieceKind};
 use std::iter;
 
 // All evaluation metrics are transformed into a [0.0, 1.0] score,
@@ -18,6 +18,7 @@ pub(crate) struct Metrics {
     deep_wells: f32,
     sum_of_heights: f32,
     lines_cleared: f32,
+    i_well_reward: f32,
 }
 
 impl Metrics {
@@ -31,10 +32,11 @@ impl Metrics {
             self.deep_wells,
             self.sum_of_heights,
             self.lines_cleared,
+            self.i_well_reward,
         ]
     }
 
-    pub(crate) fn measure(init: &GameState, game: &GameState) -> Self {
+    pub(crate) fn measure(init: &GameState, game: &GameState, last_placement: Piece) -> Self {
         let line_clear_info = LineClearInfo::compute(init, game);
         let height_info = HeightInfo::compute(game.board());
 
@@ -47,6 +49,7 @@ impl Metrics {
             deep_wells: height_info.deep_wells_score(),
             sum_of_heights: height_info.sum_of_heights_score(),
             lines_cleared: line_clear_info.lines_cleared_score(),
+            i_well_reward: height_info.i_well_reward(last_placement),
         }
     }
 }
@@ -133,7 +136,7 @@ impl HeightInfo {
         //   0–3   : very clean board
         //   4–7   : dangerous, recovery becomes difficult
         //   10+   : near-losing position
-        //
+        //deep_
         // A power transform (holes^1.5) emphasizes early hole creation.
         // The normalization max (~60) corresponds to ~15 practical holes.
         let raw = f32::from(self.covered_holes()).powf(1.5);
@@ -203,21 +206,16 @@ impl HeightInfo {
         // This metric is NOT a positive reward.
         // It acts purely as a safety penalty using exponential decay,
         // while preserving freedom to build shallow I-wells.
-        let raw = self
-            .heights
-            .windows(3)
-            .map(|w| {
-                let left = u16::from(w[0]);
-                let mid = u16::from(w[1]);
-                let right = u16::from(w[2]);
-                if mid >= left || mid >= right {
-                    return 0;
-                }
-                let well_depth = u16::min(left, right) - mid;
-                if well_depth < 6 {
-                    return 0;
-                }
-                well_depth * well_depth
+        let left = self.heights.into_iter().skip(1).chain(iter::once(u8::MAX));
+        let right = iter::once(u8::MAX).chain(self.heights);
+        let wells = iter::zip(self.heights, iter::zip(left, right))
+            .filter(|&(h, (l, r))| h < l && h < r)
+            .map(|(h, (l, r))| u8::min(l, r) - h)
+            .filter(|&depth| depth > 2);
+        let raw = wells
+            .map(|depth| {
+                let depth = u16::from(depth);
+                depth * depth
             })
             .sum::<u16>();
 
@@ -250,6 +248,39 @@ impl HeightInfo {
             (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)
         };
         (-4.0 * raw).exp()
+    }
+
+    fn i_well_reward(&self, last_placement: Piece) -> f32 {
+        let mut best_reward = 0.0;
+        let mut best_depth = 0.0;
+        let left = self.heights.into_iter().skip(1).chain(iter::once(u8::MAX));
+        let right = iter::once(u8::MAX).chain(self.heights);
+        let wells = iter::zip(self.heights, iter::zip(left, right))
+            .enumerate()
+            .filter(|(_i, (h, (l, r)))| h < l && h < r);
+        for (i, (h, (left, right))) in wells {
+            let depth = u8::min(left, right) - h;
+            let depth = f32::from(depth);
+            let dist_to_edge = usize::min(i, BitBoard::PLAYABLE_WIDTH - 1 - i);
+            #[expect(clippy::cast_precision_loss)]
+            let dist = (dist_to_edge as f32) / (BitBoard::PLAYABLE_WIDTH as f32 / 2.0);
+
+            let peak = 4.5;
+            let sigma = 2.0;
+            let depth_score = (-(depth - peak).powi(2) / (2.0 * sigma * sigma)).exp();
+
+            let edge_bonus = (-dist).exp();
+
+            let reward = depth_score * edge_bonus;
+            if reward > best_reward {
+                best_depth = depth;
+                best_reward = reward;
+            }
+        }
+        if best_depth >= 4.0 && last_placement.kind() == PieceKind::I {
+            return 0.0;
+        }
+        best_reward
     }
 }
 
