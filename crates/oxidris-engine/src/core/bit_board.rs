@@ -47,12 +47,14 @@ impl BitRow {
 
     /// Checks if the playable area is completely filled.
     #[inline]
+    #[must_use]
     pub fn is_playable_filled(self) -> bool {
         (self.bits & PLAYABLE_MASK) == PLAYABLE_MASK
     }
 
     /// Checks if a cell at the given x-coordinate (in playable area) is occupied.
     #[inline]
+    #[must_use]
     pub fn is_cell_occupied(self, x: usize) -> bool {
         let bit = 1 << x;
         (self.bits & bit) != 0
@@ -60,6 +62,7 @@ impl BitRow {
 
     /// Checks if any cell in the given mask (shifted by x0) is occupied.
     #[inline]
+    #[must_use]
     fn is_any_cell_occupied(self, x0: usize, mask: u16) -> bool {
         let bits = mask << x0;
         (self.bits & bits) != 0

@@ -179,18 +179,22 @@ pub struct PiecePosition {
 impl PiecePosition {
     pub const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
 
+    #[must_use]
     pub const fn new(x: usize, y: usize) -> Self {
         Self { x, y }
     }
 
+    #[must_use]
     pub fn x(self) -> usize {
         self.x
     }
 
+    #[must_use]
     pub fn y(self) -> usize {
         self.y
     }
 
+    #[must_use]
     pub const fn left(&self) -> Option<Self> {
         if self.x == 0 {
             None
@@ -199,6 +203,7 @@ impl PiecePosition {
         }
     }
 
+    #[must_use]
     pub const fn right(&self) -> Option<Self> {
         if self.x >= BitBoard::TOTAL_WIDTH - 1 {
             None
@@ -207,6 +212,7 @@ impl PiecePosition {
         }
     }
 
+    #[must_use]
     pub const fn up(&self) -> Option<Self> {
         if self.y == 0 {
             None
@@ -215,6 +221,7 @@ impl PiecePosition {
         }
     }
 
+    #[must_use]
     pub const fn down(&self) -> Option<Self> {
         if self.y >= BitBoard::TOTAL_HEIGHT - 1 {
             None
