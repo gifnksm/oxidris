@@ -1,7 +1,4 @@
-pub use self::{
-    turn_evaluator::{TurnEvaluator, TurnPlan},
-    weights::WeightSet,
-};
+pub use self::{turn_evaluator::*, weights::*};
 
 pub mod genetic;
 mod metrics;

@@ -1,7 +1,7 @@
 pub use self::{core::*, engine::*};
 
-pub mod core;
-pub mod engine;
+mod core;
+mod engine;
 
 #[derive(Debug, derive_more::Display, derive_more::Error)]
 #[display("piece colliding when setting falling piece")]
