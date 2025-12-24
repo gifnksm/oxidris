@@ -3,7 +3,7 @@ use std::io;
 use clap::{Parser, Subcommand};
 use oxidris_ai::AiType;
 
-mod modes;
+mod play;
 mod ui;
 
 #[derive(Debug, Clone, Copy, Parser)]
@@ -33,8 +33,8 @@ enum Mode {
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.mode.unwrap_or(Mode::Normal) {
-        Mode::Normal => modes::normal()?,
-        Mode::Auto { ai } => modes::auto(ai)?,
+        Mode::Normal => play::normal()?,
+        Mode::Auto { ai } => play::auto(ai)?,
         Mode::Learning { ai } => oxidris_ai::genetic::learning(ai),
     }
     Ok(())

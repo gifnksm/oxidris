@@ -1,7 +1,7 @@
 use oxidris_engine::{Block, BlockBoard, GameSession, PieceKind, PieceRotation, SessionState};
 use std::{fmt, io};
 
-use crate::modes::PlayMode;
+use crate::play::PlayMode;
 
 use super::terminal::{Color, Terminal};
 
