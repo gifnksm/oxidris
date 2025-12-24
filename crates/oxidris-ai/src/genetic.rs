@@ -137,13 +137,13 @@ pub fn learning(ai: AiType) {
     let mut population = gen_first_generation(&mut rng);
     for generation in 0..MAX_GENERATIONS {
         let phase = EvolutaionPhase::from_generation(generation);
-        println!("Generation #{generation} ({phase:?}):");
+        eprintln!("Generation #{generation} ({phase:?}):");
         let games: &[_; GAMES_PER_INDIVIDUALS] = &array::from_fn(|_| GameState::new());
         thread::scope(|s| {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
                     ind.evaluate(games, fitness_evaluator);
-                    println!(
+                    eprintln!(
                         "  {i:2}: {:.3?} => {:.3}",
                         ind.weights.to_array(),
                         ind.fitness
@@ -173,32 +173,32 @@ pub fn learning(ai: AiType) {
             .min_by(f32::total_cmp)
             .unwrap();
 
-        println!("  Weights Stats:");
-        println!("    Min:        {:.3?}", weights_min.to_array());
-        println!("    Max:        {:.3?}", weights_max.to_array());
-        println!("    Mean:       {:.3?}", weights_mean.to_array());
-        println!("    NormStddev: {:.3?}", weights_norm_stddev.to_array());
-        println!("    => Mean:    {weights_norm_stddev_mean:.3}");
-        println!("  Fitness Stats:");
-        println!("    Min:  {fitness_min:.3}");
-        println!("    Max:  {fitness_max:.3}");
-        println!("    Mean: {fitness_mean:.3}");
+        eprintln!("  Weights Stats:");
+        eprintln!("    Min:        {:.3?}", weights_min.to_array());
+        eprintln!("    Max:        {:.3?}", weights_max.to_array());
+        eprintln!("    Mean:       {:.3?}", weights_mean.to_array());
+        eprintln!("    NormStddev: {:.3?}", weights_norm_stddev.to_array());
+        eprintln!("    => Mean:    {weights_norm_stddev_mean:.3}");
+        eprintln!("  Fitness Stats:");
+        eprintln!("    Min:  {fitness_min:.3}");
+        eprintln!("    Max:  {fitness_max:.3}");
+        eprintln!("    Mean: {fitness_mean:.3}");
 
         if generation + 1 < MAX_GENERATIONS {
             gen_next_generation(&mut population, phase, &mut rng);
         }
     }
 
-    println!("Best Individuals:");
+    eprintln!("Best Individuals:");
     population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
     for (i, ind) in population.iter().take(5).enumerate() {
-        println!("  {i:2}: {:?} => {}", ind.weights.to_array(), ind.fitness);
+        eprintln!("  {i:2}: {:?} => {}", ind.weights.to_array(), ind.fitness);
     }
 
-    println!("Best individual weights saved to file:");
-    println!("{:#?}", population[0].weights);
+    eprintln!("Best individual weights saved to file:");
+    eprintln!("{:#?}", population[0].weights);
 
-    println!("{ai:?} AI learning completed.");
+    eprintln!("{ai:?} AI learning completed.");
 }
 
 fn mean(values: impl IntoIterator<Item = f32>) -> f32 {
