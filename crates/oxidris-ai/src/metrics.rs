@@ -1,4 +1,4 @@
-use oxidris_engine::{BitBoard, GameState, Piece, PieceKind};
+use oxidris_engine::{BitBoard, Piece, PieceKind};
 use std::{fmt, iter};
 
 // All evaluation metrics are transformed into a [0.0, 1.0] score,
@@ -105,37 +105,36 @@ impl Metrics {
         self.0.to_array()
     }
 
-    pub(crate) fn measure(init: &GameState, game: &GameState, last_placement: Piece) -> Self {
-        let line_clear_info = LineClearInfo::compute(init, game);
-        let height_info = HeightInfo::compute(game.board());
+    pub(crate) fn measure(board: &BitBoard, placement: Piece) -> Self {
+        let mut board = board.clone();
+        board.fill_piece(&placement);
+        let cleared_lines = board.clear_lines();
+
+        let line_clear_info = LineClearInfo::compute(cleared_lines);
+        let height_info = HeightInfo::compute(&board);
 
         Self(MetricValues {
             covered_holes: height_info.covered_holes_score(),
-            row_transitions: row_transitions_score(game.board()),
-            column_transitions: column_transitions_score(game.board()),
+            row_transitions: row_transitions_score(&board),
+            column_transitions: column_transitions_score(&board),
             surface_roughness: height_info.surface_roughness_score(),
             height_risk: height_info.height_risk_score(),
             deep_well_risk: height_info.deep_well_risk_score(),
             sum_of_heights: height_info.sum_of_heights_score(),
             lines_cleared: line_clear_info.lines_cleared_score(),
-            i_well_reward: height_info.i_well_reward(last_placement),
+            i_well_reward: height_info.i_well_reward(placement),
         })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 struct LineClearInfo {
-    turns: u8,
-    counter: [u8; 5],
+    cleared_lines: usize,
 }
 
 impl LineClearInfo {
-    fn compute(init: &GameState, game: &GameState) -> Self {
-        let turns = u8::try_from(game.completed_pieces() - init.completed_pieces()).unwrap();
-        let counter = core::array::from_fn(|i| {
-            u8::try_from(game.line_cleared_counter()[i] - init.line_cleared_counter()[i]).unwrap()
-        });
-        Self { turns, counter }
+    fn compute(cleared_lines: usize) -> Self {
+        Self { cleared_lines }
     }
 
     fn lines_cleared_score(self) -> f32 {
@@ -150,11 +149,8 @@ impl LineClearInfo {
         // sqrt() is applied to reduce variance and prevent domination
         // by rare high-reward events.
         const WEIGHT: [f32; 5] = [0.0, 0.0, 1.0, 2.0, 6.0];
-        let raw = iter::zip(self.counter, WEIGHT)
-            .map(|(count, weight)| f32::from(count) * weight)
-            .sum::<f32>();
-        let turns = f32::from(self.turns);
-        let norm = normalize(raw.sqrt(), (turns * 6.0).sqrt());
+        let raw = WEIGHT[self.cleared_lines];
+        let norm = normalize(raw.sqrt(), WEIGHT[4].sqrt());
         positive_metrics_score(norm)
     }
 }

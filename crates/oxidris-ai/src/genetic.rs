@@ -73,10 +73,17 @@ impl Individual {
         self.fitness = 0.0;
         for mut game in games.iter().cloned() {
             for _ in 0..MAX_PIECES_PER_GAME {
-                let Some((_, next_game)) = turn_evaluator.select_best_turn(&game) else {
+                let Some(turn) = turn_evaluator.select_best_turn(&game) else {
                     break;
                 };
-                game = next_game;
+                if turn.use_hold {
+                    game.try_hold().unwrap();
+                }
+                assert_eq!(game.falling_piece().kind(), turn.placement.kind());
+                game.set_falling_piece_unchecked(turn.placement);
+                if game.complete_piece_drop().is_err() {
+                    break;
+                }
             }
 
             self.fitness += fitness_evaluator.evaluate(&game);

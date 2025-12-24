@@ -165,7 +165,7 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
         // AI move selection and operation
         if game.session_state().is_playing() {
             if best_turn.is_none()
-                && let Some((turn, _next_game)) = turn_evaluator.select_best_turn(game.game_state())
+                && let Some(turn) = turn_evaluator.select_best_turn(game.game_state())
             {
                 best_turn = Some(turn);
             }

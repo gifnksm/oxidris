@@ -47,38 +47,24 @@ impl TurnEvaluator {
     }
 
     #[inline]
-    fn score(
-        &self,
-        init: &GameState,
-        game: &GameState,
-        last_placement: Piece,
-        game_over: bool,
-    ) -> f32 {
-        if game_over {
-            return 0.0;
-        }
-
-        let metrics = Metrics::measure(init, game, last_placement);
+    fn score(&self, board: &BitBoard, placement: Piece) -> f32 {
+        let metrics = Metrics::measure(board, placement);
         iter::zip(metrics.to_array(), self.weights.to_array())
             .map(|(m, w)| m * w)
             .sum()
     }
 
     #[must_use]
-    pub fn select_best_turn(&self, game: &GameState) -> Option<(TurnPlan, GameState)> {
+    pub fn select_best_turn(&self, game: &GameState) -> Option<TurnPlan> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
-        let init = game;
 
         for (game, turns) in available_turns(game.clone()) {
             for turn in turns {
-                let mut game = game.clone();
-                game.set_falling_piece_unchecked(turn.placement);
-                let game_over = game.complete_piece_drop().is_err();
-                let score = self.score(init, &game, turn.placement, game_over);
+                let score = self.score(game.board(), turn.placement);
                 if score > best_score {
                     best_score = score;
-                    best_result = Some((turn, game.clone()));
+                    best_result = Some(turn);
                 }
             }
         }
