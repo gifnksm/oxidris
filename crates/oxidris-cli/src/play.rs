@@ -174,25 +174,25 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
 }
 
 fn operate_game(game: &mut GameSession, target: TurnPlan) -> bool {
-    assert!(target.use_hold || !game.hold_used());
-    if target.use_hold && !game.hold_used() {
+    assert!(target.use_hold() || !game.hold_used());
+    if target.use_hold() && !game.hold_used() {
         return game.try_hold().is_err();
     }
 
     let falling_piece = game.field().falling_piece();
-    assert_eq!(target.placement.kind(), falling_piece.kind());
-    if falling_piece.rotation() != target.placement.rotation() {
+    assert_eq!(target.placement().kind(), falling_piece.kind());
+    if falling_piece.rotation() != target.placement().rotation() {
         return game.try_rotate_right().is_err();
     }
 
-    if falling_piece.position().x() < target.placement.position().x() {
+    if falling_piece.position().x() < target.placement().position().x() {
         return game.try_move_right().is_err();
-    } else if falling_piece.position().x() > target.placement.position().x() {
+    } else if falling_piece.position().x() > target.placement().position().x() {
         return game.try_move_left().is_err();
     }
     assert_eq!(
         falling_piece.position().x(),
-        target.placement.position().x()
+        target.placement().position().x()
     );
     game.hard_drop_and_complete();
 

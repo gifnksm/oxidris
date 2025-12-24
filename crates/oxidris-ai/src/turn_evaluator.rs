@@ -1,14 +1,41 @@
 use std::iter;
 
 use arrayvec::ArrayVec;
-use oxidris_engine::{BitBoard, GameField, Piece};
+use oxidris_engine::{BitBoard, CompletePieceDropError, GameField, GameStats, Piece};
 
 use crate::PlacementEvaluator;
 
 #[derive(Debug, Clone, Copy)]
 pub struct TurnPlan {
-    pub use_hold: bool,
-    pub placement: Piece,
+    use_hold: bool,
+    placement: Piece,
+}
+
+impl TurnPlan {
+    #[must_use]
+    pub fn use_hold(&self) -> bool {
+        self.use_hold
+    }
+
+    #[must_use]
+    pub fn placement(&self) -> &Piece {
+        &self.placement
+    }
+
+    pub fn apply(
+        &self,
+        field: &mut GameField,
+        stats: &mut GameStats,
+    ) -> (usize, Result<(), CompletePieceDropError>) {
+        if self.use_hold {
+            field.try_hold().unwrap();
+        }
+        assert_eq!(field.falling_piece().kind(), self.placement.kind());
+        field.set_falling_piece_unchecked(self.placement);
+        let (cleared_lines, result) = field.complete_piece_drop();
+        stats.complete_piece_drop(cleared_lines);
+        (cleared_lines, result)
+    }
 }
 
 #[derive(Debug)]

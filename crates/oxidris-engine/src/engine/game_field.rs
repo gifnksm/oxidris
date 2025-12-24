@@ -1,5 +1,5 @@
 use crate::{
-    PieceCollisionError,
+    CompletePieceDropError, PieceCollisionError,
     core::{
         bit_board::BitBoard,
         piece::{Piece, PieceKind},
@@ -91,13 +91,16 @@ impl GameField {
         Ok(())
     }
 
-    pub fn complete_piece_drop(&mut self) -> (usize, Result<(), PieceCollisionError>) {
+    pub fn complete_piece_drop(&mut self) -> (usize, Result<(), CompletePieceDropError>) {
         self.board.fill_piece(&self.falling_piece);
         let cleared_lines = self.board.clear_lines();
 
         self.falling_piece = Piece::new(self.piece_buffer.pop_next());
         if self.board.is_colliding(&self.falling_piece) {
-            return (cleared_lines, Err(PieceCollisionError));
+            return (
+                cleared_lines,
+                Err(CompletePieceDropError::NewPieceCollision),
+            );
         }
 
         (cleared_lines, Ok(()))

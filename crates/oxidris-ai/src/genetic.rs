@@ -70,31 +70,25 @@ struct Individual {
 
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&mut self, games: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
+    fn evaluate(&mut self, fields: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
         let turn_evaluator =
             TurnEvaluator::new(MetricsBasedPlacementEvaluator::new(self.weights.clone()));
         self.fitness = 0.0;
-        for mut game in games.iter().cloned() {
+        for mut field in fields.iter().cloned() {
             let mut stats = GameStats::new();
             for _ in 0..MAX_PIECES_PER_GAME {
-                let Some(turn) = turn_evaluator.select_best_turn(&game) else {
-                    break;
-                };
-                if turn.use_hold {
-                    game.try_hold().unwrap();
-                }
-                assert_eq!(game.falling_piece().kind(), turn.placement.kind());
-                game.set_falling_piece_unchecked(turn.placement);
-                let (cleared_lines, result) = game.complete_piece_drop();
-                stats.complete_piece_drop(cleared_lines);
+                let (_cleared_lines, result) = turn_evaluator
+                    .select_best_turn(&field)
+                    .unwrap()
+                    .apply(&mut field, &mut stats);
                 if result.is_err() {
                     break;
                 }
             }
 
-            self.fitness += fitness_evaluator.evaluate(&game, &stats);
+            self.fitness += fitness_evaluator.evaluate(&field, &stats);
         }
-        self.fitness /= games.len() as f32;
+        self.fitness /= fields.len() as f32;
     }
 }
 
@@ -151,11 +145,11 @@ pub fn learning(ai: AiType) {
     for generation in 0..MAX_GENERATIONS {
         let phase = EvolutaionPhase::from_generation(generation);
         eprintln!("Generation #{generation} ({phase:?}):");
-        let games: &[_; GAMES_PER_INDIVIDUALS] = &array::from_fn(|_| GameField::new());
+        let fields: &[_; GAMES_PER_INDIVIDUALS] = &array::from_fn(|_| GameField::new());
         thread::scope(|s| {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
-                    ind.evaluate(games, fitness_evaluator);
+                    ind.evaluate(fields, fitness_evaluator);
                     eprintln!(
                         "  {i:2}: {:.3?} => {:.3}",
                         ind.weights.to_array(),
