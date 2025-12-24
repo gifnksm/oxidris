@@ -2,9 +2,11 @@ use crate::{
     HoldError, PieceCollisionError,
     core::{
         bit_board::BitBoard,
-        piece::{Piece, PieceGenerator, PieceKind},
+        piece::{Piece, PieceKind},
     },
 };
+
+use super::piece_generator::PieceBuffer;
 
 const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 
@@ -12,9 +14,8 @@ const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 pub struct GameState {
     board: BitBoard,
     falling_piece: Piece,
-    held_piece: Option<PieceKind>,
     hold_used: bool,
-    piece_generator: PieceGenerator,
+    piece_buffer: PieceBuffer,
     score: usize,
     completed_pieces: usize,
     total_cleared_lines: usize,
@@ -30,20 +31,18 @@ impl Default for GameState {
 impl GameState {
     #[must_use]
     pub fn new() -> Self {
-        let first_piece = PieceKind::I; // dummy initial value
-        let mut game = Self {
+        let mut piece_buffer = PieceBuffer::new();
+        let falling_piece = Piece::new(piece_buffer.pop_next());
+        Self {
             board: BitBoard::INITIAL,
-            falling_piece: Piece::new(first_piece),
-            held_piece: None,
+            falling_piece,
             hold_used: false,
-            piece_generator: PieceGenerator::new(),
+            piece_buffer,
             score: 0,
             completed_pieces: 0,
             total_cleared_lines: 0,
             line_cleared_counter: [0; 5],
-        };
-        game.begin_next_piece_fall();
-        game
+        }
     }
 
     #[must_use]
@@ -95,7 +94,7 @@ impl GameState {
 
     #[must_use]
     pub fn held_piece(&self) -> Option<PieceKind> {
-        self.held_piece
+        self.piece_buffer.held_piece()
     }
 
     #[must_use]
@@ -104,7 +103,7 @@ impl GameState {
     }
 
     pub fn next_pieces(&self) -> impl Iterator<Item = PieceKind> + '_ {
-        self.piece_generator.next_pieces()
+        self.piece_buffer.next_pieces()
     }
 
     #[must_use]
@@ -116,16 +115,16 @@ impl GameState {
         if self.hold_used {
             return Err(HoldError::HoldAlreadyUsed);
         }
-        if let Some(held_piece) = self.held_piece {
-            let piece = Piece::new(held_piece);
+        if let Some(piece) = self.piece_buffer.held_piece() {
+            let piece = Piece::new(piece);
             if self.board.is_colliding(&piece) {
                 return Err(HoldError::PieceCollision(PieceCollisionError));
             }
-            self.held_piece = Some(self.falling_piece.kind());
+            self.piece_buffer.swap_hold(self.falling_piece.kind());
             self.falling_piece = piece;
         } else {
-            self.held_piece = Some(self.falling_piece.kind());
-            self.begin_next_piece_fall();
+            self.piece_buffer.swap_hold(self.falling_piece.kind());
+            self.falling_piece = Piece::new(self.piece_buffer.pop_next());
         }
         self.hold_used = true;
         Ok(())
@@ -139,16 +138,12 @@ impl GameState {
         self.line_cleared_counter[cleared_lines] += 1;
         self.completed_pieces += 1;
 
-        self.begin_next_piece_fall();
+        self.falling_piece = Piece::new(self.piece_buffer.pop_next());
         if self.board.is_colliding(&self.falling_piece) {
             return Err(PieceCollisionError);
         }
 
         self.hold_used = false;
         Ok(cleared_lines)
-    }
-
-    fn begin_next_piece_fall(&mut self) {
-        self.falling_piece = Piece::new(self.piece_generator.pop_next());
     }
 }

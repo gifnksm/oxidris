@@ -1,12 +1,5 @@
-use std::collections::VecDeque;
-
 use arrayvec::ArrayVec;
-use rand::{
-    Rng, SeedableRng as _,
-    distr::StandardUniform,
-    prelude::{Distribution, StdRng},
-    seq::SliceRandom,
-};
+use rand::{Rng, distr::StandardUniform, prelude::Distribution};
 
 use super::{
     bit_board::{BitBoard, PIECE_SPAWN_X, PIECE_SPAWN_Y},
@@ -289,7 +282,7 @@ impl Distribution<PieceKind> for StandardUniform {
 
 impl PieceKind {
     /// Number of piece types (7).
-    const LEN: usize = 7;
+    pub const LEN: usize = 7;
 
     pub(crate) fn mask(self, rotation: PieceRotation) -> PieceMask {
         PIECE_MASKS[self as usize][rotation.as_usize()]
@@ -424,64 +417,3 @@ const PIECE_SHAPES: [[PieceShape; 4]; PieceKind::LEN] = {
         shape_rotations(3, &[[E, T, E, E], [T, T, T, E], EEEE, EEEE]),
     ]
 };
-
-/// Manages the order and random generation of pieces.
-///
-/// Supplies pieces using the 7-bag system.
-#[derive(Debug, Clone)]
-pub(crate) struct PieceGenerator {
-    rng: StdRng,
-    bag: VecDeque<PieceKind>,
-}
-
-impl PieceGenerator {
-    /// Creates a new [`PieceGenerator`].
-    ///
-    /// The random seed is initialized from the OS's random data source.
-    pub(crate) fn new() -> Self {
-        let rng = StdRng::from_os_rng();
-        let bag = VecDeque::with_capacity(PieceKind::LEN * 2);
-        let mut this = Self { rng, bag };
-        this.fill_bag();
-        this
-    }
-
-    /// Fills the bag with a shuffled set of 7 pieces when needed.
-    ///
-    /// After filling, the bag will always contain at least 8 elements
-    /// (so that even after one `pop_next`, there are still 7 left).
-    fn fill_bag(&mut self) {
-        while self.bag.len() <= PieceKind::LEN {
-            let mut new_bag = [
-                PieceKind::I,
-                PieceKind::O,
-                PieceKind::S,
-                PieceKind::Z,
-                PieceKind::J,
-                PieceKind::L,
-                PieceKind::T,
-            ];
-            new_bag.shuffle(&mut self.rng);
-            self.bag.extend(new_bag);
-        }
-    }
-
-    /// Pops the next piece from the bag.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the bag is empty (should never happen).
-    pub(crate) fn pop_next(&mut self) -> PieceKind {
-        self.fill_bag();
-        self.bag
-            .pop_front()
-            .expect("Piece bag should never be empty")
-    }
-
-    /// Returns an iterator of upcoming pieces in the bag.
-    ///
-    /// The iterator always contains at least 8 elements.
-    pub(crate) fn next_pieces(&self) -> impl Iterator<Item = PieceKind> + '_ {
-        self.bag.iter().copied()
-    }
-}
