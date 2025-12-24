@@ -2,21 +2,13 @@ use std::ops::Range;
 
 use crate::core::piece::Piece;
 
-pub(super) const PLAYABLE_WIDTH: usize = 10;
-pub(super) const PLAYABLE_HEIGHT: usize = 20;
+use super::{
+    PLAYABLE_HEIGHT, PLAYABLE_WIDTH, SENTINEL_MARGIN_LEFT, SENTINEL_MARGIN_TOP, TOTAL_HEIGHT,
+    TOTAL_WIDTH,
+};
 
 pub(super) const PIECE_SPAWN_X: usize = 5;
 pub(super) const PIECE_SPAWN_Y: usize = 0;
-
-pub(super) const TOTAL_WIDTH: usize =
-    PLAYABLE_WIDTH + (SENTINEL_MARGIN_LEFT + SENTINEL_MARGIN_RIGHT);
-pub(super) const TOTAL_HEIGHT: usize =
-    PLAYABLE_HEIGHT + (SENTINEL_MARGIN_TOP + SENTINEL_MARGIN_BOTTOM);
-
-pub(super) const SENTINEL_MARGIN_TOP: usize = 2;
-pub(super) const SENTINEL_MARGIN_BOTTOM: usize = 2;
-pub(super) const SENTINEL_MARGIN_LEFT: usize = 2;
-pub(super) const SENTINEL_MARGIN_RIGHT: usize = 2;
 
 // Bit masks for sentinel regions
 // Left sentinel: bits 0-1 (x=0,1)

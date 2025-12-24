@@ -1,12 +1,8 @@
-use crate::core::bit_board::SENTINEL_MARGIN_BOTTOM;
-use crate::core::piece::Piece;
-use Block::{Empty as E, Wall as W};
-
-use super::bit_board::{
-    PLAYABLE_HEIGHT, PLAYABLE_WIDTH, SENTINEL_MARGIN_LEFT, SENTINEL_MARGIN_RIGHT,
-    SENTINEL_MARGIN_TOP, TOTAL_HEIGHT, TOTAL_WIDTH,
+use super::piece::{Piece, PieceKind};
+use super::{
+    PLAYABLE_HEIGHT, PLAYABLE_WIDTH, SENTINEL_MARGIN_BOTTOM, SENTINEL_MARGIN_LEFT,
+    SENTINEL_MARGIN_RIGHT, SENTINEL_MARGIN_TOP, TOTAL_HEIGHT, TOTAL_WIDTH,
 };
-use super::piece::PieceKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
@@ -34,6 +30,7 @@ impl BlockRow {
     // Sentinel border layout matches BitBoard for coordinate compatibility.
     // See BitBoard documentation for detailed explanation of the 2-cell sentinel design.
     const TOP: Self = {
+        use Block::{Empty as E, Wall as W};
         assert!(SENTINEL_MARGIN_LEFT == 2);
         assert!(SENTINEL_MARGIN_RIGHT == 2);
         BlockRow {
@@ -41,7 +38,7 @@ impl BlockRow {
         }
     };
     const BOTTOM: Self = BlockRow {
-        cells: [W; TOTAL_WIDTH],
+        cells: [Block::Wall; TOTAL_WIDTH],
     };
 
     fn playable_cells(&self) -> &[Block; PLAYABLE_WIDTH] {
@@ -65,8 +62,8 @@ impl BlockBoard {
     pub const PLAYABLE_HEIGHT: usize = PLAYABLE_HEIGHT;
 
     // Initial board layout matches BitBoard structure for coordinate compatibility.
-    // Top sentinels use RenderRow::TOP (side walls only) to allow piece spawning.
-    // Bottom sentinels use RenderRow::BOTTOM (fully occupied) to block downward movement.
+    // Top sentinels use BlockRow::TOP (side walls only) to allow piece spawning.
+    // Bottom sentinels use BlockRow::BOTTOM (fully occupied) to block downward movement.
     pub const INITIAL: Self = {
         assert!(SENTINEL_MARGIN_TOP == 2);
         assert!(SENTINEL_MARGIN_BOTTOM == 2);
