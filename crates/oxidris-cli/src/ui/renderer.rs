@@ -326,7 +326,7 @@ impl Renderer {
         // Show ghost piece only in normal mode
         if self.mode == PlayMode::Normal {
             let dropped = game.simulate_drop_position();
-            board_buf.fill_piece_as(&dropped, Block::Ghost);
+            board_buf.fill_piece_as(dropped, Block::Ghost);
         }
         board_buf.fill_piece(falling_piece);
 

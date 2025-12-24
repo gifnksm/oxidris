@@ -18,8 +18,8 @@ impl TurnPlan {
     }
 
     #[must_use]
-    pub fn placement(&self) -> &Piece {
-        &self.placement
+    pub fn placement(&self) -> Piece {
+        self.placement
     }
 
     pub fn apply(
@@ -82,7 +82,7 @@ fn available_turns(field: &GameField) -> ArrayVec<impl Iterator<Item = TurnPlan>
     };
 
     let board = field.board();
-    let p1 = *field.falling_piece();
+    let p1 = field.falling_piece();
     result.push(available_placement(p1, board).map(placement2turn(false)));
 
     if field.can_hold() {
@@ -106,9 +106,9 @@ fn available_placement(piece: Piece, board: &BitBoard) -> impl Iterator<Item = P
 }
 
 fn left(piece: Piece, board: &BitBoard) -> Option<Piece> {
-    piece.left().filter(|moved| !board.is_colliding(moved))
+    piece.left().filter(|moved| !board.is_colliding(*moved))
 }
 
 fn right(piece: Piece, board: &BitBoard) -> Option<Piece> {
-    piece.right().filter(|moved| !board.is_colliding(moved))
+    piece.right().filter(|moved| !board.is_colliding(*moved))
 }

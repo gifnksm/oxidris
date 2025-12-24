@@ -194,7 +194,7 @@ impl BitBoard {
 
     /// Checks if the piece collides with occupied cells.
     #[must_use]
-    pub fn is_colliding(&self, piece: &Piece) -> bool {
+    pub fn is_colliding(&self, piece: Piece) -> bool {
         let x0 = piece.position().x();
         let y0 = piece.position().y();
         for (mask, row) in piece.mask().into_iter().zip(&self.rows[y0..]) {
@@ -206,7 +206,7 @@ impl BitBoard {
     }
 
     /// Fills the piece cells on the board.
-    pub fn fill_piece(&mut self, piece: &Piece) {
+    pub fn fill_piece(&mut self, piece: Piece) {
         let x0 = piece.position().x();
         let y0 = piece.position().y();
         for (mask, row) in piece.mask().into_iter().zip(&mut self.rows[y0..]) {

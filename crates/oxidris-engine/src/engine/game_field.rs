@@ -39,12 +39,12 @@ impl GameField {
     }
 
     #[must_use]
-    pub fn falling_piece(&self) -> &Piece {
-        &self.falling_piece
+    pub fn falling_piece(&self) -> Piece {
+        self.falling_piece
     }
 
     pub fn set_falling_piece(&mut self, piece: Piece) -> Result<(), PieceCollisionError> {
-        if self.board.is_colliding(&piece) {
+        if self.board.is_colliding(piece) {
             return Err(PieceCollisionError);
         }
         self.falling_piece = piece;
@@ -72,7 +72,7 @@ impl GameField {
     #[must_use]
     pub fn can_hold(&self) -> bool {
         let piece = self.piece_buffer.peek_hold_result();
-        !self.board.is_colliding(&Piece::new(piece))
+        !self.board.is_colliding(Piece::new(piece))
     }
 
     #[must_use]
@@ -92,11 +92,11 @@ impl GameField {
     }
 
     pub fn complete_piece_drop(&mut self) -> (usize, Result<(), CompletePieceDropError>) {
-        self.board.fill_piece(&self.falling_piece);
+        self.board.fill_piece(self.falling_piece);
         let cleared_lines = self.board.clear_lines();
 
         self.falling_piece = Piece::new(self.piece_buffer.pop_next());
-        if self.board.is_colliding(&self.falling_piece) {
+        if self.board.is_colliding(self.falling_piece) {
             return (
                 cleared_lines,
                 Err(CompletePieceDropError::NewPieceCollision),

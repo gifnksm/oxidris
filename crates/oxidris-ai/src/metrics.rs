@@ -107,7 +107,7 @@ impl Metrics {
 
     pub(crate) fn measure(board: &BitBoard, placement: Piece) -> Self {
         let mut board = board.clone();
-        board.fill_piece(&placement);
+        board.fill_piece(placement);
         let cleared_lines = board.clear_lines();
 
         let line_clear_info = LineClearInfo::compute(cleared_lines);

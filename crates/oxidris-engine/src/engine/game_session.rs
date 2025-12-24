@@ -91,7 +91,7 @@ impl GameSession {
     }
 
     #[must_use]
-    pub fn falling_piece(&self) -> &Piece {
+    pub fn falling_piece(&self) -> Piece {
         self.field.falling_piece()
     }
 

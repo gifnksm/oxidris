@@ -110,7 +110,7 @@ impl Piece {
     #[must_use]
     pub fn super_rotated_left(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_left();
-        if board.is_colliding(&piece) {
+        if board.is_colliding(piece) {
             piece = super_rotation(board, piece)?;
         }
         Some(piece)
@@ -119,7 +119,7 @@ impl Piece {
     #[must_use]
     pub fn super_rotated_right(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_right();
-        if board.is_colliding(&piece) {
+        if board.is_colliding(piece) {
             piece = super_rotation(board, piece)?;
         }
         Some(piece)
@@ -146,7 +146,7 @@ impl Piece {
     #[must_use]
     pub fn simulate_drop_position(&self, board: &BitBoard) -> Self {
         let mut dropped = *self;
-        while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(m)) {
+        while let Some(piece) = dropped.down().filter(|m| !board.is_colliding(*m)) {
             dropped = piece;
         }
         dropped
@@ -156,7 +156,7 @@ impl Piece {
 fn super_rotation(board: &BitBoard, piece: Piece) -> Option<Piece> {
     let pieces = [piece.up(), piece.right(), piece.down(), piece.left()];
     for piece in pieces.iter().flatten() {
-        if !board.is_colliding(piece) {
+        if !board.is_colliding(*piece) {
             return Some(*piece);
         }
     }

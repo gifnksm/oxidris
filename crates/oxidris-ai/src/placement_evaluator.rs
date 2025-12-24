@@ -58,7 +58,7 @@ impl PlacementEvaluator for DumpPlacementEvaluator {
     #[inline]
     fn evaluate_placement(&self, board: &BitBoard, placement: Piece) -> f32 {
         let mut board = board.clone();
-        board.fill_piece(&placement);
+        board.fill_piece(placement);
         let height_info = HeightInfo::compute(&board);
         let max_height = height_info.max_height();
         let covered_holes = height_info.covered_holes();

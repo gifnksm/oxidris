@@ -106,13 +106,13 @@ impl BlockBoard {
             .map(BlockRow::playable_cells)
     }
 
-    pub fn fill_piece(&mut self, piece: &Piece) {
+    pub fn fill_piece(&mut self, piece: Piece) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = Block::Piece(piece.kind());
         }
     }
 
-    pub fn fill_piece_as(&mut self, piece: &Piece, cell: Block) {
+    pub fn fill_piece_as(&mut self, piece: Piece, cell: Block) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = cell;
         }
