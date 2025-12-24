@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use serde::{Deserialize, Serialize};
+
 use crate::core::piece::Piece;
 
 use super::{
@@ -24,7 +26,8 @@ const PLAYABLE_MASK: u16 = FULL_ROW_MASK & !SENTINEL_MASK;
 
 /// Single row in the bit board representation.
 /// Stores one row of the board as a u16 bitmask.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct BitRow {
     bits: u16,
 }
@@ -126,7 +129,8 @@ impl BitRow {
 /// ```
 ///
 /// This allows full movement range while maintaining 4x4 grid collision detection.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct BitBoard {
     rows: [BitRow; TOTAL_HEIGHT],
 }

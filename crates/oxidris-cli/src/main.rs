@@ -3,6 +3,7 @@ use std::io;
 use clap::{Parser, Subcommand};
 use oxidris_ai::AiType;
 
+mod generate_boards;
 mod play;
 mod ui;
 
@@ -28,6 +29,8 @@ enum Mode {
         #[arg(long, default_value = "aggro")]
         ai: AiType,
     },
+    /// Generate boards for training data
+    GenerateBoards,
 }
 
 fn main() -> io::Result<()> {
@@ -36,6 +39,7 @@ fn main() -> io::Result<()> {
         Mode::Normal => play::normal()?,
         Mode::Auto { ai } => play::auto(ai)?,
         Mode::Learning { ai } => oxidris_ai::genetic::learning(ai),
+        Mode::GenerateBoards => generate_boards::run(),
     }
     Ok(())
 }
