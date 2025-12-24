@@ -55,36 +55,33 @@ fn available_turns(field: &GameField) -> ArrayVec<impl Iterator<Item = TurnPlan>
     };
 
     let board = field.board();
-    let p1 = field.falling_piece();
+    let p1 = *field.falling_piece();
     result.push(available_placement(p1, board).map(placement2turn(false)));
 
     if field.can_hold() {
         let p2 = field.peek_falling_piece_after_hold();
-        result.push(available_placement(&p2, board).map(placement2turn(true)));
+        result.push(available_placement(p2, board).map(placement2turn(true)));
     }
 
     result
 }
 
-fn available_placement<'b>(
-    piece: &Piece,
-    board: &'b BitBoard,
-) -> impl Iterator<Item = Piece> + use<'b> {
+fn available_placement(piece: Piece, board: &BitBoard) -> impl Iterator<Item = Piece> + use<'_> {
     piece
         .super_rotations(board)
         .into_iter()
         .flat_map(move |p| {
             iter::once(p)
-                .chain(iter::successors(left(&p, board), |p| left(p, board)))
-                .chain(iter::successors(right(&p, board), |p| right(p, board)))
+                .chain(iter::successors(left(p, board), |p| left(*p, board)))
+                .chain(iter::successors(right(p, board), |p| right(*p, board)))
         })
         .map(|piece| piece.simulate_drop_position(board))
 }
 
-fn left(piece: &Piece, board: &BitBoard) -> Option<Piece> {
+fn left(piece: Piece, board: &BitBoard) -> Option<Piece> {
     piece.left().filter(|moved| !board.is_colliding(moved))
 }
 
-fn right(piece: &Piece, board: &BitBoard) -> Option<Piece> {
+fn right(piece: Piece, board: &BitBoard) -> Option<Piece> {
     piece.right().filter(|moved| !board.is_colliding(moved))
 }

@@ -111,7 +111,7 @@ impl Piece {
     pub fn super_rotated_left(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_left();
         if board.is_colliding(&piece) {
-            piece = super_rotation(board, &piece)?;
+            piece = super_rotation(board, piece)?;
         }
         Some(piece)
     }
@@ -120,7 +120,7 @@ impl Piece {
     pub fn super_rotated_right(self, board: &BitBoard) -> Option<Self> {
         let mut piece = self.rotated_right();
         if board.is_colliding(&piece) {
-            piece = super_rotation(board, &piece)?;
+            piece = super_rotation(board, piece)?;
         }
         Some(piece)
     }
@@ -153,7 +153,7 @@ impl Piece {
     }
 }
 
-fn super_rotation(board: &BitBoard, piece: &Piece) -> Option<Piece> {
+fn super_rotation(board: &BitBoard, piece: Piece) -> Option<Piece> {
     let pieces = [piece.up(), piece.right(), piece.down(), piece.left()];
     for piece in pieces.iter().flatten() {
         if !board.is_colliding(piece) {
@@ -165,26 +165,27 @@ fn super_rotation(board: &BitBoard, piece: &Piece) -> Option<Piece> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PiecePosition {
-    x: usize,
-    y: usize,
+    x: u8,
+    y: u8,
 }
 
 impl PiecePosition {
-    pub const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X, PIECE_SPAWN_Y);
+    #[expect(clippy::cast_possible_truncation)]
+    pub const SPAWN_POSITION: Self = Self::new(PIECE_SPAWN_X as u8, PIECE_SPAWN_Y as u8);
 
     #[must_use]
-    pub const fn new(x: usize, y: usize) -> Self {
+    pub const fn new(x: u8, y: u8) -> Self {
         Self { x, y }
     }
 
     #[must_use]
     pub fn x(self) -> usize {
-        self.x
+        usize::from(self.x)
     }
 
     #[must_use]
     pub fn y(self) -> usize {
-        self.y
+        usize::from(self.y)
     }
 
     #[must_use]
@@ -198,7 +199,7 @@ impl PiecePosition {
 
     #[must_use]
     pub const fn right(&self) -> Option<Self> {
-        if self.x >= BitBoard::TOTAL_WIDTH - 1 {
+        if self.x as usize >= BitBoard::TOTAL_WIDTH - 1 {
             None
         } else {
             Some(Self::new(self.x + 1, self.y))
@@ -216,7 +217,7 @@ impl PiecePosition {
 
     #[must_use]
     pub const fn down(&self) -> Option<Self> {
-        if self.y >= BitBoard::TOTAL_HEIGHT - 1 {
+        if self.y as usize >= BitBoard::TOTAL_HEIGHT - 1 {
             None
         } else {
             Some(Self::new(self.x, self.y + 1))

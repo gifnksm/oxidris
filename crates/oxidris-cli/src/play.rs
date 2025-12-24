@@ -163,7 +163,7 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
             best_turn = turn_evaluator.select_best_turn(game.field());
         }
 
-        if let Some(target) = &best_turn
+        if let Some(target) = best_turn
             && operate_game(game, target)
         {
             best_turn = None;
@@ -173,7 +173,7 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
     })
 }
 
-fn operate_game(game: &mut GameSession, target: &TurnPlan) -> bool {
+fn operate_game(game: &mut GameSession, target: TurnPlan) -> bool {
     assert!(target.use_hold || !game.hold_used());
     if target.use_hold && !game.hold_used() {
         return game.try_hold().is_err();
