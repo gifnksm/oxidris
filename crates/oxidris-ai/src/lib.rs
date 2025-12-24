@@ -1,7 +1,8 @@
-pub use self::{turn_evaluator::*, weights::*};
+pub use self::{placement_evaluator::*, turn_evaluator::*, weights::*};
 
 pub mod genetic;
 mod metrics;
+mod placement_evaluator;
 mod turn_evaluator;
 mod weights;
 

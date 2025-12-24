@@ -3,9 +3,7 @@ use std::iter;
 use arrayvec::ArrayVec;
 use oxidris_engine::{BitBoard, GameField, Piece};
 
-use super::metrics::Metrics;
-use super::weights::WeightSet;
-use crate::AiType;
+use crate::PlacementEvaluator;
 
 #[derive(Debug, Clone, Copy)]
 pub struct TurnPlan {
@@ -13,45 +11,19 @@ pub struct TurnPlan {
     pub placement: Piece,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TurnEvaluator {
-    weights: WeightSet,
+    placement_evaluator: Box<dyn PlacementEvaluator>,
 }
 
 impl TurnEvaluator {
-    #[must_use]
-    pub fn aggro() -> Self {
+    pub fn new<E>(placement_evaluator: E) -> Self
+    where
+        E: PlacementEvaluator + 'static,
+    {
         Self {
-            weights: WeightSet::AGGRO,
+            placement_evaluator: Box::new(placement_evaluator),
         }
-    }
-
-    #[must_use]
-    pub fn defensive() -> Self {
-        Self {
-            weights: WeightSet::DEFENSIVE,
-        }
-    }
-
-    #[must_use]
-    pub fn by_ai_type(ai: AiType) -> Self {
-        match ai {
-            AiType::Aggro => Self::aggro(),
-            AiType::Defensive => Self::defensive(),
-        }
-    }
-
-    #[must_use]
-    pub fn new(weights: WeightSet) -> Self {
-        Self { weights }
-    }
-
-    #[inline]
-    fn score(&self, board: &BitBoard, placement: Piece) -> f32 {
-        let metrics = Metrics::measure(board, placement);
-        iter::zip(metrics.to_array(), self.weights.to_array())
-            .map(|(m, w)| m * w)
-            .sum()
     }
 
     #[must_use]
@@ -61,7 +33,9 @@ impl TurnEvaluator {
 
         for (field, turns) in available_turns(field.clone()) {
             for turn in turns {
-                let score = self.score(field.board(), turn.placement);
+                let score = self
+                    .placement_evaluator
+                    .evaluate_placement(field.board(), turn.placement);
                 if score > best_score {
                     best_score = score;
                     best_result = Some(turn);

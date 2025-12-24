@@ -9,7 +9,9 @@ use rand::{
 
 use oxidris_engine::{GameField, GameStats};
 
-use crate::{AiType, turn_evaluator::TurnEvaluator, weights::WeightSet};
+use crate::{
+    AiType, MetricsBasedPlacementEvaluator, turn_evaluator::TurnEvaluator, weights::WeightSet,
+};
 
 use super::metrics::HeightInfo;
 
@@ -69,7 +71,8 @@ struct Individual {
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
     fn evaluate(&mut self, games: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
-        let turn_evaluator = TurnEvaluator::new(self.weights.clone());
+        let turn_evaluator =
+            TurnEvaluator::new(MetricsBasedPlacementEvaluator::new(self.weights.clone()));
         self.fitness = 0.0;
         for mut game in games.iter().cloned() {
             let mut stats = GameStats::new();
