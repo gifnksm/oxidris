@@ -96,6 +96,7 @@ impl LineClearInfo {
 pub(crate) struct HeightInfo {
     heights: [u8; BitBoard::PLAYABLE_WIDTH],
     occupied: [u8; BitBoard::PLAYABLE_WIDTH],
+    well_depths: [u8; BitBoard::PLAYABLE_WIDTH],
 }
 
 impl HeightInfo {
@@ -119,7 +120,22 @@ impl HeightInfo {
                 }
             }
         }
-        Self { heights, occupied }
+
+        let left = heights.into_iter().skip(1).chain(iter::once(u8::MAX));
+        let right = iter::once(u8::MAX).chain(heights);
+        let wells = iter::zip(heights, iter::zip(left, right)).map(|(h, (l, r))| {
+            if h < l && h < r { u8::min(l, r) - h } else { 0 }
+        });
+        let mut well_depths = [0; BitBoard::PLAYABLE_WIDTH];
+        for (i, depth) in wells.enumerate() {
+            well_depths[i] = depth;
+        }
+
+        Self {
+            heights,
+            occupied,
+            well_depths,
+        }
     }
 
     pub(crate) fn covered_holes(&self) -> u16 {
@@ -206,19 +222,14 @@ impl HeightInfo {
         // This metric is NOT a positive reward.
         // It acts purely as a safety penalty using exponential decay,
         // while preserving freedom to build shallow I-wells.
-        let left = self.heights.into_iter().skip(1).chain(iter::once(u8::MAX));
-        let right = iter::once(u8::MAX).chain(self.heights);
-        let wells = iter::zip(self.heights, iter::zip(left, right))
-            .filter(|&(h, (l, r))| h < l && h < r)
-            .map(|(h, (l, r))| u8::min(l, r) - h)
-            .filter(|&depth| depth > 2);
-        let raw = wells
+        let raw = self
+            .well_depths
+            .into_iter()
             .map(|depth| {
                 let depth = u16::from(depth);
                 depth * depth
             })
             .sum::<u16>();
-
         let raw = f32::from(raw);
         let norm = normalize(raw, 50.0);
         // do not use negative_metrics_score here
@@ -253,13 +264,10 @@ impl HeightInfo {
     fn i_well_reward(&self, last_placement: Piece) -> f32 {
         let mut best_reward = 0.0;
         let mut best_depth = 0.0;
-        let left = self.heights.into_iter().skip(1).chain(iter::once(u8::MAX));
-        let right = iter::once(u8::MAX).chain(self.heights);
-        let wells = iter::zip(self.heights, iter::zip(left, right))
-            .enumerate()
-            .filter(|(_i, (h, (l, r)))| h < l && h < r);
-        for (i, (h, (left, right))) in wells {
-            let depth = u8::min(left, right) - h;
+        for (i, depth) in self.well_depths.into_iter().enumerate() {
+            if depth < 1 {
+                continue;
+            }
             let depth = f32::from(depth);
             let dist_to_edge = usize::min(i, BitBoard::PLAYABLE_WIDTH - 1 - i);
             #[expect(clippy::cast_precision_loss)]
