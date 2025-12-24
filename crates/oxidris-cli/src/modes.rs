@@ -1,5 +1,7 @@
 use std::{
-    io, thread,
+    io,
+    ops::ControlFlow,
+    thread,
     time::{Duration, Instant},
 };
 
@@ -69,50 +71,23 @@ impl NormalModeAction {
 
 const FPS: u64 = 60;
 
-pub(crate) fn normal() -> io::Result<()> {
-    let mut game = GameSession::new(FPS);
-    let mut renderer = Renderer::new(PlayMode::Normal)?;
-    renderer.draw(&game)?;
+fn run_game_loop<F>(play_mode: PlayMode, mut handler: F) -> io::Result<()>
+where
+    F: FnMut(&mut Input, &mut GameSession) -> io::Result<ControlFlow<()>>,
+{
+    let mut session = GameSession::new(FPS);
+    let mut renderer = Renderer::new(play_mode)?;
     let mut input = Input::new()?;
 
+    renderer.draw(&session)?;
+
     let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
+
     loop {
         let now = Instant::now();
-        let mut quit = false;
-
-        // Handle input
-        while let Some(key) = input.try_read()? {
-            if let Some(action) = NormalModeAction::from_key(key) {
-                match game.session_state() {
-                    SessionState::Playing => match action {
-                        NormalModeAction::MoveLeft => _ = game.try_move_left(),
-                        NormalModeAction::MoveRight => _ = game.try_move_right(),
-                        NormalModeAction::RotateLeft => _ = game.try_rotate_left(),
-                        NormalModeAction::RotateRight => _ = game.try_rotate_right(),
-                        NormalModeAction::SoftDrop => _ = game.try_soft_drop(),
-                        NormalModeAction::HardDrop => game.hard_drop_and_complete(),
-                        NormalModeAction::Hold => _ = game.try_hold(),
-                        NormalModeAction::Pause => game.toggle_pause(),
-                        NormalModeAction::Quit => quit = true,
-                    },
-                    SessionState::Paused => match action {
-                        NormalModeAction::Pause => game.toggle_pause(),
-                        NormalModeAction::Quit => quit = true,
-                        _ => {}
-                    },
-                    SessionState::GameOver => unreachable!(),
-                }
-            }
-        }
-
-        // Game progression
-        if !quit && game.session_state().is_playing() {
-            game.increment_frame();
-        }
-
-        renderer.draw(&game)?;
-
-        if game.session_state().is_game_over() || quit {
+        let result = handler(&mut input, &mut session)?;
+        renderer.draw(&session)?;
+        if result.is_break() {
             break;
         }
 
@@ -128,63 +103,73 @@ pub(crate) fn normal() -> io::Result<()> {
     Ok(())
 }
 
+pub(crate) fn normal() -> io::Result<()> {
+    run_game_loop(PlayMode::Normal, |input, game| {
+        while let Some(key) = input.try_read()? {
+            if let Some(action) = NormalModeAction::from_key(key) {
+                match game.session_state() {
+                    SessionState::Playing => match action {
+                        NormalModeAction::MoveLeft => _ = game.try_move_left(),
+                        NormalModeAction::MoveRight => _ = game.try_move_right(),
+                        NormalModeAction::RotateLeft => _ = game.try_rotate_left(),
+                        NormalModeAction::RotateRight => _ = game.try_rotate_right(),
+                        NormalModeAction::SoftDrop => _ = game.try_soft_drop(),
+                        NormalModeAction::HardDrop => game.hard_drop_and_complete(),
+                        NormalModeAction::Hold => _ = game.try_hold(),
+                        NormalModeAction::Pause => game.toggle_pause(),
+                        NormalModeAction::Quit => return Ok(ControlFlow::Break(())),
+                    },
+                    SessionState::Paused => match action {
+                        NormalModeAction::Pause => game.toggle_pause(),
+                        NormalModeAction::Quit => return Ok(ControlFlow::Break(())),
+                        _ => {}
+                    },
+                    SessionState::GameOver => unreachable!(),
+                }
+            }
+        }
+
+        match game.session_state() {
+            SessionState::Paused => Ok(ControlFlow::Continue(())),
+            SessionState::GameOver => Ok(ControlFlow::Break(())),
+            SessionState::Playing => {
+                game.increment_frame();
+                Ok(ControlFlow::Continue(()))
+            }
+        }
+    })
+}
+
 pub(crate) fn auto(ai: AiType) -> io::Result<()> {
-    let mut game = GameSession::new(FPS);
-    let mut renderer = Renderer::new(PlayMode::Auto)?;
-    renderer.draw(&game)?;
-    let mut input = Input::new()?;
-    let mut best_turn = None;
-
     let turn_evaluator = TurnEvaluator::by_ai_type(ai);
-
-    let frame_duration = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
-    loop {
-        let now = Instant::now();
-        let mut quit = false;
-
-        // Handle input
+    let mut best_turn = None;
+    run_game_loop(PlayMode::Auto, |input, game| {
         while let Some(key) = input.try_read()? {
             match key {
-                KeyCode::Char('q') => quit = true,
+                KeyCode::Char('q') => return Ok(ControlFlow::Break(())),
                 KeyCode::Char('p') => game.toggle_pause(),
                 _ => {}
             }
         }
 
-        // Game progression
-        if !quit && game.session_state().is_playing() {
-            game.increment_frame();
+        match game.session_state() {
+            SessionState::Paused => return Ok(ControlFlow::Continue(())),
+            SessionState::GameOver => return Ok(ControlFlow::Break(())),
+            SessionState::Playing => game.increment_frame(),
         }
 
-        renderer.draw(&game)?;
-
-        if game.session_state().is_game_over() || quit {
-            break;
+        if best_turn.is_none() {
+            best_turn = turn_evaluator.select_best_turn(game.field());
         }
 
-        // AI move selection and operation
-        if game.session_state().is_playing() {
-            if best_turn.is_none()
-                && let Some(turn) = turn_evaluator.select_best_turn(game.field())
-            {
-                best_turn = Some(turn);
-            }
-
-            if let Some(target) = &best_turn
-                && operate_game(&mut game, target)
-            {
-                best_turn = None;
-            }
+        if let Some(target) = &best_turn
+            && operate_game(game, target)
+        {
+            best_turn = None;
         }
 
-        let elapsed = now.elapsed();
-        if let Some(rest) = frame_duration.checked_sub(elapsed) {
-            thread::sleep(rest);
-        }
-    }
-    renderer.cleanup()?;
-    input.cleanup()?;
-    Ok(())
+        Ok(ControlFlow::Continue(()))
+    })
 }
 
 fn operate_game(game: &mut GameSession, target: &TurnPlan) -> bool {
