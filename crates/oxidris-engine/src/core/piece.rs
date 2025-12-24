@@ -126,13 +126,13 @@ impl Piece {
     }
 
     #[must_use]
-    pub fn super_rotations(self, board: &BitBoard) -> ArrayVec<Self, 4> {
+    pub fn super_rotations(&self, board: &BitBoard) -> ArrayVec<Self, 4> {
         let mut rotations = ArrayVec::new();
-        rotations.push(self);
+        rotations.push(*self);
         if self.kind == PieceKind::O {
             return rotations;
         }
-        let mut prev = self;
+        let mut prev = *self;
         for _ in 0..3 {
             let Some(piece) = prev.super_rotated_right(board) else {
                 break;

@@ -31,15 +31,13 @@ impl TurnEvaluator {
         let mut best_score = f32::MIN;
         let mut best_result = None;
 
-        for (field, turns) in available_turns(field.clone()) {
-            for turn in turns {
-                let score = self
-                    .placement_evaluator
-                    .evaluate_placement(field.board(), turn.placement);
-                if score > best_score {
-                    best_score = score;
-                    best_result = Some(turn);
-                }
+        for turn in available_turns(field).into_iter().flatten() {
+            let score = self
+                .placement_evaluator
+                .evaluate_placement(field.board(), turn.placement);
+            if score > best_score {
+                best_score = score;
+                best_result = Some(turn);
             }
         }
 
@@ -47,9 +45,7 @@ impl TurnEvaluator {
     }
 }
 
-fn available_turns(
-    mut field: GameField,
-) -> ArrayVec<(GameField, impl Iterator<Item = TurnPlan>), 2> {
+fn available_turns(field: &GameField) -> ArrayVec<impl Iterator<Item = TurnPlan>, 2> {
     let mut result = ArrayVec::new();
     let placement2turn = |use_hold| {
         move |placement| TurnPlan {
@@ -58,35 +54,37 @@ fn available_turns(
         }
     };
 
-    let turns = available_placement(&field);
-    result.push((field.clone(), turns.map(placement2turn(false))));
-    if field.try_hold().is_ok() {
-        let turns = available_placement(&field).map(placement2turn(true));
-        result.push((field, turns));
+    let board = field.board();
+    let p1 = field.falling_piece();
+    result.push(available_placement(p1, board).map(placement2turn(false)));
+
+    if field.can_hold() {
+        let p2 = field.peek_falling_piece_after_hold();
+        result.push(available_placement(&p2, board).map(placement2turn(true)));
     }
+
     result
 }
 
-fn available_placement(game: &GameField) -> impl Iterator<Item = Piece> + use<> {
-    let board = game.board().clone();
-    let rotations = game.falling_piece().super_rotations(&board).into_iter();
-    rotations.flat_map(move |piece| {
-        iter::once(piece)
-            .chain(iter::successors(move_left(&piece, &board), |p| {
-                move_left(p, &board)
-            }))
-            .chain(iter::successors(move_right(&piece, &board), |p| {
-                move_right(p, &board)
-            }))
-            .map(|piece| piece.simulate_drop_position(&board))
-            .collect::<ArrayVec<_, { BitBoard::PLAYABLE_WIDTH }>>()
-    })
+fn available_placement<'b>(
+    piece: &Piece,
+    board: &'b BitBoard,
+) -> impl Iterator<Item = Piece> + use<'b> {
+    piece
+        .super_rotations(board)
+        .into_iter()
+        .flat_map(move |p| {
+            iter::once(p)
+                .chain(iter::successors(left(&p, board), |p| left(p, board)))
+                .chain(iter::successors(right(&p, board), |p| right(p, board)))
+        })
+        .map(|piece| piece.simulate_drop_position(board))
 }
 
-fn move_left(piece: &Piece, board: &BitBoard) -> Option<Piece> {
+fn left(piece: &Piece, board: &BitBoard) -> Option<Piece> {
     piece.left().filter(|moved| !board.is_colliding(moved))
 }
 
-fn move_right(piece: &Piece, board: &BitBoard) -> Option<Piece> {
+fn right(piece: &Piece, board: &BitBoard) -> Option<Piece> {
     piece.right().filter(|moved| !board.is_colliding(moved))
 }

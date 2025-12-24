@@ -6,7 +6,7 @@ use crate::{
     },
 };
 
-use super::piece_generator::PieceBuffer;
+use super::piece_buffer::PieceBuffer;
 
 #[derive(Debug, Clone)]
 pub struct GameField {
@@ -69,18 +69,25 @@ impl GameField {
         self.falling_piece.simulate_drop_position(&self.board)
     }
 
+    #[must_use]
+    pub fn can_hold(&self) -> bool {
+        let piece = self.piece_buffer.peek_hold_result();
+        !self.board.is_colliding(&Piece::new(piece))
+    }
+
+    #[must_use]
+    pub fn peek_falling_piece_after_hold(&self) -> Piece {
+        Piece::new(self.piece_buffer.peek_hold_result())
+    }
+
     pub fn try_hold(&mut self) -> Result<(), PieceCollisionError> {
-        if let Some(piece) = self.piece_buffer.held_piece() {
-            let piece = Piece::new(piece);
-            if self.board.is_colliding(&piece) {
-                return Err(PieceCollisionError);
-            }
-            self.piece_buffer.swap_hold(self.falling_piece.kind());
-            self.falling_piece = piece;
-        } else {
-            self.piece_buffer.swap_hold(self.falling_piece.kind());
-            self.falling_piece = Piece::new(self.piece_buffer.pop_next());
+        if !self.can_hold() {
+            return Err(PieceCollisionError);
         }
+
+        let next_piece = self.piece_buffer.hold(self.falling_piece.kind());
+        self.falling_piece = Piece::new(next_piece);
+
         Ok(())
     }
 

@@ -69,9 +69,17 @@ impl PieceBuffer {
         self.bag.iter().copied()
     }
 
+    /// Peeks the result of holding the current piece.
+    #[must_use]
+    pub fn peek_hold_result(&self) -> PieceKind {
+        self.held.unwrap_or_else(|| self.bag[0])
+    }
+
     /// Swaps the currently held piece with the given piece.
-    pub fn swap_hold(&mut self, current: PieceKind) -> Option<PieceKind> {
-        self.held.replace(current)
+    pub fn hold(&mut self, current: PieceKind) -> PieceKind {
+        self.held
+            .replace(current)
+            .unwrap_or_else(|| self.pop_next())
     }
 
     /// Returns the currently held piece, if any.
