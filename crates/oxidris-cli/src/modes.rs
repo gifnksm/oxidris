@@ -188,8 +188,8 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
 }
 
 fn operate_game(game: &mut GameSession, target: &TurnPlan) -> bool {
-    assert!(target.use_hold || !game.field().is_hold_used());
-    if target.use_hold && !game.field().is_hold_used() {
+    assert!(target.use_hold || !game.hold_used());
+    if target.use_hold && !game.hold_used() {
         return game.try_hold().is_err();
     }
 

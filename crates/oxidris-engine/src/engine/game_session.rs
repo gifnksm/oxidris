@@ -21,6 +21,7 @@ pub enum SessionState {
 pub struct GameSession {
     field: GameField,
     stats: GameStats,
+    hold_used: bool,
     render_board: BlockBoard,
     session_state: SessionState,
     fps: u64,
@@ -39,6 +40,7 @@ impl GameSession {
         Self {
             field: GameField::new(),
             stats: GameStats::new(),
+            hold_used: false,
             render_board: BlockBoard::INITIAL,
             session_state: SessionState::Playing,
             fps,
@@ -55,6 +57,11 @@ impl GameSession {
     #[must_use]
     pub fn stats(&self) -> &GameStats {
         &self.stats
+    }
+
+    #[must_use]
+    pub fn hold_used(&self) -> bool {
+        self.hold_used
     }
 
     #[must_use]
@@ -159,7 +166,12 @@ impl GameSession {
     }
 
     pub fn try_hold(&mut self) -> Result<(), HoldError> {
-        self.field.try_hold()
+        if self.hold_used {
+            return Err(HoldError::HoldAlreadyUsed);
+        }
+        self.field.try_hold().map_err(HoldError::PieceCollision)?;
+        self.hold_used = true;
+        Ok(())
     }
 
     pub fn hard_drop_and_complete(&mut self) {
@@ -178,6 +190,8 @@ impl GameSession {
         self.render_board.fill_piece(self.field.falling_piece());
         let (cleared_lines, result) = self.field.complete_piece_drop();
         self.stats.complete_piece_drop(cleared_lines);
+        self.hold_used = false;
+
         if result.is_err() {
             self.session_state = SessionState::GameOver;
             return;
