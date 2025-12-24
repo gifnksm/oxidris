@@ -22,7 +22,7 @@ pub(crate) struct Metrics {
 }
 
 impl Metrics {
-    pub(crate) fn as_array(&self) -> [f32; METRIC_COUNT] {
+    pub(crate) fn to_array(&self) -> [f32; METRIC_COUNT] {
         [
             self.covered_holes,
             self.row_transitions,

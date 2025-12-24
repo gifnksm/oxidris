@@ -4,7 +4,7 @@ use rand_distr::Normal;
 use std::{array, fmt};
 
 #[derive(Clone)]
-pub struct WeightSet<const N: usize>(pub(crate) [f32; N]);
+pub struct WeightSet<const N: usize>([f32; N]);
 
 impl<const N: usize> fmt::Debug for WeightSet<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -38,6 +38,21 @@ impl WeightSet<{ METRIC_COUNT }> {
 }
 
 impl<const N: usize> WeightSet<N> {
+    pub(crate) const fn from_array(arr: [f32; N]) -> Self {
+        Self(arr)
+    }
+
+    pub(crate) fn from_fn<F>(f: F) -> Self
+    where
+        F: FnMut(usize) -> f32,
+    {
+        Self::from_array(array::from_fn(f))
+    }
+
+    pub(crate) const fn to_array(&self) -> [f32; N] {
+        self.0
+    }
+
     pub(crate) fn random<R>(rng: &mut R, max_w: f32) -> Self
     where
         R: Rng + ?Sized,
@@ -49,9 +64,11 @@ impl<const N: usize> WeightSet<N> {
     where
         R: Rng + ?Sized,
     {
+        let p1 = p1.to_array();
+        let p2 = p2.to_array();
         Self(array::from_fn(|i| {
-            let x1 = p1.0[i];
-            let x2 = p2.0[i];
+            let x1 = p1[i];
+            let x2 = p2[i];
             let min = f32::min(x1, x2);
             let max = f32::max(x1, x2);
             let d = max - min;
@@ -65,20 +82,24 @@ impl<const N: usize> WeightSet<N> {
     where
         R: Rng + ?Sized,
     {
+        let mut weights = self.to_array();
         let normal = Normal::new(0.0, sigma).unwrap();
-        for w in &mut self.0 {
+        for w in &mut weights {
             if rng.random_bool(rate) {
                 *w = (*w + rng.sample(normal)).clamp(0.0, max_w);
             }
         }
+        *self = Self(weights);
     }
 
     pub(crate) fn normalize_l1(&mut self) {
-        let sum: f32 = self.0.iter().copied().sum();
+        let mut weights = self.to_array();
+        let sum: f32 = weights.into_iter().sum();
         if sum > 0.0 {
-            for w in &mut self.0 {
+            for w in &mut weights {
                 *w /= sum;
             }
         }
+        *self = Self(weights);
     }
 }

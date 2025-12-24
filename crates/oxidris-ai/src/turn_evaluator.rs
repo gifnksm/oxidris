@@ -59,7 +59,7 @@ impl TurnEvaluator {
         }
 
         let metrics = Metrics::measure(init, game, last_placement);
-        iter::zip(metrics.as_array(), self.weights.0)
+        iter::zip(metrics.to_array(), self.weights.to_array())
             .map(|(m, w)| m * w)
             .sum()
     }

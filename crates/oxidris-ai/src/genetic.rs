@@ -150,13 +150,13 @@ pub fn learning(ai: AiType) {
 
         let population_count = POPULATION_COUNT as f32;
 
-        let weights = |i| population.iter().map(move |ind| ind.weights.0[i]);
-        let weights_min = WeightSet::<METRIC_COUNT>(array::from_fn(|i| min(weights(i))));
-        let weights_max = WeightSet::<METRIC_COUNT>(array::from_fn(|i| max(weights(i))));
-        let weights_mean = WeightSet::<METRIC_COUNT>(array::from_fn(|i| mean(weights(i))));
+        let weights = |i| population.iter().map(move |ind| ind.weights.to_array()[i]);
+        let weights_min = WeightSet::<METRIC_COUNT>::from_fn(|i| min(weights(i)));
+        let weights_max = WeightSet::<METRIC_COUNT>::from_fn(|i| max(weights(i)));
+        let weights_mean = WeightSet::<METRIC_COUNT>::from_fn(|i| mean(weights(i)));
         let weights_norm_stddev =
-            WeightSet::<METRIC_COUNT>(array::from_fn(|i| normalized_stddev(weights(i))));
-        let weights_norm_stddev_mean = mean(weights_norm_stddev.0);
+            WeightSet::<METRIC_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
+        let weights_norm_stddev_mean = mean(weights_norm_stddev.to_array());
 
         let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
         let fitness_max = population
@@ -189,7 +189,7 @@ pub fn learning(ai: AiType) {
     println!("Best Individuals:");
     population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
     for (i, ind) in population.iter().take(5).enumerate() {
-        println!("  {i:2}: {:?} => {}", ind.weights.0, ind.fitness);
+        println!("  {i:2}: {:?} => {}", ind.weights.to_array(), ind.fitness);
     }
 }
 
