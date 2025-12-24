@@ -3,7 +3,7 @@ use std::iter;
 use arrayvec::ArrayVec;
 use oxidris_engine::{BitBoard, GameState, Piece};
 
-use super::metrics::{METRIC_COUNT, Metrics};
+use super::metrics::Metrics;
 use super::weights::WeightSet;
 use crate::AiType;
 
@@ -15,7 +15,7 @@ pub struct TurnPlan {
 
 #[derive(Debug, Clone)]
 pub struct TurnEvaluator {
-    weights: WeightSet<{ METRIC_COUNT }>,
+    weights: WeightSet,
 }
 
 impl TurnEvaluator {
@@ -42,7 +42,7 @@ impl TurnEvaluator {
     }
 
     #[must_use]
-    pub fn new(weights: WeightSet<{ METRIC_COUNT }>) -> Self {
+    pub fn new(weights: WeightSet) -> Self {
         Self { weights }
     }
 

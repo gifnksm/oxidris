@@ -9,7 +9,7 @@ use rand::{
 
 use oxidris_engine::GameState;
 
-use crate::{AiType, metrics::METRIC_COUNT, turn_evaluator::TurnEvaluator, weights::WeightSet};
+use crate::{AiType, turn_evaluator::TurnEvaluator, weights::WeightSet};
 
 use super::metrics::HeightInfo;
 
@@ -62,7 +62,7 @@ const BLX_ALPHA: f32 = 0.2;
 
 #[derive(Debug, Clone)]
 struct Individual {
-    weights: WeightSet<METRIC_COUNT>,
+    weights: WeightSet,
     fitness: f32,
 }
 
@@ -143,7 +143,11 @@ pub fn learning(ai: AiType) {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {
                     ind.evaluate(games, fitness_evaluator);
-                    println!("  {i:2}: {:.3?} => {:.3}", ind.weights, ind.fitness);
+                    println!(
+                        "  {i:2}: {:.3?} => {:.3}",
+                        ind.weights.to_array(),
+                        ind.fitness
+                    );
                 });
             }
         });
@@ -151,11 +155,10 @@ pub fn learning(ai: AiType) {
         let population_count = POPULATION_COUNT as f32;
 
         let weights = |i| population.iter().map(move |ind| ind.weights.to_array()[i]);
-        let weights_min = WeightSet::<METRIC_COUNT>::from_fn(|i| min(weights(i)));
-        let weights_max = WeightSet::<METRIC_COUNT>::from_fn(|i| max(weights(i)));
-        let weights_mean = WeightSet::<METRIC_COUNT>::from_fn(|i| mean(weights(i)));
-        let weights_norm_stddev =
-            WeightSet::<METRIC_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
+        let weights_min = WeightSet::from_fn(|i| min(weights(i)));
+        let weights_max = WeightSet::from_fn(|i| max(weights(i)));
+        let weights_mean = WeightSet::from_fn(|i| mean(weights(i)));
+        let weights_norm_stddev = WeightSet::from_fn(|i| normalized_stddev(weights(i)));
         let weights_norm_stddev_mean = mean(weights_norm_stddev.to_array());
 
         let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
@@ -171,10 +174,10 @@ pub fn learning(ai: AiType) {
             .unwrap();
 
         println!("  Weights Stats:");
-        println!("    Min:        {weights_min:.3?}");
-        println!("    Max:        {weights_max:.3?}");
-        println!("    Mean:       {weights_mean:.3?}");
-        println!("    NormStddev: {weights_norm_stddev:.3?}");
+        println!("    Min:        {:.3?}", weights_min.to_array());
+        println!("    Max:        {:.3?}", weights_max.to_array());
+        println!("    Mean:       {:.3?}", weights_mean.to_array());
+        println!("    NormStddev: {:.3?}", weights_norm_stddev.to_array());
         println!("    => Mean:    {weights_norm_stddev_mean:.3}");
         println!("  Fitness Stats:");
         println!("    Min:  {fitness_min:.3}");
@@ -191,6 +194,11 @@ pub fn learning(ai: AiType) {
     for (i, ind) in population.iter().take(5).enumerate() {
         println!("  {i:2}: {:?} => {}", ind.weights.to_array(), ind.fitness);
     }
+
+    println!("Best individual weights saved to file:");
+    println!("{:#?}", population[0].weights);
+
+    println!("{ai:?} AI learning completed.");
 }
 
 fn mean(values: impl IntoIterator<Item = f32>) -> f32 {
