@@ -1,7 +1,7 @@
 use std::iter;
 
 use arrayvec::ArrayVec;
-use oxidris_engine::{BitBoard, GameState, Piece};
+use oxidris_engine::{BitBoard, GameField, Piece};
 
 use super::metrics::Metrics;
 use super::weights::WeightSet;
@@ -55,13 +55,13 @@ impl TurnEvaluator {
     }
 
     #[must_use]
-    pub fn select_best_turn(&self, game: &GameState) -> Option<TurnPlan> {
+    pub fn select_best_turn(&self, field: &GameField) -> Option<TurnPlan> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
 
-        for (game, turns) in available_turns(game.clone()) {
+        for (field, turns) in available_turns(field.clone()) {
             for turn in turns {
-                let score = self.score(game.board(), turn.placement);
+                let score = self.score(field.board(), turn.placement);
                 if score > best_score {
                     best_score = score;
                     best_result = Some(turn);
@@ -74,8 +74,8 @@ impl TurnEvaluator {
 }
 
 fn available_turns(
-    mut game: GameState,
-) -> ArrayVec<(GameState, impl Iterator<Item = TurnPlan>), 2> {
+    mut field: GameField,
+) -> ArrayVec<(GameField, impl Iterator<Item = TurnPlan>), 2> {
     let mut result = ArrayVec::new();
     let placement2turn = |use_hold| {
         move |placement| TurnPlan {
@@ -84,16 +84,16 @@ fn available_turns(
         }
     };
 
-    let turns = available_placement(&game);
-    result.push((game.clone(), turns.map(placement2turn(false))));
-    if game.try_hold().is_ok() {
-        let turns = available_placement(&game).map(placement2turn(true));
-        result.push((game, turns));
+    let turns = available_placement(&field);
+    result.push((field.clone(), turns.map(placement2turn(false))));
+    if field.try_hold().is_ok() {
+        let turns = available_placement(&field).map(placement2turn(true));
+        result.push((field, turns));
     }
     result
 }
 
-fn available_placement(game: &GameState) -> impl Iterator<Item = Piece> + use<> {
+fn available_placement(game: &GameField) -> impl Iterator<Item = Piece> + use<> {
     let board = game.board().clone();
     let rotations = game.falling_piece().super_rotations(&board).into_iter();
     rotations.flat_map(move |piece| {

@@ -8,27 +8,21 @@ use crate::{
 
 use super::piece_generator::PieceBuffer;
 
-const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
-
 #[derive(Debug, Clone)]
-pub struct GameState {
+pub struct GameField {
     board: BitBoard,
     falling_piece: Piece,
     hold_used: bool,
     piece_buffer: PieceBuffer,
-    score: usize,
-    completed_pieces: usize,
-    total_cleared_lines: usize,
-    line_cleared_counter: [usize; 5],
 }
 
-impl Default for GameState {
+impl Default for GameField {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl GameState {
+impl GameField {
     #[must_use]
     pub fn new() -> Self {
         let mut piece_buffer = PieceBuffer::new();
@@ -38,36 +32,7 @@ impl GameState {
             falling_piece,
             hold_used: false,
             piece_buffer,
-            score: 0,
-            completed_pieces: 0,
-            total_cleared_lines: 0,
-            line_cleared_counter: [0; 5],
         }
-    }
-
-    #[must_use]
-    pub fn level(&self) -> usize {
-        self.total_cleared_lines / 10
-    }
-
-    #[must_use]
-    pub fn total_cleared_lines(&self) -> usize {
-        self.total_cleared_lines
-    }
-
-    #[must_use]
-    pub fn completed_pieces(&self) -> usize {
-        self.completed_pieces
-    }
-
-    #[must_use]
-    pub fn line_cleared_counter(&self) -> &[usize; 5] {
-        &self.line_cleared_counter
-    }
-
-    #[must_use]
-    pub fn score(&self) -> usize {
-        self.score
     }
 
     #[must_use]
@@ -130,20 +95,16 @@ impl GameState {
         Ok(())
     }
 
-    pub fn complete_piece_drop(&mut self) -> Result<usize, PieceCollisionError> {
+    pub fn complete_piece_drop(&mut self) -> (usize, Result<(), PieceCollisionError>) {
         self.board.fill_piece(&self.falling_piece);
         let cleared_lines = self.board.clear_lines();
-        self.score += SCORE_TABLE[cleared_lines];
-        self.total_cleared_lines += cleared_lines;
-        self.line_cleared_counter[cleared_lines] += 1;
-        self.completed_pieces += 1;
 
         self.falling_piece = Piece::new(self.piece_buffer.pop_next());
         if self.board.is_colliding(&self.falling_piece) {
-            return Err(PieceCollisionError);
+            return (cleared_lines, Err(PieceCollisionError));
         }
 
         self.hold_used = false;
-        Ok(cleared_lines)
+        (cleared_lines, Ok(()))
     }
 }

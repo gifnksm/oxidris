@@ -165,7 +165,7 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
         // AI move selection and operation
         if game.session_state().is_playing() {
             if best_turn.is_none()
-                && let Some(turn) = turn_evaluator.select_best_turn(game.game_state())
+                && let Some(turn) = turn_evaluator.select_best_turn(game.field())
             {
                 best_turn = Some(turn);
             }
@@ -188,12 +188,12 @@ pub(crate) fn auto(ai: AiType) -> io::Result<()> {
 }
 
 fn operate_game(game: &mut GameSession, target: &TurnPlan) -> bool {
-    assert!(target.use_hold || !game.game_state().is_hold_used());
-    if target.use_hold && !game.game_state().is_hold_used() {
+    assert!(target.use_hold || !game.field().is_hold_used());
+    if target.use_hold && !game.field().is_hold_used() {
         return game.try_hold().is_err();
     }
 
-    let falling_piece = game.game_state().falling_piece();
+    let falling_piece = game.field().falling_piece();
     assert_eq!(target.placement.kind(), falling_piece.kind());
     if falling_piece.rotation() != target.placement.rotation() {
         return game.try_rotate_right().is_err();

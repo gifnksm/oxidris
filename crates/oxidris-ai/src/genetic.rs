@@ -7,7 +7,7 @@ use rand::{
     seq::IndexedRandom,
 };
 
-use oxidris_engine::GameState;
+use oxidris_engine::{GameField, GameStats};
 
 use crate::{AiType, turn_evaluator::TurnEvaluator, weights::WeightSet};
 
@@ -68,10 +68,11 @@ struct Individual {
 
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&mut self, games: &[GameState], fitness_evaluator: &dyn FitnessEvaluator) {
+    fn evaluate(&mut self, games: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
         let turn_evaluator = TurnEvaluator::new(self.weights.clone());
         self.fitness = 0.0;
         for mut game in games.iter().cloned() {
+            let mut stats = GameStats::new();
             for _ in 0..MAX_PIECES_PER_GAME {
                 let Some(turn) = turn_evaluator.select_best_turn(&game) else {
                     break;
@@ -81,19 +82,21 @@ impl Individual {
                 }
                 assert_eq!(game.falling_piece().kind(), turn.placement.kind());
                 game.set_falling_piece_unchecked(turn.placement);
-                if game.complete_piece_drop().is_err() {
+                let (cleared_lines, result) = game.complete_piece_drop();
+                stats.complete_piece_drop(cleared_lines);
+                if result.is_err() {
                     break;
                 }
             }
 
-            self.fitness += fitness_evaluator.evaluate(&game);
+            self.fitness += fitness_evaluator.evaluate(&game, &stats);
         }
         self.fitness /= games.len() as f32;
     }
 }
 
 trait FitnessEvaluator: Send + Sync {
-    fn evaluate(&self, game: &GameState) -> f32;
+    fn evaluate(&self, field: &GameField, stats: &GameStats) -> f32;
 }
 
 #[derive(Debug)]
@@ -101,14 +104,14 @@ struct AggroFitnessEvaluator;
 
 impl FitnessEvaluator for AggroFitnessEvaluator {
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&self, game: &GameState) -> f32 {
+    fn evaluate(&self, _field: &GameField, stats: &GameStats) -> f32 {
         const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
 
-        let survived = game.completed_pieces() as f32;
+        let survived = stats.completed_pieces() as f32;
         let max_pieces = MAX_PIECES_PER_GAME as f32;
         let survived_ratio = survived / max_pieces;
         let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, game.line_cleared_counter())
+        let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, stats.line_cleared_counter())
             .map(|(w, c)| f32::from(w) * (*c as f32))
             .sum::<f32>();
         let efficiency = weighted_line_count / survived.max(1.0);
@@ -121,13 +124,13 @@ struct DefensiveFitnessEvaluator;
 
 impl FitnessEvaluator for DefensiveFitnessEvaluator {
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&self, game: &GameState) -> f32 {
-        let height_info = HeightInfo::compute(game.board());
-        let survived = game.completed_pieces() as f32;
+    fn evaluate(&self, field: &GameField, stats: &GameStats) -> f32 {
+        let height_info = HeightInfo::compute(field.board());
+        let survived = stats.completed_pieces() as f32;
         let max_pieces = MAX_PIECES_PER_GAME as f32;
         let survived_ratio = survived / max_pieces;
         let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let line_count = game.total_cleared_lines() as f32;
+        let line_count = stats.total_cleared_lines() as f32;
         let efficiency = line_count / survived.max(1.0);
         let height_penalty = f32::from(height_info.max_height()) / 20.0;
         survival_bonus + efficiency * survived_ratio - height_penalty
@@ -145,7 +148,7 @@ pub fn learning(ai: AiType) {
     for generation in 0..MAX_GENERATIONS {
         let phase = EvolutaionPhase::from_generation(generation);
         eprintln!("Generation #{generation} ({phase:?}):");
-        let games: &[_; GAMES_PER_INDIVIDUALS] = &array::from_fn(|_| GameState::new());
+        let games: &[_; GAMES_PER_INDIVIDUALS] = &array::from_fn(|_| GameField::new());
         thread::scope(|s| {
             for (i, ind) in population.iter_mut().enumerate() {
                 s.spawn(move || {

@@ -375,11 +375,12 @@ impl Renderer {
     }
 
     fn draw_stats_panel(&mut self, game: &GameSession) -> io::Result<()> {
+        let stats = game.stats();
         STATS_PANEL.draw_border(&mut self.term)?;
         let mut writer = BodyWriter::new(&mut self.term, STATS_PANEL, 10);
         writer
             .write_text("SCORE:")?
-            .write_number(game.score())?
+            .write_number(stats.score())?
             .write_text("TIME:")?
             .write_number(format!(
                 "{:0}:{:0>2}.{:0>2}",
@@ -388,14 +389,14 @@ impl Renderer {
                 game.duration().subsec_millis() / 10,
             ))?
             .skip_rows(1)
-            .write_labeled_number("LEVEL:", game.level())?
-            .write_labeled_number("LINES:", game.total_cleared_lines())?
+            .write_labeled_number("LEVEL:", stats.level())?
+            .write_labeled_number("LINES:", stats.total_cleared_lines())?
             .skip_rows(1)
-            .write_labeled_number("PIECES:", game.completed_pieces())?
-            .write_labeled_number("SINGLES:", game.line_cleared_counter()[1])?
-            .write_labeled_number("DOUBLES:", game.line_cleared_counter()[2])?
-            .write_labeled_number("TRIPLES:", game.line_cleared_counter()[3])?
-            .write_labeled_number("TETRISES:", game.line_cleared_counter()[4])?;
+            .write_labeled_number("PIECES:", stats.completed_pieces())?
+            .write_labeled_number("SINGLES:", stats.line_cleared_counter()[1])?
+            .write_labeled_number("DOUBLES:", stats.line_cleared_counter()[2])?
+            .write_labeled_number("TRIPLES:", stats.line_cleared_counter()[3])?
+            .write_labeled_number("TETRISES:", stats.line_cleared_counter()[4])?;
 
         Ok(())
     }
