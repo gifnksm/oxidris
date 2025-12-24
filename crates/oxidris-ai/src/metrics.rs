@@ -15,7 +15,7 @@ pub(crate) struct MetricValues {
     pub column_transitions: f32,
     pub surface_roughness: f32,
     pub height_risk: f32,
-    pub deep_wells: f32,
+    pub deep_well_risk: f32,
     pub sum_of_heights: f32,
     pub lines_cleared: f32,
     pub i_well_reward: f32,
@@ -29,7 +29,7 @@ impl fmt::Debug for MetricValues {
             column_transitions,
             surface_roughness,
             height_risk,
-            deep_wells,
+            deep_well_risk,
             sum_of_heights,
             lines_cleared,
             i_well_reward,
@@ -40,7 +40,7 @@ impl fmt::Debug for MetricValues {
             .field("column_transitions", &F32Fmt(column_transitions))
             .field("surface_roughness", &F32Fmt(surface_roughness))
             .field("height_risk", &F32Fmt(height_risk))
-            .field("deep_wells", &F32Fmt(deep_wells))
+            .field("deep_well_risk", &F32Fmt(deep_well_risk))
             .field("sum_of_heights", &F32Fmt(sum_of_heights))
             .field("lines_cleared", &F32Fmt(lines_cleared))
             .field("i_well_reward", &F32Fmt(i_well_reward))
@@ -75,7 +75,7 @@ impl MetricValues {
             column_transitions: arr[2],
             surface_roughness: arr[3],
             height_risk: arr[4],
-            deep_wells: arr[5],
+            deep_well_risk: arr[5],
             sum_of_heights: arr[6],
             lines_cleared: arr[7],
             i_well_reward: arr[8],
@@ -89,7 +89,7 @@ impl MetricValues {
             self.column_transitions,
             self.surface_roughness,
             self.height_risk,
-            self.deep_wells,
+            self.deep_well_risk,
             self.sum_of_heights,
             self.lines_cleared,
             self.i_well_reward,
@@ -115,7 +115,7 @@ impl Metrics {
             column_transitions: column_transitions_score(game.board()),
             surface_roughness: height_info.surface_roughness_score(),
             height_risk: height_info.height_risk_score(),
-            deep_wells: height_info.deep_wells_score(),
+            deep_well_risk: height_info.deep_well_risk_score(),
             sum_of_heights: height_info.sum_of_heights_score(),
             lines_cleared: line_clear_info.lines_cleared_score(),
             i_well_reward: height_info.i_well_reward(last_placement),
@@ -271,12 +271,9 @@ impl HeightInfo {
         negative_metrics_score(norm)
     }
 
-    fn deep_wells_score(&self) -> f32 {
+    fn deep_well_risk_score(&self) -> f32 {
         // Deep wells detect excessively deep vertical gaps (width = 1).
-        // Controlled shallow wells are intentionally ignored to allow
-        // I-well (Tetris) strategies.
-        //
-        // Only wells deeper than 5 are considered dangerous.
+        // Only wells deeper than 2 are considered dangerous.
         //
         // raw = sum of (well_depth^2) for dangerous wells
         // This aggressively penalizes over-committed vertical structures.
@@ -289,11 +286,13 @@ impl HeightInfo {
         // This metric is NOT a positive reward.
         // It acts purely as a safety penalty using exponential decay,
         // while preserving freedom to build shallow I-wells.
+        let threshold = 4;
         let raw = self
             .well_depths
             .into_iter()
+            .filter(|depth| *depth > 2)
             .map(|depth| {
-                let depth = u16::from(depth);
+                let depth = u16::from(depth - threshold);
                 depth * depth
             })
             .sum::<u16>();
