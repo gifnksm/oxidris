@@ -13,8 +13,6 @@ use crate::{
     AiType, MetricsBasedPlacementEvaluator, turn_evaluator::TurnEvaluator, weights::WeightSet,
 };
 
-use super::metrics::HeightInfo;
-
 const GAMES_PER_INDIVIDUALS: usize = 3;
 const MAX_PIECES_PER_GAME: usize = 800;
 
@@ -122,14 +120,13 @@ struct DefensiveFitnessEvaluator;
 impl FitnessEvaluator for DefensiveFitnessEvaluator {
     #[expect(clippy::cast_precision_loss)]
     fn evaluate(&self, field: &GameField, stats: &GameStats) -> f32 {
-        let height_info = HeightInfo::compute(field.board());
         let survived = stats.completed_pieces() as f32;
         let max_pieces = MAX_PIECES_PER_GAME as f32;
         let survived_ratio = survived / max_pieces;
         let survival_bonus = 2.0 * survived_ratio * survived_ratio;
         let line_count = stats.total_cleared_lines() as f32;
         let efficiency = line_count / survived.max(1.0);
-        let height_penalty = f32::from(height_info.max_height()) / 20.0;
+        let height_penalty = (field.board().max_height() as f32) / 20.0;
         survival_bonus + efficiency * survived_ratio - height_penalty
     }
 }

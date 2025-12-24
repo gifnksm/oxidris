@@ -3,8 +3,8 @@ use std::{fmt, iter};
 use oxidris_engine::{BitBoard, Piece};
 
 use crate::{
-    AiType, WeightSet,
-    metrics::{HeightInfo, Metrics},
+    AiType, BoardAnalysis, CoveredHolesMetric, MaxHeightMetric, MetricSource as _, WeightSet,
+    metrics::Metrics,
 };
 
 pub trait PlacementEvaluator: fmt::Debug {
@@ -56,12 +56,13 @@ pub struct DumpPlacementEvaluator;
 
 impl PlacementEvaluator for DumpPlacementEvaluator {
     #[inline]
+    #[expect(clippy::cast_precision_loss)]
     fn evaluate_placement(&self, board: &BitBoard, placement: Piece) -> f32 {
         let mut board = board.clone();
         board.fill_piece(placement);
-        let height_info = HeightInfo::compute(&board);
-        let max_height = height_info.max_height();
-        let covered_holes = height_info.covered_holes();
-        -f32::from(max_height) - f32::from(covered_holes)
+        let analysis = BoardAnalysis::from_board(&board, placement);
+        let max_height = MaxHeightMetric.measure_raw(&analysis);
+        let covered_holes = CoveredHolesMetric.measure_raw(&analysis);
+        -(max_height as f32) - 2.0 * (covered_holes as f32)
     }
 }

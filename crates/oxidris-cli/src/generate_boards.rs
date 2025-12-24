@@ -1,5 +1,5 @@
 use oxidris_ai::{DumpPlacementEvaluator, TurnEvaluator};
-use oxidris_engine::{BitBoard, GameField, GameStats};
+use oxidris_engine::{GameField, GameStats};
 
 pub(crate) fn run() {
     let placement_evaluator = DumpPlacementEvaluator;
@@ -24,7 +24,7 @@ pub(crate) fn run() {
                 break;
             }
 
-            let h = max_height(field.board());
+            let h = field.board().max_height();
 
             // Fixed intervals to capture boards
             if matches!(t, 5 | 15 | 30 | 60) {
@@ -69,12 +69,4 @@ pub(crate) fn run() {
         let min = i * 2;
         eprintln!("  {min:2}- : {count:5} {}", "#".repeat(count / 50));
     }
-}
-
-fn max_height(board: &BitBoard) -> usize {
-    board
-        .playable_rows()
-        .enumerate()
-        .find(|(_, row)| row.iter_playable_cells().any(|cell| cell))
-        .map_or(0, |(i, _)| BitBoard::PLAYABLE_Y_RANGE.end - i)
 }

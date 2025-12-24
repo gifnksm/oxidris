@@ -235,6 +235,17 @@ impl BitBoard {
         playable_rows[..count].fill(BitRow::EMPTY);
         count
     }
+
+    #[must_use]
+    pub fn max_height(&self) -> usize {
+        for y in Self::PLAYABLE_Y_RANGE {
+            let row = self.playable_row(y);
+            if row.iter_playable_cells().any(|occupied| occupied) {
+                return Self::PLAYABLE_HEIGHT - (y - SENTINEL_MARGIN_TOP);
+            }
+        }
+        0
+    }
 }
 
 #[cfg(test)]

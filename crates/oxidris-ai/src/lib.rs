@@ -1,5 +1,8 @@
-pub use self::{placement_evaluator::*, turn_evaluator::*, weights::*};
+pub use self::{
+    board_analysis::*, metrics::*, placement_evaluator::*, turn_evaluator::*, weights::*,
+};
 
+mod board_analysis;
 pub mod genetic;
 mod metrics;
 mod placement_evaluator;

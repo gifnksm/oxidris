@@ -10,26 +10,26 @@ pub struct WeightSet(MetricValues);
 
 impl WeightSet {
     pub const AGGRO: Self = WeightSet(MetricValues {
-        covered_holes: 0.434_629_8,
-        row_transitions: 0.086_059_77,
-        column_transitions: 0.098_730_02,
-        surface_roughness: 0.004_102_067_6,
-        height_risk: 0.138_786_9,
-        deep_well_risk: 0.216_158_88,
-        sum_of_heights: 0.0,
-        lines_cleared: 0.008_848_529,
-        i_well_reward: 0.012_684_016,
+        covered_holes: 0.335_617_72,
+        row_transitions: 0.062_274_728,
+        column_transitions: 0.248_791_89,
+        surface_roughness: 0.012_387_047,
+        max_height: 0.082_933_77,
+        deep_well_risk: 0.156_237_26,
+        sum_of_heights: 0.000_172_045_55,
+        lines_cleared: 0.058_346_03,
+        i_well_reward: 0.043_239_586,
     });
     pub const DEFENSIVE: Self = WeightSet(MetricValues {
-        covered_holes: 0.107_194_17,
-        row_transitions: 0.234_455_47,
-        column_transitions: 0.130_683_21,
-        surface_roughness: 0.022_107_849,
-        height_risk: 0.071_108_915,
-        deep_well_risk: 0.105_950_765,
-        sum_of_heights: 0.158_108_67,
-        lines_cleared: 0.154_509_29,
-        i_well_reward: 0.015_881_691,
+        covered_holes: 0.154_823_62,
+        row_transitions: 0.104_609_77,
+        column_transitions: 0.179_360_51,
+        surface_roughness: 0.013_652_652_5,
+        max_height: 0.072_458_126,
+        deep_well_risk: 0.147_185_07,
+        sum_of_heights: 0.103_371_166,
+        lines_cleared: 0.222_526_91,
+        i_well_reward: 0.002_012_13,
     });
 }
 
