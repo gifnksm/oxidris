@@ -52,7 +52,7 @@ impl MetricsBasedPlacementEvaluator<'static, ALL_METRICS_COUNT> {
 impl<const N: usize> PlacementEvaluator for MetricsBasedPlacementEvaluator<'_, N> {
     #[inline]
     fn evaluate_placement(&self, board: &BitBoard, placement: Piece) -> f32 {
-        let metric_values = self.metrics.measure(board, placement);
+        let metric_values = self.metrics.measure_normalized(board, placement);
         iter::zip(metric_values, self.weights.to_array())
             .map(|(m, w)| m * w)
             .sum()

@@ -27,9 +27,30 @@ pub(crate) const ALL_METRICS_COUNT: usize = ALL_METRICS.0.len();
 #[derive(Debug, Clone)]
 pub struct MetricSet<'a, const N: usize>([&'a dyn DynMetricSource; N]);
 
-impl<const N: usize> MetricSet<'_, N> {
+impl<'a, const N: usize> MetricSet<'a, N> {
     #[must_use]
-    pub fn measure(&self, board: &BitBoard, placement: Piece) -> [f32; N] {
+    pub const fn is_empty(&self) -> bool {
+        N == 0
+    }
+
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        N
+    }
+
+    #[must_use]
+    pub const fn as_array(&self) -> [&'a dyn DynMetricSource; N] {
+        self.0
+    }
+
+    #[must_use]
+    pub fn measure(&self, board: &BitBoard, placement: Piece) -> [MetricMeasurement; N] {
+        let analysis = BoardAnalysis::from_board(board, placement);
+        self.0.map(|metric| metric.measure(&analysis))
+    }
+
+    #[must_use]
+    pub fn measure_normalized(&self, board: &BitBoard, placement: Piece) -> [f32; N] {
         let analysis = BoardAnalysis::from_board(board, placement);
         self.0.map(|metric| metric.measure(&analysis).normalized)
     }
@@ -42,14 +63,14 @@ pub enum MetricSignal {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct MetricValue {
+pub struct MetricMeasurement {
     pub raw: u32,
     pub transformed: f32,
     pub normalized: f32,
 }
 
 pub trait MetricSource: fmt::Debug {
-    const MAX_VALUE: f32;
+    const NORMALIZATION_CAP: f32;
     const SIGNAL: MetricSignal;
 
     #[must_use]
@@ -66,7 +87,7 @@ pub trait MetricSource: fmt::Debug {
 
     #[must_use]
     fn normalize(transformed: f32) -> f32 {
-        let norm = (transformed / Self::MAX_VALUE).clamp(0.0, 1.0);
+        let norm = (transformed / Self::NORMALIZATION_CAP).clamp(0.0, 1.0);
         match Self::SIGNAL {
             MetricSignal::Positive => norm,
             MetricSignal::Negative => 1.0 - norm,
@@ -74,11 +95,11 @@ pub trait MetricSource: fmt::Debug {
     }
 
     #[must_use]
-    fn measure(analysis: &BoardAnalysis) -> MetricValue {
+    fn measure(analysis: &BoardAnalysis) -> MetricMeasurement {
         let raw = Self::measure_raw(analysis);
         let transformed = Self::transform(raw);
         let normalized = Self::normalize(transformed);
-        MetricValue {
+        MetricMeasurement {
             raw,
             transformed,
             normalized,
@@ -90,7 +111,7 @@ pub trait DynMetricSource: fmt::Debug {
     #[must_use]
     fn name(&self) -> &'static str;
     #[must_use]
-    fn max_value(&self) -> f32;
+    fn normalization_cap(&self) -> f32;
     #[must_use]
     fn signal(&self) -> MetricSignal;
     #[must_use]
@@ -100,7 +121,7 @@ pub trait DynMetricSource: fmt::Debug {
     #[must_use]
     fn normalize(&self, transformed: f32) -> f32;
     #[must_use]
-    fn measure(&self, analysis: &BoardAnalysis) -> MetricValue;
+    fn measure(&self, analysis: &BoardAnalysis) -> MetricMeasurement;
 }
 
 impl<T> DynMetricSource for T
@@ -111,8 +132,8 @@ where
         T::name()
     }
 
-    fn max_value(&self) -> f32 {
-        T::MAX_VALUE
+    fn normalization_cap(&self) -> f32 {
+        T::NORMALIZATION_CAP
     }
 
     fn signal(&self) -> MetricSignal {
@@ -131,7 +152,7 @@ where
         T::normalize(transformed)
     }
 
-    fn measure(&self, analysis: &BoardAnalysis) -> MetricValue {
+    fn measure(&self, analysis: &BoardAnalysis) -> MetricMeasurement {
         T::measure(analysis)
     }
 }
@@ -150,7 +171,7 @@ pub struct CoveredHolesMetric;
 // A power transform (holes^1.5) emphasizes early hole creation.
 // The normalization max (~60) corresponds to ~15 practical holes.
 impl MetricSource for CoveredHolesMetric {
-    const MAX_VALUE: f32 = 60.0;
+    const NORMALIZATION_CAP: f32 = 60.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -191,7 +212,7 @@ pub struct RowTransitionsMetric;
 //
 // This is a negative metric; lower transition counts are better.
 impl MetricSource for RowTransitionsMetric {
-    const MAX_VALUE: f32 = 120.0;
+    const NORMALIZATION_CAP: f32 = 120.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -231,7 +252,7 @@ pub struct ColumnTransitionsMetric;
 // Covered holes are intentionally treated as empty here,
 // since they are already penalized by a dedicated metric.
 impl MetricSource for ColumnTransitionsMetric {
-    const MAX_VALUE: f32 = 120.0;
+    const NORMALIZATION_CAP: f32 = 120.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -273,7 +294,7 @@ pub struct SurfaceRoughnessMetric;
 //
 // This metric complements row transitions rather than replacing it.
 impl MetricSource for SurfaceRoughnessMetric {
-    const MAX_VALUE: f32 = 40.0;
+    const NORMALIZATION_CAP: f32 = 40.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -304,7 +325,7 @@ pub struct MaxHeightMetric;
 // A sharp exponential penalty is applied only near the ceiling
 // to model the irreversible nature of top-out.
 impl MetricSource for MaxHeightMetric {
-    const MAX_VALUE: f32 = 1.0;
+    const NORMALIZATION_CAP: f32 = 1.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -350,7 +371,7 @@ pub struct DeepWellRiskMetric;
 // It acts purely as a safety penalty using exponential decay,
 // while preserving freedom to build shallow I-wells.
 impl MetricSource for DeepWellRiskMetric {
-    const MAX_VALUE: f32 = 50.0;
+    const NORMALIZATION_CAP: f32 = 50.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -388,7 +409,7 @@ pub struct SumOfHeightsMetric;
 // max = 160 is chosen as a "95% practical limit",
 // not the theoretical maximum.
 impl MetricSource for SumOfHeightsMetric {
-    const MAX_VALUE: f32 = 160.0;
+    const NORMALIZATION_CAP: f32 = 160.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -404,7 +425,7 @@ impl MetricSource for SumOfHeightsMetric {
 pub struct IWellRewardMetric;
 
 impl MetricSource for IWellRewardMetric {
-    const MAX_VALUE: f32 = 1.0;
+    const NORMALIZATION_CAP: f32 = 1.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
     fn name() -> &'static str {
@@ -454,7 +475,7 @@ pub struct LineClearMetric;
 // Lines cleared represent forward progress and efficiency.
 // Weights strongly favor tetrises (4-line clears).
 impl MetricSource for LineClearMetric {
-    const MAX_VALUE: f32 = 6.0;
+    const NORMALIZATION_CAP: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
     fn name() -> &'static str {

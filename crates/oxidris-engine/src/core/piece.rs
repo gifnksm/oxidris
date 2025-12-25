@@ -1,12 +1,13 @@
 use arrayvec::ArrayVec;
 use rand::{Rng, distr::StandardUniform, prelude::Distribution};
+use serde::{Deserialize, Serialize};
 
 use super::{
     bit_board::{BitBoard, PIECE_SPAWN_X, PIECE_SPAWN_Y},
     block_board::Block,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Piece {
     position: PiecePosition,
     rotation: PieceRotation,
@@ -163,7 +164,7 @@ fn super_rotation(board: &BitBoard, piece: Piece) -> Option<Piece> {
     None
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PiecePosition {
     x: u8,
     y: u8,
@@ -228,7 +229,7 @@ impl PiecePosition {
 /// Represents the rotation state of a piece.
 ///
 /// 0: 0 degrees, 1: 90° right, 2: 180°, 3: 90° left.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PieceRotation(u8);
 
 impl PieceRotation {
@@ -248,7 +249,7 @@ impl PieceRotation {
 }
 
 /// Enum representing the type of piece.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(u8)]
 pub enum PieceKind {
     /// I-piece.

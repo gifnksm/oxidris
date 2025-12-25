@@ -1,6 +1,8 @@
 use oxidris_ai::{DumpPlacementEvaluator, TurnEvaluator};
 use oxidris_engine::{GameField, GameStats};
 
+use crate::data::{BoardAndPlacement, BoardCollection};
+
 pub(crate) fn run() {
     let placement_evaluator = DumpPlacementEvaluator;
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
@@ -19,18 +21,23 @@ pub(crate) fn run() {
         let mut stats = GameStats::new();
         while let Some(turn) = turn_evaluator.select_best_turn(&field) {
             let t = stats.completed_pieces();
+            let capture_board = BoardAndPlacement {
+                board: field.board().clone(),
+                placement: turn.placement(),
+            };
             let (_cleared_lines, result) = turn.apply(&mut field, &mut stats);
             if result.is_err() {
                 break;
             }
 
+            let mut do_capture = false;
             let h = field.board().max_height();
 
             // Fixed intervals to capture boards
             if matches!(t, 5 | 15 | 30 | 60) {
                 turns_histogram[(t / 10).min(9)] += 1;
                 height_histogram[(h / 2).min(9)] += 1;
-                captured_boards.push(field.board().clone());
+                do_capture = true;
             }
 
             for (i, th) in [5, 9, 12, 14].into_iter().enumerate() {
@@ -38,9 +45,14 @@ pub(crate) fn run() {
                     captured_heights[i] = true;
                     turns_histogram[(t / 10).min(9)] += 1;
                     height_histogram[(h / 2).min(9)] += 1;
-                    captured_boards.push(field.board().clone());
+                    do_capture = true;
                 }
             }
+
+            if do_capture {
+                captured_boards.push(capture_board);
+            }
+
             if h >= 15 {
                 break;
             }
@@ -50,11 +62,14 @@ pub(crate) fn run() {
         }
     }
 
-    serde_json::to_writer(std::io::stdout().lock(), &captured_boards).unwrap();
+    let captured_boards = BoardCollection {
+        boards: captured_boards,
+    };
 
+    serde_json::to_writer(std::io::stdout().lock(), &captured_boards).unwrap();
     eprintln!(
         "Captured {} boards from {} games.",
-        captured_boards.len(),
+        captured_boards.boards.len(),
         total_games,
     );
     eprintln!();
