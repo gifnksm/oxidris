@@ -10,117 +10,28 @@ use crate::BoardAnalysis;
 // (approximately the 95% percentile), not theoretical maxima.
 // This preserves resolution and stabilizes GA optimization.
 
-#[derive(Clone)]
-pub(crate) struct MetricValues {
-    pub covered_holes: f32,
-    pub row_transitions: f32,
-    pub column_transitions: f32,
-    pub surface_roughness: f32,
-    pub max_height: f32,
-    pub deep_well_risk: f32,
-    pub sum_of_heights: f32,
-    pub lines_cleared: f32,
-    pub i_well_reward: f32,
-}
+pub const ALL_METRICS: MetricSet<'static, 9> = MetricSet([
+    &CoveredHolesMetric,
+    &RowTransitionsMetric,
+    &ColumnTransitionsMetric,
+    &SurfaceRoughnessMetric,
+    &MaxHeightMetric,
+    &DeepWellRiskMetric,
+    &SumOfHeightsMetric,
+    &LineClearMetric,
+    &IWellRewardMetric,
+]);
 
-impl fmt::Debug for MetricValues {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            covered_holes,
-            row_transitions,
-            column_transitions,
-            surface_roughness,
-            max_height,
-            deep_well_risk,
-            sum_of_heights,
-            lines_cleared,
-            i_well_reward,
-        } = *self;
-        f.debug_struct("MetricValues")
-            .field("covered_holes", &F32Fmt(covered_holes))
-            .field("row_transitions", &F32Fmt(row_transitions))
-            .field("column_transitions", &F32Fmt(column_transitions))
-            .field("surface_roughness", &F32Fmt(surface_roughness))
-            .field("max_height", &F32Fmt(max_height))
-            .field("deep_well_risk", &F32Fmt(deep_well_risk))
-            .field("sum_of_heights", &F32Fmt(sum_of_heights))
-            .field("lines_cleared", &F32Fmt(lines_cleared))
-            .field("i_well_reward", &F32Fmt(i_well_reward))
-            .finish()
-    }
-}
-
-struct F32Fmt(f32);
-impl fmt::Debug for F32Fmt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // 0.123456789 -> 0.123_456_789
-        let s = format!("{:?}", self.0);
-        let (int, frac) = s.split_once('.').unwrap();
-        write!(f, "{int}.")?;
-        for (i, c) in frac.chars().enumerate() {
-            if i > 0 && i % 3 == 0 {
-                write!(f, "_")?;
-            }
-            write!(f, "{c}")?;
-        }
-        Ok(())
-    }
-}
-
-pub(crate) const METRIC_COUNT: usize = size_of::<MetricValues>() / size_of::<f32>();
-
-impl MetricValues {
-    pub(crate) const fn from_array(arr: [f32; METRIC_COUNT]) -> Self {
-        Self {
-            covered_holes: arr[0],
-            row_transitions: arr[1],
-            column_transitions: arr[2],
-            surface_roughness: arr[3],
-            max_height: arr[4],
-            deep_well_risk: arr[5],
-            sum_of_heights: arr[6],
-            lines_cleared: arr[7],
-            i_well_reward: arr[8],
-        }
-    }
-
-    pub(crate) const fn to_array(&self) -> [f32; METRIC_COUNT] {
-        [
-            self.covered_holes,
-            self.row_transitions,
-            self.column_transitions,
-            self.surface_roughness,
-            self.max_height,
-            self.deep_well_risk,
-            self.sum_of_heights,
-            self.lines_cleared,
-            self.i_well_reward,
-        ]
-    }
-}
+pub(crate) const ALL_METRICS_COUNT: usize = ALL_METRICS.0.len();
 
 #[derive(Debug, Clone)]
-pub(crate) struct Metrics(MetricValues);
+pub struct MetricSet<'a, const N: usize>([&'a dyn DynMetricSource; N]);
 
-impl Metrics {
-    pub(crate) fn to_array(&self) -> [f32; METRIC_COUNT] {
-        self.0.to_array()
-    }
-
-    pub(crate) fn measure(board: &BitBoard, placement: Piece) -> Self {
+impl<const N: usize> MetricSet<'_, N> {
+    #[must_use]
+    pub fn measure(&self, board: &BitBoard, placement: Piece) -> [f32; N] {
         let analysis = BoardAnalysis::from_board(board, placement);
-
-        Self(MetricValues {
-            covered_holes: CoveredHolesMetric.measure(&analysis).normalized,
-            row_transitions: RowTransitionsMetric.measure(&analysis).normalized,
-            column_transitions: ColumnTransitionsMetric.measure(&analysis).normalized,
-            surface_roughness: SurfaceRoughnessMetric.measure(&analysis).normalized,
-            max_height: MaxHeightMetric.measure(&analysis).normalized,
-            deep_well_risk: DeepWellRiskMetric.measure(&analysis).normalized,
-            sum_of_heights: SumOfHeightsMetric.measure(&analysis).normalized,
-            lines_cleared: LineClearMetric.measure(&analysis).normalized,
-            i_well_reward: IWellRewardMetric.measure(&analysis).normalized,
-        })
+        self.0.map(|metric| metric.measure(&analysis).normalized)
     }
 }
 
@@ -130,6 +41,7 @@ pub enum MetricSignal {
     Negative,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct MetricValue {
     pub raw: u32,
     pub transformed: f32,
@@ -140,15 +52,20 @@ pub trait MetricSource: fmt::Debug {
     const MAX_VALUE: f32;
     const SIGNAL: MetricSignal;
 
-    fn name(&self) -> &'static str;
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32;
+    #[must_use]
+    fn name() -> &'static str;
 
+    #[must_use]
+    fn measure_raw(analysis: &BoardAnalysis) -> u32;
+
+    #[must_use]
     #[expect(clippy::cast_precision_loss)]
-    fn transform(&self, raw: u32) -> f32 {
+    fn transform(raw: u32) -> f32 {
         raw as f32
     }
 
-    fn normalize(&self, transformed: f32) -> f32 {
+    #[must_use]
+    fn normalize(transformed: f32) -> f32 {
         let norm = (transformed / Self::MAX_VALUE).clamp(0.0, 1.0);
         match Self::SIGNAL {
             MetricSignal::Positive => norm,
@@ -156,15 +73,66 @@ pub trait MetricSource: fmt::Debug {
         }
     }
 
-    fn measure(&self, analysis: &BoardAnalysis) -> MetricValue {
-        let raw = self.measure_raw(analysis);
-        let transformed = self.transform(raw);
-        let normalized = self.normalize(transformed);
+    #[must_use]
+    fn measure(analysis: &BoardAnalysis) -> MetricValue {
+        let raw = Self::measure_raw(analysis);
+        let transformed = Self::transform(raw);
+        let normalized = Self::normalize(transformed);
         MetricValue {
             raw,
             transformed,
             normalized,
         }
+    }
+}
+
+pub trait DynMetricSource: fmt::Debug {
+    #[must_use]
+    fn name(&self) -> &'static str;
+    #[must_use]
+    fn max_value(&self) -> f32;
+    #[must_use]
+    fn signal(&self) -> MetricSignal;
+    #[must_use]
+    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32;
+    #[must_use]
+    fn transform(&self, raw: u32) -> f32;
+    #[must_use]
+    fn normalize(&self, transformed: f32) -> f32;
+    #[must_use]
+    fn measure(&self, analysis: &BoardAnalysis) -> MetricValue;
+}
+
+impl<T> DynMetricSource for T
+where
+    T: MetricSource,
+{
+    fn name(&self) -> &'static str {
+        T::name()
+    }
+
+    fn max_value(&self) -> f32 {
+        T::MAX_VALUE
+    }
+
+    fn signal(&self) -> MetricSignal {
+        T::SIGNAL
+    }
+
+    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+        T::measure_raw(analysis)
+    }
+
+    fn transform(&self, raw: u32) -> f32 {
+        T::transform(raw)
+    }
+
+    fn normalize(&self, transformed: f32) -> f32 {
+        T::normalize(transformed)
+    }
+
+    fn measure(&self, analysis: &BoardAnalysis) -> MetricValue {
+        T::measure(analysis)
     }
 }
 
@@ -185,18 +153,18 @@ impl MetricSource for CoveredHolesMetric {
     const MAX_VALUE: f32 = 60.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Covered Holes"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
             .map(|(h, occ)| u32::from(h - occ))
             .sum()
     }
 
     #[expect(clippy::cast_precision_loss)]
-    fn transform(&self, raw: u32) -> f32 {
+    fn transform(raw: u32) -> f32 {
         (raw as f32).powf(1.5)
     }
 }
@@ -226,11 +194,11 @@ impl MetricSource for RowTransitionsMetric {
     const MAX_VALUE: f32 = 120.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Row Transitions"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
         for row in analysis.board.playable_rows() {
             let mut cells = row.iter_playable_cells();
@@ -266,11 +234,11 @@ impl MetricSource for ColumnTransitionsMetric {
     const MAX_VALUE: f32 = 120.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Column Transitions"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
         for x in BitBoard::PLAYABLE_X_RANGE {
             let mut prev_occupied = analysis.board.playable_row(0).is_cell_occupied(x); // top cell
@@ -308,11 +276,11 @@ impl MetricSource for SurfaceRoughnessMetric {
     const MAX_VALUE: f32 = 40.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Surface Roughness"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         analysis
             .column_heights
             .windows(3)
@@ -339,16 +307,16 @@ impl MetricSource for MaxHeightMetric {
     const MAX_VALUE: f32 = 1.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Max Height"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         let max_height = *analysis.column_heights.iter().max().unwrap();
         u32::from(max_height)
     }
 
-    fn transform(&self, raw: u32) -> f32 {
+    fn transform(raw: u32) -> f32 {
         const SAFE_THRESHOLD: f32 = 0.7;
         #[expect(clippy::cast_precision_loss)]
         let h = (raw as f32) / (BitBoard::PLAYABLE_HEIGHT as f32);
@@ -359,7 +327,7 @@ impl MetricSource for MaxHeightMetric {
         }
     }
 
-    fn normalize(&self, norm: f32) -> f32 {
+    fn normalize(norm: f32) -> f32 {
         (-4.0 * norm).exp()
     }
 }
@@ -385,11 +353,11 @@ impl MetricSource for DeepWellRiskMetric {
     const MAX_VALUE: f32 = 50.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Deep Well Risk"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         analysis
             .column_well_depths
             .iter()
@@ -401,7 +369,7 @@ impl MetricSource for DeepWellRiskMetric {
             .sum()
     }
 
-    fn normalize(&self, norm: f32) -> f32 {
+    fn normalize(norm: f32) -> f32 {
         (-norm).exp()
     }
 }
@@ -423,11 +391,11 @@ impl MetricSource for SumOfHeightsMetric {
     const MAX_VALUE: f32 = 160.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Sum of Heights"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         analysis.column_heights.iter().map(|&h| u32::from(h)).sum()
     }
 }
@@ -439,12 +407,12 @@ impl MetricSource for IWellRewardMetric {
     const MAX_VALUE: f32 = 1.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "I-Well Reward"
     }
 
     #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         let mut best_reward = 0.0;
         let mut best_depth = 0.0;
         for (i, depth) in analysis.column_well_depths.into_iter().enumerate() {
@@ -475,7 +443,7 @@ impl MetricSource for IWellRewardMetric {
     }
 
     #[expect(clippy::cast_precision_loss)]
-    fn transform(&self, raw: u32) -> f32 {
+    fn transform(raw: u32) -> f32 {
         (raw as f32) / 1000.0
     }
 }
@@ -489,15 +457,15 @@ impl MetricSource for LineClearMetric {
     const MAX_VALUE: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "Lines Cleared"
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         u32::try_from(analysis.cleared_lines).unwrap()
     }
 
-    fn transform(&self, raw: u32) -> f32 {
+    fn transform(raw: u32) -> f32 {
         const WEIGHT: [f32; 5] = [0.0, 0.0, 1.0, 2.0, 6.0];
         WEIGHT[usize::try_from(raw).unwrap()]
     }

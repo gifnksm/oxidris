@@ -3,8 +3,8 @@ use std::{fmt, iter};
 use oxidris_engine::{BitBoard, Piece};
 
 use crate::{
-    AiType, BoardAnalysis, CoveredHolesMetric, MaxHeightMetric, MetricSource as _, WeightSet,
-    metrics::Metrics,
+    ALL_METRICS, ALL_METRICS_COUNT, AiType, BoardAnalysis, CoveredHolesMetric, MaxHeightMetric,
+    MetricSet, MetricSource as _, WeightSet,
 };
 
 pub trait PlacementEvaluator: fmt::Debug {
@@ -12,24 +12,32 @@ pub trait PlacementEvaluator: fmt::Debug {
 }
 
 #[derive(Debug, Clone)]
-pub struct MetricsBasedPlacementEvaluator {
-    weights: WeightSet,
+pub struct MetricsBasedPlacementEvaluator<'a, const N: usize> {
+    metrics: MetricSet<'a, N>,
+    weights: WeightSet<N>,
 }
 
-impl MetricsBasedPlacementEvaluator {
+impl<'a, const N: usize> MetricsBasedPlacementEvaluator<'a, N> {
     #[must_use]
-    pub fn new(weights: WeightSet) -> Self {
-        Self { weights }
+    pub fn new(metrics: MetricSet<'a, N>, weights: WeightSet<N>) -> Self {
+        Self { metrics, weights }
+    }
+}
+
+impl MetricsBasedPlacementEvaluator<'static, ALL_METRICS_COUNT> {
+    #[must_use]
+    pub fn from_weights(weights: WeightSet<ALL_METRICS_COUNT>) -> Self {
+        Self::new(ALL_METRICS, weights)
     }
 
     #[must_use]
     pub fn aggro() -> Self {
-        Self::new(WeightSet::AGGRO)
+        Self::from_weights(WeightSet::AGGRO)
     }
 
     #[must_use]
     pub fn defensive() -> Self {
-        Self::new(WeightSet::DEFENSIVE)
+        Self::from_weights(WeightSet::DEFENSIVE)
     }
 
     #[must_use]
@@ -41,11 +49,11 @@ impl MetricsBasedPlacementEvaluator {
     }
 }
 
-impl PlacementEvaluator for MetricsBasedPlacementEvaluator {
+impl<const N: usize> PlacementEvaluator for MetricsBasedPlacementEvaluator<'_, N> {
     #[inline]
     fn evaluate_placement(&self, board: &BitBoard, placement: Piece) -> f32 {
-        let metrics = Metrics::measure(board, placement);
-        iter::zip(metrics.to_array(), self.weights.to_array())
+        let metric_values = self.metrics.measure(board, placement);
+        iter::zip(metric_values, self.weights.to_array())
             .map(|(m, w)| m * w)
             .sum()
     }
@@ -61,8 +69,8 @@ impl PlacementEvaluator for DumpPlacementEvaluator {
         let mut board = board.clone();
         board.fill_piece(placement);
         let analysis = BoardAnalysis::from_board(&board, placement);
-        let max_height = MaxHeightMetric.measure_raw(&analysis);
-        let covered_holes = CoveredHolesMetric.measure_raw(&analysis);
+        let max_height = MaxHeightMetric::measure_raw(&analysis);
+        let covered_holes = CoveredHolesMetric::measure_raw(&analysis);
         -(max_height as f32) - 2.0 * (covered_holes as f32)
     }
 }

@@ -10,7 +10,8 @@ use rand::{
 use oxidris_engine::{GameField, GameStats};
 
 use crate::{
-    AiType, MetricsBasedPlacementEvaluator, turn_evaluator::TurnEvaluator, weights::WeightSet,
+    ALL_METRICS_COUNT, AiType, MetricsBasedPlacementEvaluator, turn_evaluator::TurnEvaluator,
+    weights::WeightSet,
 };
 
 const GAMES_PER_INDIVIDUALS: usize = 3;
@@ -62,15 +63,16 @@ const BLX_ALPHA: f32 = 0.2;
 
 #[derive(Debug, Clone)]
 struct Individual {
-    weights: WeightSet,
+    weights: WeightSet<ALL_METRICS_COUNT>,
     fitness: f32,
 }
 
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
     fn evaluate(&mut self, fields: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
-        let turn_evaluator =
-            TurnEvaluator::new(MetricsBasedPlacementEvaluator::new(self.weights.clone()));
+        let turn_evaluator = TurnEvaluator::new(MetricsBasedPlacementEvaluator::from_weights(
+            self.weights.clone(),
+        ));
         self.fitness = 0.0;
         for mut field in fields.iter().cloned() {
             let mut stats = GameStats::new();
@@ -159,10 +161,11 @@ pub fn learning(ai: AiType) {
         let population_count = POPULATION_COUNT as f32;
 
         let weights = |i| population.iter().map(move |ind| ind.weights.to_array()[i]);
-        let weights_min = WeightSet::from_fn(|i| min(weights(i)));
-        let weights_max = WeightSet::from_fn(|i| max(weights(i)));
-        let weights_mean = WeightSet::from_fn(|i| mean(weights(i)));
-        let weights_norm_stddev = WeightSet::from_fn(|i| normalized_stddev(weights(i)));
+        let weights_min = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| min(weights(i)));
+        let weights_max = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| max(weights(i)));
+        let weights_mean = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| mean(weights(i)));
+        let weights_norm_stddev =
+            WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
         let weights_norm_stddev_mean = mean(weights_norm_stddev.to_array());
 
         let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;

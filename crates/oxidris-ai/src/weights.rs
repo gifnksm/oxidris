@@ -1,41 +1,39 @@
-use crate::metrics::MetricValues;
-
-use super::metrics::METRIC_COUNT;
+use super::metrics::ALL_METRICS_COUNT;
 use rand::Rng;
 use rand_distr::Normal;
 use std::array;
 
 #[derive(Debug, Clone)]
-pub struct WeightSet(MetricValues);
+pub struct WeightSet<const N: usize>([f32; N]);
 
-impl WeightSet {
-    pub const AGGRO: Self = WeightSet(MetricValues {
-        covered_holes: 0.335_617_72,
-        row_transitions: 0.062_274_728,
-        column_transitions: 0.248_791_89,
-        surface_roughness: 0.012_387_047,
-        max_height: 0.082_933_77,
-        deep_well_risk: 0.156_237_26,
-        sum_of_heights: 0.000_172_045_55,
-        lines_cleared: 0.058_346_03,
-        i_well_reward: 0.043_239_586,
-    });
-    pub const DEFENSIVE: Self = WeightSet(MetricValues {
-        covered_holes: 0.154_823_62,
-        row_transitions: 0.104_609_77,
-        column_transitions: 0.179_360_51,
-        surface_roughness: 0.013_652_652_5,
-        max_height: 0.072_458_126,
-        deep_well_risk: 0.147_185_07,
-        sum_of_heights: 0.103_371_166,
-        lines_cleared: 0.222_526_91,
-        i_well_reward: 0.002_012_13,
-    });
+impl WeightSet<ALL_METRICS_COUNT> {
+    pub const AGGRO: Self = WeightSet([
+        0.325_431_05,
+        0.122_726_105,
+        0.162_394_06,
+        0.055_353_27,
+        0.144_940_85,
+        0.039_051_976,
+        0.013_117_433_5,
+        0.047_776_867,
+        0.089_208_305,
+    ]);
+    pub const DEFENSIVE: Self = WeightSet([
+        0.148_629_59,
+        0.115_528_28,
+        0.139_948_,
+        0.015_676_659,
+        0.214_597_3,
+        0.134_059_6,
+        0.075_302_44,
+        0.151_040_05,
+        0.005_218_068,
+    ]);
 }
 
-impl WeightSet {
-    pub(crate) const fn from_array(arr: [f32; METRIC_COUNT]) -> Self {
-        Self(MetricValues::from_array(arr))
+impl<const N: usize> WeightSet<N> {
+    pub(crate) const fn from_array(arr: [f32; N]) -> Self {
+        Self(arr)
     }
 
     pub(crate) fn from_fn<F>(f: F) -> Self
@@ -45,8 +43,8 @@ impl WeightSet {
         Self::from_array(array::from_fn(f))
     }
 
-    pub(crate) const fn to_array(&self) -> [f32; METRIC_COUNT] {
-        self.0.to_array()
+    pub(crate) const fn to_array(&self) -> [f32; N] {
+        self.0
     }
 
     pub(crate) fn random<R>(rng: &mut R, max_w: f32) -> Self
