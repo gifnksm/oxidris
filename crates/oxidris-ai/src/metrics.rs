@@ -18,7 +18,7 @@ pub const ALL_METRICS: MetricSet<'static, 9> = MetricSet([
     &MaxHeightMetric,
     &DeepWellRiskMetric,
     &SumOfHeightsMetric,
-    &LineClearMetric,
+    &LineClearRewardMetric,
     &IWellRewardMetric,
 ]);
 
@@ -161,17 +161,29 @@ where
 pub struct CoveredHolesMetric;
 
 // Covered holes are empty cells with at least one block above them.
-// They are one of the strongest losing factors.
+// They are one of the strongest losing factors in Tetris,
+// because they are difficult or impossible to clear directly.
 //
-// Typical ranges (raw hole count):
-//   0–3   : very clean board
-//   4–7   : dangerous, recovery becomes difficult
-//   10+   : near-losing position
+// Empirical distribution (weak–mid AI, long-run):
+//   Median ≈ 1
+//   P90    ≈ 4
+//   P95    ≈ 6
+//   P99    ≈ 9
 //
-// A power transform (holes^1.5) emphasizes early hole creation.
-// The normalization max (~60) corresponds to ~15 practical holes.
+// Interpretation (raw hole count):
+//   0       : ideal, fully clean board
+//   1–2     : early warning, still recoverable
+//   3–4     : dangerous, recovery is hard
+//   5–6     : near-losing position
+//   7+      : effectively lost
+//
+// A power transform (holes^1.7) strongly emphasizes early hole creation,
+// while saturating quickly for already-losing boards.
+// The normalization cap (~12) corresponds to ~6 practical holes.
 impl MetricSource for CoveredHolesMetric {
-    const NORMALIZATION_CAP: f32 = 60.0;
+    /// Normalization cap chosen from empirical distribution:
+    /// P95 ≈ 6 holes → transformed ≈ 6^1.7 ≈ 21.03
+    const NORMALIZATION_CAP: f32 = 21.03;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -179,6 +191,9 @@ impl MetricSource for CoveredHolesMetric {
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+        // For each column:
+        //   covered_holes = column_height - number_of_occupied_cells
+        // This counts empty cells that have at least one block above.
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
             .map(|(h, occ)| u32::from(h - occ))
             .sum()
@@ -186,33 +201,41 @@ impl MetricSource for CoveredHolesMetric {
 
     #[expect(clippy::cast_precision_loss)]
     fn transform(raw: u32) -> f32 {
-        (raw as f32).powf(1.5)
+        (raw as f32).powf(1.7)
     }
 }
 
 #[derive(Debug)]
 pub struct RowTransitionsMetric;
 
-// Row transitions measure how fragmented each row is by counting
-// horizontal changes between occupied and empty cells.
+// Row transitions measure horizontal fragmentation by counting
+// occupancy changes between adjacent cells within each row.
 //
-// Only transitions *within* the playable area are counted.
-// Board walls are intentionally ignored to avoid artificial
-// incentives for stacking against the edges.
+// Only transitions *inside* the playable area are counted.
+// Board walls are intentionally ignored to preserve left–right symmetry
+// and avoid artificial incentives for edge stacking.
 //
 // This metric penalizes:
-//   - fragmented horizontal structures
-//   - narrow gaps and broken surfaces
-//   - layouts that are difficult to clear efficiently
+//   - horizontally fragmented structures
+//   - narrow gaps and broken rows
+//   - layouts that are inefficient to clear
 //
-// Typical ranges (10x20 board, wall-ignored):
-//   20–40   : very clean and flat structure
-//   60–90   : normal mid-game roughness
-//   120+    : highly fragmented, unstable board
+// Empirical distribution (10x20 board, weak–mid AI):
+//   Median ≈ 11
+//   P90    ≈ 26
+//   P95    ≈ 32
+//   P99    ≈ 44
+//
+// Interpretation (raw):
+//   0–15    : very clean and flat surface
+//   20–30   : normal mid-game roughness
+//   30–40   : dangerous fragmentation
+//   40+     : highly unstable board
 //
 // This is a negative metric; lower transition counts are better.
 impl MetricSource for RowTransitionsMetric {
-    const NORMALIZATION_CAP: f32 = 120.0;
+    /// Normalization cap chosen from empirical P95 (~32)
+    const NORMALIZATION_CAP: f32 = 32.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -223,7 +246,7 @@ impl MetricSource for RowTransitionsMetric {
         let mut transitions = 0;
         for row in analysis.board.playable_rows() {
             let mut cells = row.iter_playable_cells();
-            let mut prev_occupied = cells.next().unwrap(); // left wall
+            let mut prev_occupied = cells.next().unwrap();
             for occupied in cells {
                 if occupied != prev_occupied {
                     transitions += 1;
@@ -239,20 +262,29 @@ impl MetricSource for RowTransitionsMetric {
 pub struct ColumnTransitionsMetric;
 
 // Column transitions count vertical occupancy changes per column,
-// treating covered holes as empty cells.
+// scanning from the top of the playable area downwards.
 //
-// This metric captures vertical fragmentation that is not always
-// visible from row transitions alone.
+// This metric measures vertical fragmentation inside columns,
+// including stacked blocks and covered holes.
 //
-// Typical ranges (10x20 board):
-//   20–40   : clean vertical structure
-//   60–100  : normal mid-game fragmentation
-//   120+    : severe vertical instability
+// Observed distribution (10x20 board, self-play sampling):
+//   Mean   ≈ 11
+//   Median ≈ 11
+//   P90    ≈ 17
+//   P95    ≈ 19
+//   P99    ≈ 25
+//   Max    ≈ 45
 //
-// Covered holes are intentionally treated as empty here,
-// since they are already penalized by a dedicated metric.
+// Interpretation:
+//   0-15   : clean columns, mostly solid
+//   15–25  : typical mid-game vertical fragmentation
+//   25+    : severe internal instability (many splits / holes)
 impl MetricSource for ColumnTransitionsMetric {
-    const NORMALIZATION_CAP: f32 = 120.0;
+    // Normalization cap is set to the observed P95 value.
+    // Values beyond this represent already-losing positions
+    // and are saturated to preserve signal resolution
+    // in the normal play regime.
+    const NORMALIZATION_CAP: f32 = 19.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -270,9 +302,6 @@ impl MetricSource for ColumnTransitionsMetric {
                 }
                 prev_occupied = occupied;
             }
-            if !prev_occupied {
-                transitions += 1; // bottom wall
-            }
         }
         transitions
     }
@@ -282,19 +311,32 @@ impl MetricSource for ColumnTransitionsMetric {
 pub struct SurfaceRoughnessMetric;
 
 // Surface roughness measures local curvature of the board surface
-// using second-order height differences.
+// using second-order height differences (discrete Laplacian).
 //
-// Unlike row transitions, this metric remains sensitive
-// when the overall stack is low.
+// This metric captures small-scale unevenness that may not
+// immediately create holes, but increases future instability.
 //
-// Typical ranges:
-//   0–5    : flat or well-shaped surface
-//   10–20  : normal mid-game roughness
-//   30+    : chaotic surface with high hole risk
+// Observed distribution (10x20 board, self-play sampling):
+//   Mean   ≈ 15
+//   Median ≈ 12
+//   P90    ≈ 28
+//   P95    ≈ 37
+//   P99    ≈ 55
+//   Max    ≈ 130
 //
-// This metric complements row transitions rather than replacing it.
+// Interpretation:
+//   < 10   : flat or intentionally shaped surface
+//   10–30  : normal mid-game roughness
+//   30–55  : highly uneven, high hole risk
+//   > 55   : chaotic surface, often unrecoverable
+//
+// This metric complements row and column transitions
+// by remaining sensitive even when the overall stack is low.
 impl MetricSource for SurfaceRoughnessMetric {
-    const NORMALIZATION_CAP: f32 = 40.0;
+    // Normalization cap is set to the observed P95 value.
+    // Values beyond this correspond to highly chaotic surfaces
+    // and are saturated to preserve resolution in normal play.
+    const NORMALIZATION_CAP: f32 = 37.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -318,14 +360,35 @@ impl MetricSource for SurfaceRoughnessMetric {
 #[derive(Debug)]
 pub struct MaxHeightMetric;
 
-// Max height represents imminent top-out danger.
-// Heights below the safe threshold are intentionally ignored,
-// as moderate stacking is often necessary for line clears
-// and I-well construction.
-// A sharp exponential penalty is applied only near the ceiling
-// to model the irreversible nature of top-out.
+// Max Height represents imminent top-out danger.
+//
+// Unlike other metrics, max height is intentionally ignored
+// for most of the game and only penalized near the ceiling,
+// reflecting the irreversible nature of top-out.
+//
+// Observed distribution (10x20 board, self-play sampling):
+//   Mean   ≈ 5.7
+//   Median ≈ 4
+//   P90    ≈ 12
+//   P95    ≈ 12
+//   P99    ≈ 16
+//   Max    = 20 (top-out)
+//
+// Interpretation:
+//   <= 10  : safe, no penalty applied
+//   13–15  : dangerous zone, recovery still possible
+//   >= 16  : critical, near-certain top-out
+//
+// A linear ramp is applied above the safe threshold,
+// followed by an exponential penalty to strongly discourage
+// states close to top-out.
+//
+// This metric acts as a hard constraint rather than
+// a general board quality measure.
 impl MetricSource for MaxHeightMetric {
-    const NORMALIZATION_CAP: f32 = 1.0;
+    // Normalization cap applies to the transformed value (0–1),
+    // not to the raw board height.
+    const NORMALIZATION_CAP: f32 = 0.18;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -338,40 +401,60 @@ impl MetricSource for MaxHeightMetric {
     }
 
     fn transform(raw: u32) -> f32 {
-        const SAFE_THRESHOLD: f32 = 0.7;
+        // Heights up to this threshold are considered safe
+        // and intentionally ignored.
+        const SAFE_THRESHOLD: f32 = 0.5; // ≈ height 10 on a 20-row board
         #[expect(clippy::cast_precision_loss)]
         let h = (raw as f32) / (BitBoard::PLAYABLE_HEIGHT as f32);
         if h <= SAFE_THRESHOLD {
             0.0
         } else {
-            (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)
+            // normalized danger ∈ [0, 1]
+            let danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD);
+            // exponential escalation near ceiling
+            danger.powf(2.5)
         }
-    }
-
-    fn normalize(norm: f32) -> f32 {
-        (-4.0 * norm).exp()
     }
 }
 
 #[derive(Debug)]
 pub struct DeepWellRiskMetric;
 
-// Deep wells detect excessively deep vertical gaps (width = 1).
+// Deep Well Risk detects excessively deep single-column wells
+// that are difficult or impossible to recover from.
+//
 // Only wells deeper than 2 are considered dangerous.
+// Shallow wells (depth <= 2) are allowed to preserve freedom
+// for controlled I-well construction.
 //
-// raw = sum of (well_depth^2) for dangerous wells
-// This aggressively penalizes over-committed vertical structures.
+// Raw value definition:
+//   raw = Σ (max(depth - 2, 0)^2)
 //
-// Typical interpretation (10x20 board):
-//   raw ≈ 0      : no dangerous wells (safe or controlled I-wells)
-//   raw ≈ 10–20  : risky but potentially recoverable
-//   raw ≥ 50     : highly unstable, near-fatal structure
+// Squaring aggressively penalizes over-committed vertical wells,
+// reflecting the non-linear difficulty of recovery.
 //
-// This metric is NOT a positive reward.
-// It acts purely as a safety penalty using exponential decay,
-// while preserving freedom to build shallow I-wells.
+// Observed distribution (10x20 board, self-play sampling):
+//   Median ≈ 0
+//   P90    ≈ 34
+//   P95    ≈ 59
+//   P99    ≈ 136
+//   Max    ≫ 100 (rare catastrophic outliers)
+//
+// Interpretation:
+//   raw ≈ 0        : safe or controlled wells only
+//   raw ≈ 30–60    : dangerous but sometimes recoverable
+//   raw ≥ 100      : near-fatal vertical structure
+//
+// This metric is strictly a safety penalty.
+// It does NOT reward I-wells and should be combined with
+// a separate positive I-well reward metric.
+//
+// Normalization is capped at P95 to preserve resolution
+// between dangerous and fatal states.
 impl MetricSource for DeepWellRiskMetric {
-    const NORMALIZATION_CAP: f32 = 50.0;
+    // Cap is based on P95 to distinguish dangerous vs fatal wells.
+    // ln(1+59) ≈ 4.09
+    const NORMALIZATION_CAP: f32 = 4.09;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -382,6 +465,7 @@ impl MetricSource for DeepWellRiskMetric {
         analysis
             .column_well_depths
             .iter()
+            // Allow shallow wells for I-well construction
             .filter(|depth| **depth > 2)
             .map(|depth| {
                 let depth = u32::from(*depth - 2);
@@ -390,26 +474,46 @@ impl MetricSource for DeepWellRiskMetric {
             .sum()
     }
 
-    fn normalize(norm: f32) -> f32 {
-        (-norm).exp()
+    #[expect(clippy::cast_precision_loss)]
+    fn transform(raw: u32) -> f32 {
+        // Exponential growth models non-linear recovery difficulty
+        (raw as f32).ln_1p()
     }
 }
 
 #[derive(Debug)]
 pub struct SumOfHeightsMetric;
 
-// Sum of column heights represents overall board pressure.
-// It correlates with reduced mobility and imminent top-out.
+// Sum of Heights measures overall board pressure by summing
+// all column heights.
 //
-// Typical ranges (sum of heights, 10x20 board):
-//   40–60   : early game, very safe
-//   80–120  : mid game, manageable
-//   140+    : near top-out, highly dangerous
+// This metric captures *global stacking pressure* that is
+// not necessarily reflected by local roughness or transitions.
+// Unlike Max Height, it penalizes gradual accumulation of blocks
+// across the entire board.
 //
-// max = 160 is chosen as a "95% practical limit",
-// not the theoretical maximum.
+// Empirical distribution (10x20 board, weak–mid AI):
+//   Median ≈  27
+//   P90    ≈  83
+//   P95    ≈  93
+//   P99    ≈ 122
+//
+// Typical ranges (10x20 board, empirical):
+//   0–40    : very safe, early-game state
+//   40–80   : normal mid-game pressure
+//   80–120  : high pressure, limited recovery options
+//   120+    : near top-out or effectively lost
+//
+// NORMALIZATION_CAP is set to the empirical P99 (~120),
+// ignoring extreme terminal states while preserving sensitivity
+// throughout practical play.
+//
+// This metric follows the same linear-raw philosophy as
+// Row Transitions and Column Transitions.
 impl MetricSource for SumOfHeightsMetric {
-    const NORMALIZATION_CAP: f32 = 160.0;
+    /// Normalization cap chosen from empirical P95 (93)
+    /// ln(1+9.3) ≈ 2.33
+    const NORMALIZATION_CAP: f32 = 2.33;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -418,6 +522,34 @@ impl MetricSource for SumOfHeightsMetric {
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         analysis.column_heights.iter().map(|&h| u32::from(h)).sum()
+    }
+
+    #[expect(clippy::cast_precision_loss)]
+    fn transform(raw: u32) -> f32 {
+        (raw as f32 / 10.0).ln_1p()
+    }
+}
+
+#[derive(Debug)]
+pub struct LineClearRewardMetric;
+
+// Lines cleared represent forward progress and efficiency.
+// Weights strongly favor tetrises (4-line clears).
+impl MetricSource for LineClearRewardMetric {
+    const NORMALIZATION_CAP: f32 = 6.0;
+    const SIGNAL: MetricSignal = MetricSignal::Positive;
+
+    fn name() -> &'static str {
+        "Lines Clear Reward"
+    }
+
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+        u32::try_from(analysis.cleared_lines).unwrap()
+    }
+
+    fn transform(raw: u32) -> f32 {
+        const WEIGHT: [f32; 5] = [0.0, 0.5, 1.0, 2.0, 6.0];
+        WEIGHT[usize::try_from(raw).unwrap()]
     }
 }
 
@@ -466,28 +598,5 @@ impl MetricSource for IWellRewardMetric {
     #[expect(clippy::cast_precision_loss)]
     fn transform(raw: u32) -> f32 {
         (raw as f32) / 1000.0
-    }
-}
-
-#[derive(Debug)]
-pub struct LineClearMetric;
-
-// Lines cleared represent forward progress and efficiency.
-// Weights strongly favor tetrises (4-line clears).
-impl MetricSource for LineClearMetric {
-    const NORMALIZATION_CAP: f32 = 6.0;
-    const SIGNAL: MetricSignal = MetricSignal::Positive;
-
-    fn name() -> &'static str {
-        "Lines Cleared"
-    }
-
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
-        u32::try_from(analysis.cleared_lines).unwrap()
-    }
-
-    fn transform(raw: u32) -> f32 {
-        const WEIGHT: [f32; 5] = [0.0, 0.0, 1.0, 2.0, 6.0];
-        WEIGHT[usize::try_from(raw).unwrap()]
     }
 }
