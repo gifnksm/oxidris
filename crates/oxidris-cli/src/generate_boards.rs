@@ -3,6 +3,10 @@ use oxidris_engine::{GameField, GameStats};
 
 use crate::data::{BoardAndPlacement, BoardCollection};
 
+const MAX_TURNS: usize = 500;
+const TURNS_HISTOGRAM_WIDTH: usize = 10;
+const HEIGHT_HISTOGRAM_WIDTH: usize = 2;
+
 pub(crate) fn run() {
     let placement_evaluator = DumpPlacementEvaluator;
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
@@ -11,10 +15,10 @@ pub(crate) fn run() {
 
     let mut total_games = 0;
     let mut captured_boards = vec![];
-    let mut turns_histogram = [0; 10];
+    let mut turns_histogram = [0; MAX_TURNS / TURNS_HISTOGRAM_WIDTH + 1];
     let mut height_histogram = [0; 10];
 
-    while captured_boards.len() < 10000 {
+    while captured_boards.len() < 20000 {
         total_games += 1;
         let mut captured_heights = [false; 4];
         let mut field = GameField::new();
@@ -34,29 +38,24 @@ pub(crate) fn run() {
             let h = field.board().max_height();
 
             // Fixed intervals to capture boards
-            if matches!(t, 5 | 15 | 30 | 60) {
-                turns_histogram[(t / 10).min(9)] += 1;
-                height_histogram[(h / 2).min(9)] += 1;
+            if matches!(t, 5 | 15 | 30 | 60) || (t >= 100 && t.is_multiple_of(50)) {
                 do_capture = true;
             }
 
             for (i, th) in [5, 9, 12, 14].into_iter().enumerate() {
                 if h >= th && !captured_heights[i] {
                     captured_heights[i] = true;
-                    turns_histogram[(t / 10).min(9)] += 1;
-                    height_histogram[(h / 2).min(9)] += 1;
                     do_capture = true;
                 }
             }
 
             if do_capture {
+                turns_histogram[(t / TURNS_HISTOGRAM_WIDTH).min(turns_histogram.len() - 1)] += 1;
+                height_histogram[(h / HEIGHT_HISTOGRAM_WIDTH).min(height_histogram.len() - 1)] += 1;
                 captured_boards.push(capture_board);
             }
 
-            if h >= 15 {
-                break;
-            }
-            if stats.completed_pieces() >= 100 {
+            if stats.completed_pieces() > MAX_TURNS {
                 break;
             }
         }
@@ -75,13 +74,13 @@ pub(crate) fn run() {
     eprintln!();
     eprintln!("Turns histogram:");
     for (i, count) in turns_histogram.iter().enumerate() {
-        let min = i * 10;
+        let min = i * TURNS_HISTOGRAM_WIDTH;
         eprintln!("  {min:2}- : {count:5} {}", "#".repeat(count / 50));
     }
     eprintln!();
     eprintln!("Height histogram:");
     for (i, count) in height_histogram.iter().enumerate() {
-        let min = i * 2;
+        let min = i * HEIGHT_HISTOGRAM_WIDTH;
         eprintln!("  {min:2}- : {count:5} {}", "#".repeat(count / 50));
     }
 }

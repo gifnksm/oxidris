@@ -71,6 +71,6 @@ impl PlacementEvaluator for DumpPlacementEvaluator {
         let analysis = BoardAnalysis::from_board(&board, placement);
         let max_height = MaxHeightMetric::measure_raw(&analysis);
         let covered_holes = CoveredHolesMetric::measure_raw(&analysis);
-        -(max_height as f32) - 2.0 * (covered_holes as f32)
+        -(max_height as f32) - (covered_holes as f32)
     }
 }
