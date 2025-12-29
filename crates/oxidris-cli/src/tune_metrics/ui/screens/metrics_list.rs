@@ -200,7 +200,7 @@ impl Widget for MetricStatistics<'_> {
             Line::raw(format!("  Median: {:10.2}", self.stats.median)),
             Line::raw(format!("  Min:    {:10.2}", self.stats.min,)),
         ];
-        for p in [10, 25, 75, 90, 95, 99] {
+        for p in [1, 5, 10, 25, 50, 75, 90, 95, 99] {
             text.push(Line::raw(format!(
                 "  P{p:02}:    {:10.2}",
                 self.stats.get_percentile(p as f32).unwrap_or(f32::NAN)

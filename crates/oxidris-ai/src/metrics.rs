@@ -586,13 +586,8 @@ impl MetricSource for DeepWellRiskMetric {
 /// - `raw = Σ (column_heights)` across all 10 columns.
 /// - Linear accumulation of individual column heights.
 ///
-/// # Transform
+/// # Stats (raw values, 10x20, self-play sampling)
 ///
-/// - `ln(1 + raw / 10)`: logarithmic transform after scaling by 10 to compress high values.
-///
-/// # Stats (10x20, self-play sampling)
-///
-/// Raw values:
 /// - Mean ≈ 40.02
 /// - P10 = 14
 /// - P25 = 14
@@ -601,9 +596,6 @@ impl MetricSource for DeepWellRiskMetric {
 /// - P90 ≈ 83
 /// - P95 ≈ 93
 /// - P99 ≈ 122
-///
-/// Transformed values:
-/// - P95 ≈ 2.33
 ///
 /// # Interpretation (raw)
 ///
@@ -616,13 +608,13 @@ impl MetricSource for DeepWellRiskMetric {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 2.33 (set to P95 transformed value: ln(1+93/10) ≈ 2.33).
+/// - `NORMALIZATION_CAP` = 93.0 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (lower total height is better).
 #[derive(Debug)]
 pub struct SumOfHeightsMetric;
 
 impl MetricSource for SumOfHeightsMetric {
-    const NORMALIZATION_CAP: f32 = 2.33;
+    const NORMALIZATION_CAP: f32 = 93.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -631,11 +623,6 @@ impl MetricSource for SumOfHeightsMetric {
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         analysis.column_heights.iter().map(|&h| u32::from(h)).sum()
-    }
-
-    #[expect(clippy::cast_precision_loss)]
-    fn transform(raw: u32) -> f32 {
-        (raw as f32 / 10.0).ln_1p()
     }
 }
 
