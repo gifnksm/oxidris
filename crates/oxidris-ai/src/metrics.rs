@@ -14,6 +14,7 @@
 //!
 //! - Normalization clips to practical in-game spans (≈ P05–P95) via `NORMALIZATION_MIN`/`NORMALIZATION_MAX`.
 //! - `MetricSource` defines `measure_raw` → optional `transform` → `normalize` with min/max span and signal.
+//! - Transforms are metric-specific: e.g., [`TopOutRisk`] uses a thresholded linear ramp above a safe height; [`IWellReward`] uses a triangular peak centered at depth 4.
 //! - `ALL_METRICS` lists the active metrics and supports batch measurement.
 //!
 //! # Usage
@@ -524,8 +525,8 @@ impl MetricSource for WellDepthPenalty {
 /// # Transform
 ///
 /// - Heights up to `SAFE_THRESHOLD` (0.5 ≈ height 10 on 20-row board) are considered safe and map to 0.0.
-/// - Above the threshold, apply exponential escalation: `danger^2.5` where `danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)`.
-/// - This metric behaves as a thresholded risk: negligible below the threshold, rapidly increasing above it.
+/// - Above the threshold, apply a linear ramp: `danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)`.
+/// - Acts as a thresholded risk: negligible below the threshold, increasing linearly above it.
 ///
 /// # Stats (10x20, self-play sampling)
 ///
@@ -585,8 +586,7 @@ impl MetricSource for TopOutRisk {
         if h <= SAFE_THRESHOLD {
             0.0
         } else {
-            let danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD);
-            danger.powf(2.5)
+            (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)
         }
     }
 }
@@ -728,8 +728,8 @@ impl MetricSource for LineClearBonus {
 ///
 /// # Transform
 ///
-/// - Gaussian centered at depth 4 with `σ = 2`: $f(d) = e^{-(d-4)^2/(2\sigma^2)}$.
-/// - Smooth reward peaked at tetris-ready depth; decays for wells that are too shallow or too deep.
+/// - Triangular peak centered at depth 4 with width 2: `f(d) = 1 - |(d - 4) / (4/2)|`, clamped to $[0, 1]$.
+/// - Smooth reward peaked at tetris-ready depth; decays linearly for wells that are too shallow or too deep.
 ///
 /// # Normalization
 ///
@@ -774,8 +774,9 @@ impl MetricSource for IWellReward {
 
     #[expect(clippy::cast_precision_loss)]
     fn transform(raw: u32) -> f32 {
-        let peak = 4.0;
-        let sigma = 2.0;
-        (-(raw as f32 - peak).powi(2) / (2.0 * sigma * sigma)).exp()
+        const PEAK: f32 = 4.0;
+        const WIDTH: f32 = 2.0;
+        let raw = raw as f32;
+        (1.0 - ((raw - PEAK) / (PEAK / WIDTH)).abs()).clamp(0.0, 1.0)
     }
 }
