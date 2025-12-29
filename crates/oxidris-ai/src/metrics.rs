@@ -157,32 +157,46 @@ where
     }
 }
 
+/// Penalizes covered holes (empty cells with blocks above).
+///
+/// This metric penalizes:
+///
+/// - Early hole creation
+/// - Unrecoverable board states
+/// - Cells that are difficult or impossible to clear
+///
+/// # Raw measurement
+///
+/// - For each column, compute `column_height - occupied_cells`; sum across columns.
+/// - Counts empty cells that have at least one block above them.
+///
+/// # Stats (raw values, 10x20, weak–mid AI, long run)
+///
+/// - Mean ≈ 1.59
+/// - P10 = 0
+/// - P25 = 0
+/// - Median = 1
+/// - P75 = 2
+/// - P90 = 4
+/// - P95 = 6
+/// - P99 = 9
+///
+/// # Interpretation (raw hole count)
+///
+/// - 0: ideal (≤P25)
+/// - 1: good, minor concern (P25-Median)
+/// - 2-4: moderate risk (Median-P90)
+/// - 5-6: high risk (P90-P95)
+/// - 7+: critical (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 6.0 (set to P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (fewer holes is better).
 #[derive(Debug)]
 pub struct CoveredHolesMetric;
 
-// Covered holes are empty cells with at least one block above them.
-// They are one of the strongest losing factors in Tetris,
-// because they are difficult or impossible to clear directly.
-//
-// Empirical distribution (weak–mid AI, long-run):
-//   Median ≈ 1
-//   P90    ≈ 4
-//   P95    ≈ 6
-//   P99    ≈ 9
-//
-// Interpretation (raw hole count):
-//   0       : ideal, fully clean board
-//   1–2     : early warning, still recoverable
-//   3–4     : dangerous, recovery is hard
-//   5–6     : near-losing position
-//   7+      : effectively lost
-//
-// A power transform (holes^1.7) strongly emphasizes early hole creation,
-// while saturating quickly for already-losing boards.
-// The normalization cap (~12) corresponds to ~6 practical holes.
 impl MetricSource for CoveredHolesMetric {
-    /// Normalization cap chosen from empirical distribution:
-    /// P95 ≈ 6 holes → transformed ≈ 6.0
     const NORMALIZATION_CAP: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -191,45 +205,57 @@ impl MetricSource for CoveredHolesMetric {
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
-        // For each column:
-        //   covered_holes = column_height - number_of_occupied_cells
-        // This counts empty cells that have at least one block above.
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
             .map(|(h, occ)| u32::from(h - occ))
             .sum()
     }
 }
 
+/// Penalizes horizontal fragmentation by counting occupancy changes between adjacent cells within each row.
+///
+/// This metric penalizes:
+///
+/// - Horizontally fragmented structures
+/// - Narrow gaps and broken rows
+/// - Layouts that are inefficient to clear
+///
+/// # Raw measurement
+///
+/// - For each row, scan left to right within the playable area only.
+/// - Count transitions where adjacent cells differ in occupancy (empty ↔ filled).
+/// - Board walls are intentionally ignored to preserve left–right symmetry and avoid artificial incentives for edge stacking.
+///
+/// This differs from typical implementations that treat walls as filled cells, which can bias AI toward center placement.
+/// By excluding walls, this metric evaluates edge and center placements fairly.
+///
+/// # Stats (raw values, 10x20, weak–mid AI)
+///
+/// - Mean ≈ 13.70
+/// - P10 = 5
+/// - P25 = 7
+/// - Median = 11
+/// - P75 = 18
+/// - P90 = 26
+/// - P95 = 32
+/// - P99 = 44
+///
+/// # Interpretation (raw transition count)
+///
+/// - 0-7: very clean (≤P25)
+/// - 8-11: clean (P25-Median)
+/// - 12-18: normal mid-game (Median-P75)
+/// - 19-26: increased fragmentation (P75-P90)
+/// - 27-32: high fragmentation (P90-P95)
+/// - 33+: critical instability (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 32.0 (set to P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
 pub struct RowTransitionsMetric;
 
-// Row transitions measure horizontal fragmentation by counting
-// occupancy changes between adjacent cells within each row.
-//
-// Only transitions *inside* the playable area are counted.
-// Board walls are intentionally ignored to preserve left–right symmetry
-// and avoid artificial incentives for edge stacking.
-//
-// This metric penalizes:
-//   - horizontally fragmented structures
-//   - narrow gaps and broken rows
-//   - layouts that are inefficient to clear
-//
-// Empirical distribution (10x20 board, weak–mid AI):
-//   Median ≈ 11
-//   P90    ≈ 26
-//   P95    ≈ 32
-//   P99    ≈ 44
-//
-// Interpretation (raw):
-//   0–15    : very clean and flat surface
-//   20–30   : normal mid-game roughness
-//   30–40   : dangerous fragmentation
-//   40+     : highly unstable board
-//
-// This is a negative metric; lower transition counts are better.
 impl MetricSource for RowTransitionsMetric {
-    /// Normalization cap chosen from empirical P95 (~32)
     const NORMALIZATION_CAP: f32 = 32.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -253,32 +279,48 @@ impl MetricSource for RowTransitionsMetric {
     }
 }
 
+/// Penalizes vertical fragmentation within columns by counting occupancy changes from top to bottom.
+///
+/// This metric penalizes:
+///
+/// - Vertical fragmentation inside columns
+/// - Internal splits and covered holes
+/// - Unstable stacking structures
+///
+/// # Raw measurement
+///
+/// - For each column, scan from top to bottom within the playable area.
+/// - Count transitions where adjacent cells differ in occupancy (empty ↔ filled).
+///
+/// # Stats (raw values, 10x20, self-play sampling)
+///
+/// - Mean ≈ 11.41
+/// - P10 = 8
+/// - P25 = 9
+/// - Median = 11
+/// - P75 = 13
+/// - P90 = 17
+/// - P95 = 19
+/// - P99 = 25
+/// - Max = 45
+///
+/// # Interpretation (raw transition count)
+///
+/// - 0-9: very clean (≤P25)
+/// - 10-11: clean (P25-Median)
+/// - 12-13: normal (Median-P75)
+/// - 14-17: increased fragmentation (P75-P90)
+/// - 18-19: high fragmentation (P90-P95)
+/// - 20+: severe instability (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 19.0 (set to P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
 pub struct ColumnTransitionsMetric;
 
-// Column transitions count vertical occupancy changes per column,
-// scanning from the top of the playable area downwards.
-//
-// This metric measures vertical fragmentation inside columns,
-// including stacked blocks and covered holes.
-//
-// Observed distribution (10x20 board, self-play sampling):
-//   Mean   ≈ 11
-//   Median ≈ 11
-//   P90    ≈ 17
-//   P95    ≈ 19
-//   P99    ≈ 25
-//   Max    ≈ 45
-//
-// Interpretation:
-//   0-15   : clean columns, mostly solid
-//   15–25  : typical mid-game vertical fragmentation
-//   25+    : severe internal instability (many splits / holes)
 impl MetricSource for ColumnTransitionsMetric {
-    // Normalization cap is set to the observed P95 value.
-    // Values beyond this represent already-losing positions
-    // and are saturated to preserve signal resolution
-    // in the normal play regime.
     const NORMALIZATION_CAP: f32 = 19.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -289,7 +331,7 @@ impl MetricSource for ColumnTransitionsMetric {
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
         for x in BitBoard::PLAYABLE_X_RANGE {
-            let mut prev_occupied = analysis.board.playable_row(0).is_cell_occupied(x); // top cell
+            let mut prev_occupied = analysis.board.playable_row(0).is_cell_occupied(x);
             for y in 1..BitBoard::PLAYABLE_HEIGHT {
                 let occupied = analysis.board.playable_row(y).is_cell_occupied(x);
                 if occupied != prev_occupied {
@@ -302,35 +344,50 @@ impl MetricSource for ColumnTransitionsMetric {
     }
 }
 
+/// Penalizes local surface curvature using second-order height differences (discrete Laplacian).
+///
+/// This metric penalizes:
+///
+/// - Small-scale surface unevenness
+/// - Local height variations that increase future instability
+/// - Shapes that are prone to creating holes
+///
+/// Complements row and column transitions by remaining sensitive even when the overall stack is low.
+///
+/// # Raw measurement
+///
+/// - For each triplet of adjacent columns, compute the discrete Laplacian: `|(right - mid) - (mid - left)|`.
+/// - Sum across all triplets.
+///
+/// # Stats (raw values, 10x20, self-play sampling)
+///
+/// - Mean ≈ 15.04
+/// - P10 = 6
+/// - P25 = 8
+/// - Median = 12
+/// - P75 = 18
+/// - P90 = 28
+/// - P95 = 37
+/// - P99 = 55
+/// - Max = 130
+///
+/// # Interpretation (raw roughness)
+///
+/// - 0-8: flat surface (≤P25)
+/// - 9-12: smooth (P25-Median)
+/// - 13-18: normal roughness (Median-P75)
+/// - 19-28: increased unevenness (P75-P90)
+/// - 29-37: high roughness (P90-P95)
+/// - 38+: critical chaos (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 37.0 (set to P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (flatter surface is better).
 #[derive(Debug)]
 pub struct SurfaceRoughnessMetric;
 
-// Surface roughness measures local curvature of the board surface
-// using second-order height differences (discrete Laplacian).
-//
-// This metric captures small-scale unevenness that may not
-// immediately create holes, but increases future instability.
-//
-// Observed distribution (10x20 board, self-play sampling):
-//   Mean   ≈ 15
-//   Median ≈ 12
-//   P90    ≈ 28
-//   P95    ≈ 37
-//   P99    ≈ 55
-//   Max    ≈ 130
-//
-// Interpretation:
-//   < 10   : flat or intentionally shaped surface
-//   10–30  : normal mid-game roughness
-//   30–55  : highly uneven, high hole risk
-//   > 55   : chaotic surface, often unrecoverable
-//
-// This metric complements row and column transitions
-// by remaining sensitive even when the overall stack is low.
 impl MetricSource for SurfaceRoughnessMetric {
-    // Normalization cap is set to the observed P95 value.
-    // Values beyond this correspond to highly chaotic surfaces
-    // and are saturated to preserve resolution in normal play.
     const NORMALIZATION_CAP: f32 = 37.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -352,37 +409,62 @@ impl MetricSource for SurfaceRoughnessMetric {
     }
 }
 
+/// Penalizes imminent top-out danger based on maximum column height.
+///
+/// This metric penalizes:
+///
+/// - Approaching the ceiling (irreversible top-out risk)
+/// - States close to game over
+///
+/// Unlike other metrics, max height is intentionally ignored for most of the game and only penalized near the ceiling,
+/// reflecting the irreversible nature of top-out. Acts as a hard constraint rather than a general board quality measure.
+///
+/// # Raw measurement
+///
+/// - `raw = max(column_heights)`: the tallest column on the board.
+///
+/// # Transform
+///
+/// - Heights up to `SAFE_THRESHOLD` (0.5 ≈ height 10 on 20-row board) are considered safe and map to 0.0.
+/// - Above the threshold, apply exponential escalation: `danger^2.5` where `danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)`.
+/// - This strongly discourages states close to top-out.
+///
+/// # Stats (10x20, self-play sampling)
+///
+/// Raw values:
+///
+/// - Mean ≈ 5.66
+/// - P10 = 2
+/// - P25 = 3
+/// - Median = 4
+/// - P75 = 8
+/// - P90 = 12
+/// - P95 = 12
+/// - P99 = 16
+/// - Max = 20 (top-out)
+///
+/// Transformed values:
+///
+/// - P75 = 0.00 (safe zone)
+/// - P90 = 0.02
+/// - P95 = 0.02
+/// - P99 = 0.28
+///
+/// # Interpretation (raw height)
+///
+/// - 0-10: safe, no penalty applied
+/// - 11-12: caution zone
+/// - 13-15: dangerous zone, recovery still possible
+/// - 16+: critical, near-certain top-out
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 0.18 (applies to transformed value, not raw height).
+/// - `SIGNAL` = Negative (lower height is better).
 #[derive(Debug)]
 pub struct MaxHeightMetric;
 
-// Max Height represents imminent top-out danger.
-//
-// Unlike other metrics, max height is intentionally ignored
-// for most of the game and only penalized near the ceiling,
-// reflecting the irreversible nature of top-out.
-//
-// Observed distribution (10x20 board, self-play sampling):
-//   Mean   ≈ 5.7
-//   Median ≈ 4
-//   P90    ≈ 12
-//   P95    ≈ 12
-//   P99    ≈ 16
-//   Max    = 20 (top-out)
-//
-// Interpretation:
-//   <= 10  : safe, no penalty applied
-//   13–15  : dangerous zone, recovery still possible
-//   >= 16  : critical, near-certain top-out
-//
-// A linear ramp is applied above the safe threshold,
-// followed by an exponential penalty to strongly discourage
-// states close to top-out.
-//
-// This metric acts as a hard constraint rather than
-// a general board quality measure.
 impl MetricSource for MaxHeightMetric {
-    // Normalization cap applies to the transformed value (0–1),
-    // not to the raw board height.
     const NORMALIZATION_CAP: f32 = 0.18;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -396,59 +478,73 @@ impl MetricSource for MaxHeightMetric {
     }
 
     fn transform(raw: u32) -> f32 {
-        // Heights up to this threshold are considered safe
-        // and intentionally ignored.
-        const SAFE_THRESHOLD: f32 = 0.5; // ≈ height 10 on a 20-row board
+        const SAFE_THRESHOLD: f32 = 0.5;
         #[expect(clippy::cast_precision_loss)]
         let h = (raw as f32) / (BitBoard::PLAYABLE_HEIGHT as f32);
         if h <= SAFE_THRESHOLD {
             0.0
         } else {
-            // normalized danger ∈ [0, 1]
             let danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD);
-            // exponential escalation near ceiling
             danger.powf(2.5)
         }
     }
 }
 
+/// Penalizes excessively deep single-column wells that are difficult or impossible to recover from.
+///
+/// This metric penalizes:
+///
+/// - Over-committed vertical wells
+/// - Single columns with extreme depth
+/// - Structures with non-linear recovery difficulty
+///
+/// Only wells deeper than 2 are considered dangerous. Shallow wells (depth ≤ 2) are allowed to preserve freedom
+/// for controlled I-well construction. This metric is strictly a safety penalty and does NOT reward I-wells;
+/// combine with `IWellRewardMetric` for balanced evaluation.
+///
+/// # Raw measurement
+///
+/// - `raw = Σ (max(depth - 2, 0)^2)` across all columns.
+/// - Squaring aggressively penalizes over-committed vertical wells, reflecting non-linear recovery difficulty.
+///
+/// # Transform
+///
+/// - `ln(1 + raw)`: logarithmic transform models exponential growth in recovery difficulty.
+///
+/// # Stats (10x20, self-play sampling)
+///
+/// Raw values:
+/// - Mean ≈ 10.49
+/// - P10 = 0
+/// - P25 = 0
+/// - Median = 0
+/// - P75 = 5
+/// - P90 = 34
+/// - P95 = 59
+/// - P99 = 136
+///
+/// Transformed values:
+/// - P75 ≈ 1.79
+/// - P90 ≈ 3.56
+/// - P95 ≈ 4.09
+/// - P99 ≈ 4.92
+///
+/// # Interpretation (raw)
+///
+/// - 0: safe, no deep wells (≤Median)
+/// - 1-5: controlled wells (Median-P75)
+/// - 6-34: risky depth (P75-P90)
+/// - 35-59: dangerous (P90-P95)
+/// - 60+: near-fatal vertical structure (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 4.09 (set to P95 transformed value: ln(1+59) ≈ 4.09).
+/// - `SIGNAL` = Negative (shallower wells is better).
 #[derive(Debug)]
 pub struct DeepWellRiskMetric;
 
-// Deep Well Risk detects excessively deep single-column wells
-// that are difficult or impossible to recover from.
-//
-// Only wells deeper than 2 are considered dangerous.
-// Shallow wells (depth <= 2) are allowed to preserve freedom
-// for controlled I-well construction.
-//
-// Raw value definition:
-//   raw = Σ (max(depth - 2, 0)^2)
-//
-// Squaring aggressively penalizes over-committed vertical wells,
-// reflecting the non-linear difficulty of recovery.
-//
-// Observed distribution (10x20 board, self-play sampling):
-//   Median ≈ 0
-//   P90    ≈ 34
-//   P95    ≈ 59
-//   P99    ≈ 136
-//   Max    ≫ 100 (rare catastrophic outliers)
-//
-// Interpretation:
-//   raw ≈ 0        : safe or controlled wells only
-//   raw ≈ 30–60    : dangerous but sometimes recoverable
-//   raw ≥ 100      : near-fatal vertical structure
-//
-// This metric is strictly a safety penalty.
-// It does NOT reward I-wells and should be combined with
-// a separate positive I-well reward metric.
-//
-// Normalization is capped at P95 to preserve resolution
-// between dangerous and fatal states.
 impl MetricSource for DeepWellRiskMetric {
-    // Cap is based on P95 to distinguish dangerous vs fatal wells.
-    // ln(1+59) ≈ 4.09
     const NORMALIZATION_CAP: f32 = 4.09;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -460,7 +556,6 @@ impl MetricSource for DeepWellRiskMetric {
         analysis
             .column_well_depths
             .iter()
-            // Allow shallow wells for I-well construction
             .filter(|depth| **depth > 2)
             .map(|depth| {
                 let depth = u32::from(*depth - 2);
@@ -471,43 +566,62 @@ impl MetricSource for DeepWellRiskMetric {
 
     #[expect(clippy::cast_precision_loss)]
     fn transform(raw: u32) -> f32 {
-        // Exponential growth models non-linear recovery difficulty
         (raw as f32).ln_1p()
     }
 }
 
+/// Penalizes global stacking pressure by summing all column heights.
+///
+/// This metric penalizes:
+///
+/// - Gradual accumulation of blocks across the entire board
+/// - Overall board pressure not captured by local roughness or transitions
+/// - High average stack height
+///
+/// Unlike `MaxHeightMetric`, which focuses on top-out danger from the tallest column, this metric captures
+/// cumulative pressure across all columns. It reflects the total "weight" of the board state.
+///
+/// # Raw measurement
+///
+/// - `raw = Σ (column_heights)` across all 10 columns.
+/// - Linear accumulation of individual column heights.
+///
+/// # Transform
+///
+/// - `ln(1 + raw / 10)`: logarithmic transform after scaling by 10 to compress high values.
+///
+/// # Stats (10x20, self-play sampling)
+///
+/// Raw values:
+/// - Mean ≈ 40.02
+/// - P10 = 14
+/// - P25 = 14
+/// - Median ≈ 27
+/// - P75 = 58
+/// - P90 ≈ 83
+/// - P95 ≈ 93
+/// - P99 ≈ 122
+///
+/// Transformed values:
+/// - P95 ≈ 2.33
+///
+/// # Interpretation (raw)
+///
+/// - 0-14: very low pressure (≤P25)
+/// - 15-27: low pressure, early-game state (P25-Median)
+/// - 28-58: moderate pressure (Median-P75)
+/// - 59-83: elevated pressure (P75-P90)
+/// - 84-93: high pressure, limited recovery options (P90-P95)
+/// - 94+: near top-out danger (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 2.33 (set to P95 transformed value: ln(1+93/10) ≈ 2.33).
+/// - `SIGNAL` = Negative (lower total height is better).
 #[derive(Debug)]
 pub struct SumOfHeightsMetric;
 
-// Sum of Heights measures overall board pressure by summing
-// all column heights.
-//
-// This metric captures *global stacking pressure* that is
-// not necessarily reflected by local roughness or transitions.
-// Unlike Max Height, it penalizes gradual accumulation of blocks
-// across the entire board.
-//
-// Empirical distribution (10x20 board, weak–mid AI):
-//   Median ≈  27
-//   P90    ≈  83
-//   P95    ≈  93
-//   P99    ≈ 122
-//
-// Typical ranges (10x20 board, empirical):
-//   0–40    : very safe, early-game state
-//   40–80   : normal mid-game pressure
-//   80–120  : high pressure, limited recovery options
-//   120+    : near top-out or effectively lost
-//
-// NORMALIZATION_CAP is set to the empirical P99 (~120),
-// ignoring extreme terminal states while preserving sensitivity
-// throughout practical play.
-//
-// This metric follows the same linear-raw philosophy as
-// Row Transitions and Column Transitions.
 impl MetricSource for SumOfHeightsMetric {
-    /// Normalization cap chosen from empirical P95 (93)
-    /// ln(1+9.3) ≈ 2.33
     const NORMALIZATION_CAP: f32 = 2.33;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
@@ -525,11 +639,47 @@ impl MetricSource for SumOfHeightsMetric {
     }
 }
 
+/// Rewards line clears with strong emphasis on efficient 4-line clears (tetrises).
+///
+/// This metric encourages:
+///
+/// - Clearing multiple lines in a single placement
+/// - Prioritizing tetrises (4-line clears) over singles/doubles
+/// - Forward progress and board cleanup
+///
+/// The reward structure strongly favors tetrises to align with optimal Tetris strategy, where
+/// maximizing 4-line clears yields both higher scores and better board states.
+///
+/// # Raw measurement
+///
+/// - `raw = number of lines cleared` (0-4).
+/// - Direct count from the placement result.
+///
+/// # Transform
+///
+/// - Discrete mapping: `[0→0.0, 1→0.0, 2→1.0, 3→2.0, 4→6.0]`
+/// - Singles (1 line) are not rewarded to discourage inefficient clearing.
+/// - Tetrises receive 6× the reward of doubles, reflecting strategic importance.
+///
+/// # Stats
+///
+/// This is a per-placement reward, not a cumulative board state metric. Distribution depends on
+/// play style and board construction strategy.
+///
+/// # Interpretation (raw)
+///
+/// - 0-1: no reward (inefficient or no clear)
+/// - 2: minor reward (double clear)
+/// - 3: moderate reward (triple clear)
+/// - 4: major reward (tetris)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 6.0 (maximum transformed value for tetris).
+/// - `SIGNAL` = Positive (more lines cleared is better).
 #[derive(Debug)]
 pub struct LineClearRewardMetric;
 
-// Lines cleared represent forward progress and efficiency.
-// Weights strongly favor tetrises (4-line clears).
 impl MetricSource for LineClearRewardMetric {
     const NORMALIZATION_CAP: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
@@ -548,6 +698,44 @@ impl MetricSource for LineClearRewardMetric {
     }
 }
 
+/// Encourages maintaining an edge I-well for reliable tetrises without over-committing.
+///
+/// This metric encourages:
+///
+/// - Building a single-column well at the board edge
+/// - Maintaining tetris-ready depth (around 4)
+/// - Immediate consumption when I-piece is available
+///
+/// Considers only the leftmost and rightmost columns; center wells are ignored.
+///
+/// # Raw measurement
+///
+/// - `raw = max(left_well_depth, right_well_depth)`.
+/// - If a ready I-well (`depth >= 4`) coincides with placing an `I` piece,
+///   set `raw = 0` to avoid double rewarding and to encourage an immediate tetris.
+///
+/// # Transform
+///
+/// - Gaussian centered at depth 4 with `σ = 2`: $f(d) = e^{-(d-4)^2/(2\sigma^2)}$.
+/// - Rewards tetris-ready wells most; decays for wells that are too shallow or too deep.
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 1.0. Output naturally lies in $[0, 1]$.
+/// - `SIGNAL` = Positive (higher is better).
+///
+/// # Interpretation (edge well depth)
+///
+/// - 0–1: negligible reward (no/very shallow well)
+/// - 2–3: moderate reward (well construction in progress)
+/// - 4: peak reward (ideal tetris-ready well)
+/// - 5+: decreasing reward (over-commitment discouraged)
+///
+/// # Rationale and interplay
+///
+/// - Complements `DeepWellRiskMetric` by penalizing excessive vertical wells.
+/// - Synergizes with `LineClearRewardMetric` to favor consistent tetrises.
+/// - The consumption guard discourages hoarding when an `I` piece is available.
 #[derive(Debug)]
 pub struct IWellRewardMetric;
 
