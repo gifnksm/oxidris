@@ -6,7 +6,7 @@
 //! # Typology
 //!
 //! - Risk: thresholded danger that escalates rapidly beyond a safe limit (e.g., [`DeepWellRisk`], [`TopOutRisk`]).
-//! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
+//! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`HoleDepthPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
 //! - Reward: smooth positive signals (e.g., [`IWellReward`]).
 //! - Bonus: discrete strong rewards (e.g., [`LineClearBonus`]).
 //!
@@ -27,8 +27,9 @@ use std::fmt;
 
 use crate::BoardAnalysis;
 
-pub const ALL_METRICS: MetricSet<'static, 10> = MetricSet([
+pub const ALL_METRICS: MetricSet<'static, 11> = MetricSet([
     &HolesPenalty,
+    &HoleDepthPenalty,
     &RowTransitionsPenalty,
     &ColumnTransitionsPenalty,
     &SurfaceRoughnessPenalty,
@@ -234,6 +235,77 @@ impl MetricSource for HolesPenalty {
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
             .map(|(h, occ)| u32::from(h - occ))
             .sum()
+    }
+}
+
+/// Smooth penalty for cumulative hole depth (weighted by blocks above each hole).
+///
+/// This metric penalizes:
+///
+/// - Deeply buried holes that are costly to clear
+/// - Stacking that traps holes under tall columns
+/// - Mid/late-game instability from unrecoverable cavities
+///
+/// Complements [`HolesPenalty`], which counts holes uniformly. Here, holes deeper under the stack contribute more
+/// via the number of occupied cells above them.
+///
+/// # Raw measurement
+///
+/// - For each column, scan top-down. After the first filled cell, every empty cell is a hole; add `blocks_above` to
+///   the cumulative sum where `blocks_above` is the count of occupied cells seen above the hole in that column.
+/// - `raw = Σ (blocks_above for each hole)` across all columns.
+///
+/// # Stats (10x20, self-play sampling)
+///
+/// - Mean ≈ 6.90
+/// - P01 = 0
+/// - P05 = 0
+/// - P10 = 0
+/// - P25 = 0
+/// - Median = 2
+/// - P75 = 9
+/// - P90 = 21
+/// - P95 = 31
+/// - P99 = 58
+///
+/// # Interpretation (raw cumulative depth)
+///
+/// - 0-2: shallow/absent holes (≤Median)
+/// - 3-8: moderate depth (Median-P75)
+/// - 9-20: heavy depth (P75-P90)
+/// - 21-30: severe (P90-P95)
+/// - 31+: critical (P95+)
+///
+/// # Normalization
+///
+/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=31.0]` (≈ P05–P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (shallower holes is better).
+#[derive(Debug)]
+pub struct HoleDepthPenalty;
+
+impl MetricSource for HoleDepthPenalty {
+    const NORMALIZATION_MIN: f32 = 0.0;
+    const NORMALIZATION_MAX: f32 = 31.0;
+    const SIGNAL: MetricSignal = MetricSignal::Negative;
+
+    fn name() -> &'static str {
+        "Hole Depth Penalty"
+    }
+
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+        let mut depth_sum = 0u32;
+        for x in BitBoard::PLAYABLE_X_RANGE {
+            let mut blocks_above = 0u32;
+            for y in 0..BitBoard::PLAYABLE_HEIGHT {
+                let occupied = analysis.board.playable_row(y).is_cell_occupied(x);
+                if occupied {
+                    blocks_above += 1;
+                } else if blocks_above > 0 {
+                    depth_sum += blocks_above;
+                }
+            }
+        }
+        depth_sum
     }
 }
 
