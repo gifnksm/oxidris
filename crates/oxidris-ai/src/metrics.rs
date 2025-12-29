@@ -12,8 +12,8 @@
 //!
 //! # Design
 //!
-//! - Normalization uses practical in-game ranges (≈ P95) to preserve signal resolution during optimization.
-//! - `MetricSource` defines `measure_raw` → optional `transform` → `normalize` with cap and signal.
+//! - Normalization clips to practical in-game spans (≈ P05–P95) via `NORMALIZATION_MIN`/`NORMALIZATION_MAX`.
+//! - `MetricSource` defines `measure_raw` → optional `transform` → `normalize` with min/max span and signal.
 //! - `ALL_METRICS` lists the active metrics and supports batch measurement.
 //!
 //! # Usage
@@ -86,7 +86,8 @@ pub struct MetricMeasurement {
 }
 
 pub trait MetricSource: fmt::Debug {
-    const NORMALIZATION_CAP: f32;
+    const NORMALIZATION_MIN: f32;
+    const NORMALIZATION_MAX: f32;
     const SIGNAL: MetricSignal;
 
     #[must_use]
@@ -103,7 +104,8 @@ pub trait MetricSource: fmt::Debug {
 
     #[must_use]
     fn normalize(transformed: f32) -> f32 {
-        let norm = (transformed / Self::NORMALIZATION_CAP).clamp(0.0, 1.0);
+        let span = Self::NORMALIZATION_MAX - Self::NORMALIZATION_MIN;
+        let norm = ((transformed - Self::NORMALIZATION_MIN) / span).clamp(0.0, 1.0);
         match Self::SIGNAL {
             MetricSignal::Positive => norm,
             MetricSignal::Negative => 1.0 - norm,
@@ -127,7 +129,9 @@ pub trait DynMetricSource: fmt::Debug {
     #[must_use]
     fn name(&self) -> &'static str;
     #[must_use]
-    fn normalization_cap(&self) -> f32;
+    fn normalization_min(&self) -> f32;
+    #[must_use]
+    fn normalization_max(&self) -> f32;
     #[must_use]
     fn signal(&self) -> MetricSignal;
     #[must_use]
@@ -148,8 +152,12 @@ where
         T::name()
     }
 
-    fn normalization_cap(&self) -> f32 {
-        T::NORMALIZATION_CAP
+    fn normalization_min(&self) -> f32 {
+        T::NORMALIZATION_MIN
+    }
+
+    fn normalization_max(&self) -> f32 {
+        T::NORMALIZATION_MAX
     }
 
     fn signal(&self) -> MetricSignal {
@@ -189,8 +197,7 @@ where
 /// # Stats (raw values, 10x20, weak–mid AI, long run)
 ///
 /// - Mean ≈ 1.59
-/// - P10 = 0
-/// - P25 = 0
+/// - P01 = P05 = P10 = P25 = 0
 /// - Median = 1
 /// - P75 = 2
 /// - P90 = 4
@@ -207,13 +214,14 @@ where
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 6.0 (set to P95; linear, uses raw directly).
+/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=6.0]` (P05–P95 span; linear, uses raw directly).
 /// - `SIGNAL` = Negative (fewer holes is better).
 #[derive(Debug)]
 pub struct HolesPenalty;
 
 impl MetricSource for HolesPenalty {
-    const NORMALIZATION_CAP: f32 = 6.0;
+    const NORMALIZATION_MIN: f32 = 0.0;
+    const NORMALIZATION_MAX: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -247,6 +255,8 @@ impl MetricSource for HolesPenalty {
 /// # Stats (raw values, 10x20, weak–mid AI)
 ///
 /// - Mean ≈ 13.70
+/// - P01 = 3
+/// - P05 = 4
 /// - P10 = 5
 /// - P25 = 7
 /// - Median = 11
@@ -266,13 +276,14 @@ impl MetricSource for HolesPenalty {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 32.0 (set to P95; linear, uses raw directly).
+/// - Clipped to `[NORMALIZATION_MIN=4.0, NORMALIZATION_MAX=32.0]` (≈ P05–P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
 pub struct RowTransitionsPenalty;
 
 impl MetricSource for RowTransitionsPenalty {
-    const NORMALIZATION_CAP: f32 = 32.0;
+    const NORMALIZATION_MIN: f32 = 4.0;
+    const NORMALIZATION_MAX: f32 = 32.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -311,6 +322,8 @@ impl MetricSource for RowTransitionsPenalty {
 /// # Stats (raw values, 10x20, self-play sampling)
 ///
 /// - Mean ≈ 11.41
+/// - P01 = 3
+/// - P05 = 5
 /// - P10 = 8
 /// - P25 = 9
 /// - Median = 11
@@ -331,13 +344,14 @@ impl MetricSource for RowTransitionsPenalty {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 19.0 (set to P95; linear, uses raw directly).
+/// - Clipped to `[NORMALIZATION_MIN=5.0, NORMALIZATION_MAX=19.0]` (≈ P05–P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
 pub struct ColumnTransitionsPenalty;
 
 impl MetricSource for ColumnTransitionsPenalty {
-    const NORMALIZATION_CAP: f32 = 19.0;
+    const NORMALIZATION_MIN: f32 = 5.0;
+    const NORMALIZATION_MAX: f32 = 19.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -378,6 +392,8 @@ impl MetricSource for ColumnTransitionsPenalty {
 /// # Stats (raw values, 10x20, self-play sampling)
 ///
 /// - Mean ≈ 15.04
+/// - P01 = 3
+/// - P05 = 5
 /// - P10 = 6
 /// - P25 = 8
 /// - Median = 12
@@ -398,13 +414,14 @@ impl MetricSource for ColumnTransitionsPenalty {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 37.0 (set to P95; linear, uses raw directly).
+/// - Clipped to `[NORMALIZATION_MIN=5.0, NORMALIZATION_MAX=37.0]` (≈ P05–P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (flatter surface is better).
 #[derive(Debug)]
 pub struct SurfaceRoughnessPenalty;
 
 impl MetricSource for SurfaceRoughnessPenalty {
-    const NORMALIZATION_CAP: f32 = 37.0;
+    const NORMALIZATION_MIN: f32 = 5.0;
+    const NORMALIZATION_MAX: f32 = 37.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -445,8 +462,7 @@ impl MetricSource for SurfaceRoughnessPenalty {
 /// # Stats (raw values, 10x20, self-play sampling)
 ///
 /// - Mean ≈ 6.45
-/// - P10 = 0
-/// - P25 = 0
+/// - P01 = P05 = P10 = P25 = 0
 /// - Median = 2
 /// - P75 = 10
 /// - P90 = 20
@@ -463,13 +479,14 @@ impl MetricSource for SurfaceRoughnessPenalty {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 26 (set to P95; linear, uses raw directly).
+/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=26.0]` (≈ P05–P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (shallower wells is better).
 #[derive(Debug)]
 pub struct WellDepthPenalty;
 
 impl MetricSource for WellDepthPenalty {
-    const NORMALIZATION_CAP: f32 = 26.0;
+    const NORMALIZATION_MIN: f32 = 0.0;
+    const NORMALIZATION_MAX: f32 = 26.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -515,6 +532,8 @@ impl MetricSource for WellDepthPenalty {
 /// Raw values:
 ///
 /// - Mean ≈ 5.66
+/// - P01 = 1
+/// - P05 = 2
 /// - P10 = 2
 /// - P25 = 3
 /// - Median = 4
@@ -526,10 +545,10 @@ impl MetricSource for WellDepthPenalty {
 ///
 /// Transformed values:
 ///
-/// - P75 = 0.00 (safe zone)
-/// - P90 = 0.02
-/// - P95 = 0.02
-/// - P99 = 0.28
+/// - P75 ≈ 0.00 (safe zone)
+/// - P90 ≈ 0.02
+/// - P95 ≈ 0.02
+/// - P99 ≈ 0.28
 ///
 /// # Interpretation (raw height)
 ///
@@ -540,13 +559,14 @@ impl MetricSource for WellDepthPenalty {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 0.18 (applies to transformed value, not raw height).
+/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=0.18]` (≈ P05–P95 of transformed value).
 /// - `SIGNAL` = Negative (lower height is better).
 #[derive(Debug)]
 pub struct TopOutRisk;
 
 impl MetricSource for TopOutRisk {
-    const NORMALIZATION_CAP: f32 = 0.18;
+    const NORMALIZATION_MIN: f32 = 0.0;
+    const NORMALIZATION_MAX: f32 = 0.18;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -590,6 +610,8 @@ impl MetricSource for TopOutRisk {
 /// # Stats (raw values, 10x20, self-play sampling)
 ///
 /// - Mean ≈ 40.02
+/// - P01 = 4
+/// - P05 = 8
 /// - P10 = 14
 /// - P25 = 14
 /// - Median ≈ 27
@@ -609,13 +631,14 @@ impl MetricSource for TopOutRisk {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 93.0 (set to P95; linear, uses raw directly).
+/// - Clipped to `[NORMALIZATION_MIN=8.0, NORMALIZATION_MAX=93.0]` (≈ P05–P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (lower total height is better).
 #[derive(Debug)]
 pub struct TotalHeightPenalty;
 
 impl MetricSource for TotalHeightPenalty {
-    const NORMALIZATION_CAP: f32 = 93.0;
+    const NORMALIZATION_MIN: f32 = 8.0;
+    const NORMALIZATION_MAX: f32 = 93.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -663,13 +686,14 @@ impl MetricSource for TotalHeightPenalty {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 6.0 (maximum transformed value for tetris).
+/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=6.0]` (transformed range).
 /// - `SIGNAL` = Positive (more lines cleared is better).
 #[derive(Debug)]
 pub struct LineClearBonus;
 
 impl MetricSource for LineClearBonus {
-    const NORMALIZATION_CAP: f32 = 6.0;
+    const NORMALIZATION_MIN: f32 = 0.0;
+    const NORMALIZATION_MAX: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
     fn name() -> &'static str {
@@ -709,7 +733,7 @@ impl MetricSource for LineClearBonus {
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 1.0. Output naturally lies in $[0, 1]$.
+/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=1.0]` (transformed range already within bounds).
 /// - `SIGNAL` = Positive (higher is better).
 ///
 /// # Interpretation (edge well depth)
@@ -728,7 +752,8 @@ impl MetricSource for LineClearBonus {
 pub struct IWellReward;
 
 impl MetricSource for IWellReward {
-    const NORMALIZATION_CAP: f32 = 1.0;
+    const NORMALIZATION_MIN: f32 = 0.0;
+    const NORMALIZATION_MAX: f32 = 1.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
     fn name() -> &'static str {
