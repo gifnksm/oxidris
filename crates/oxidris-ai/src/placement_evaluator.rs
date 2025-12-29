@@ -3,8 +3,8 @@ use std::{fmt, iter};
 use oxidris_engine::{BitBoard, Piece};
 
 use crate::{
-    ALL_METRICS, ALL_METRICS_COUNT, AiType, BoardAnalysis, CoveredHolesMetric, MaxHeightMetric,
-    MetricSet, MetricSource as _, WeightSet,
+    ALL_METRICS, ALL_METRICS_COUNT, AiType, BoardAnalysis, HolesPenalty, MetricSet,
+    MetricSource as _, TopOutRisk, WeightSet,
 };
 
 pub trait PlacementEvaluator: fmt::Debug {
@@ -69,8 +69,8 @@ impl PlacementEvaluator for DumpPlacementEvaluator {
         let mut board = board.clone();
         board.fill_piece(placement);
         let analysis = BoardAnalysis::from_board(&board, placement);
-        let max_height = MaxHeightMetric::measure_raw(&analysis);
-        let covered_holes = CoveredHolesMetric::measure_raw(&analysis);
+        let max_height = TopOutRisk::measure_raw(&analysis);
+        let covered_holes = HolesPenalty::measure_raw(&analysis);
         -(max_height as f32) - (covered_holes as f32)
     }
 }

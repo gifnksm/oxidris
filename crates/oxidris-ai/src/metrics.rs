@@ -1,25 +1,41 @@
+//! Normalized evaluation metrics for Tetris board states.
+//!
+//! Provides board evaluation metrics for Tetris, each producing a normalized score in \[0.0, 1.0\].
+//! Higher is always better after normalization; negative metrics are inverted via `MetricSignal::Negative`.
+//!
+//! # Typology
+//!
+//! - Risk: thresholded danger that escalates rapidly beyond a safe limit (e.g., [`TopOutRisk`]).
+//! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
+//! - Reward: smooth positive signals (e.g., [`IWellReward`]).
+//! - Bonus: discrete strong rewards (e.g., [`LineClearBonus`]).
+//!
+//! # Design
+//!
+//! - Normalization uses practical in-game ranges (≈ P95) to preserve signal resolution during optimization.
+//! - `MetricSource` defines `measure_raw` → optional `transform` → `normalize` with cap and signal.
+//! - `ALL_METRICS` lists the active metrics and supports batch measurement.
+//!
+//! # Usage
+//!
+//! - `ALL_METRICS.measure(board, placement)` returns raw/transformed/normalized per metric.
+//! - `ALL_METRICS.measure_normalized(board, placement)` returns normalized scores for weighting.
+
 use oxidris_engine::{BitBoard, Piece, PieceKind};
 use std::fmt;
 
 use crate::BoardAnalysis;
 
-// All evaluation metrics are transformed into a [0.0, 1.0] score,
-// where higher is always better.
-//
-// Normalization ranges are based on practical in-game observations
-// (approximately the 95% percentile), not theoretical maxima.
-// This preserves resolution and stabilizes GA optimization.
-
 pub const ALL_METRICS: MetricSet<'static, 9> = MetricSet([
-    &CoveredHolesMetric,
-    &RowTransitionsMetric,
-    &ColumnTransitionsMetric,
-    &SurfaceRoughnessMetric,
-    &MaxHeightMetric,
-    &DeepWellRiskMetric,
-    &SumOfHeightsMetric,
-    &LineClearRewardMetric,
-    &IWellRewardMetric,
+    &HolesPenalty,
+    &RowTransitionsPenalty,
+    &ColumnTransitionsPenalty,
+    &SurfaceRoughnessPenalty,
+    &WellDepthPenalty,
+    &TopOutRisk,
+    &TotalHeightPenalty,
+    &LineClearBonus,
+    &IWellReward,
 ]);
 
 pub(crate) const ALL_METRICS_COUNT: usize = ALL_METRICS.0.len();
@@ -157,7 +173,7 @@ where
     }
 }
 
-/// Penalizes covered holes (empty cells with blocks above).
+/// Smooth penalty for covered holes (empty cells with blocks above).
 ///
 /// This metric penalizes:
 ///
@@ -194,14 +210,14 @@ where
 /// - `NORMALIZATION_CAP` = 6.0 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (fewer holes is better).
 #[derive(Debug)]
-pub struct CoveredHolesMetric;
+pub struct HolesPenalty;
 
-impl MetricSource for CoveredHolesMetric {
+impl MetricSource for HolesPenalty {
     const NORMALIZATION_CAP: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
-        "Covered Holes"
+        "Holes Penalty"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -211,7 +227,7 @@ impl MetricSource for CoveredHolesMetric {
     }
 }
 
-/// Penalizes horizontal fragmentation by counting occupancy changes between adjacent cells within each row.
+/// Smooth penalty for horizontal fragmentation by counting occupancy changes between adjacent cells within each row.
 ///
 /// This metric penalizes:
 ///
@@ -253,14 +269,14 @@ impl MetricSource for CoveredHolesMetric {
 /// - `NORMALIZATION_CAP` = 32.0 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
-pub struct RowTransitionsMetric;
+pub struct RowTransitionsPenalty;
 
-impl MetricSource for RowTransitionsMetric {
+impl MetricSource for RowTransitionsPenalty {
     const NORMALIZATION_CAP: f32 = 32.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
-        "Row Transitions"
+        "Row Transitions Penalty"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -279,7 +295,7 @@ impl MetricSource for RowTransitionsMetric {
     }
 }
 
-/// Penalizes vertical fragmentation within columns by counting occupancy changes from top to bottom.
+/// Smooth penalty for vertical fragmentation within columns by counting occupancy changes from top to bottom.
 ///
 /// This metric penalizes:
 ///
@@ -318,14 +334,14 @@ impl MetricSource for RowTransitionsMetric {
 /// - `NORMALIZATION_CAP` = 19.0 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
-pub struct ColumnTransitionsMetric;
+pub struct ColumnTransitionsPenalty;
 
-impl MetricSource for ColumnTransitionsMetric {
+impl MetricSource for ColumnTransitionsPenalty {
     const NORMALIZATION_CAP: f32 = 19.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
-        "Column Transitions"
+        "Column Transitions Penalty"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -344,7 +360,7 @@ impl MetricSource for ColumnTransitionsMetric {
     }
 }
 
-/// Penalizes local surface curvature using second-order height differences (discrete Laplacian).
+/// Smooth penalty for local surface curvature using second-order height differences (discrete Laplacian).
 ///
 /// This metric penalizes:
 ///
@@ -385,14 +401,14 @@ impl MetricSource for ColumnTransitionsMetric {
 /// - `NORMALIZATION_CAP` = 37.0 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (flatter surface is better).
 #[derive(Debug)]
-pub struct SurfaceRoughnessMetric;
+pub struct SurfaceRoughnessPenalty;
 
-impl MetricSource for SurfaceRoughnessMetric {
+impl MetricSource for SurfaceRoughnessPenalty {
     const NORMALIZATION_CAP: f32 = 37.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
-        "Surface Roughness"
+        "Surface Roughness Penalty"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -409,7 +425,72 @@ impl MetricSource for SurfaceRoughnessMetric {
     }
 }
 
-/// Penalizes imminent top-out danger based on maximum column height.
+/// Smooth penalty for excessive single-column well depth; thresholds shallow wells.
+///
+/// This metric penalizes:
+///
+/// - Over-committed vertical wells
+/// - Single columns with extreme depth
+/// - Over-commitment that reduces recovery options
+///
+/// Only wells deeper than 1 are considered dangerous. Shallow wells (depth ≤ 1) are allowed to preserve freedom
+/// for controlled I-well construction. This metric is strictly a safety penalty and does NOT reward I-wells;
+/// combine with `IWellRewardMetric` for balanced evaluation.
+///
+/// # Raw measurement
+///
+/// - `raw = Σ (2 * max(depth - 1, 0))` across all columns.
+/// - Smooth linear penalty (factor 2) for excess well depth.
+///
+/// # Stats (raw values, 10x20, self-play sampling)
+///
+/// - Mean ≈ 6.45
+/// - P10 = 0
+/// - P25 = 0
+/// - Median = 2
+/// - P75 = 10
+/// - P90 = 20
+/// - P95 = 26
+/// - P99 = 40
+///
+/// # Interpretation (raw)
+///
+/// - 0-2: safe, no deep wells (≤Median)
+/// - 3-10: controlled wells (Median-P75)
+/// - 11-20: risky depth (P75-P90)
+/// - 21-26: dangerous (P90-P95)
+/// - 27+: near-fatal vertical structure (P95+)
+///
+/// # Normalization
+///
+/// - `NORMALIZATION_CAP` = 26 (set to P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (shallower wells is better).
+#[derive(Debug)]
+pub struct WellDepthPenalty;
+
+impl MetricSource for WellDepthPenalty {
+    const NORMALIZATION_CAP: f32 = 26.0;
+    const SIGNAL: MetricSignal = MetricSignal::Negative;
+
+    fn name() -> &'static str {
+        "Well Depth Penalty"
+    }
+
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+        let threshold = 1;
+        analysis
+            .column_well_depths
+            .iter()
+            .filter(|depth| **depth > threshold)
+            .map(|depth| {
+                let depth = u32::from(*depth - threshold);
+                2 * depth
+            })
+            .sum()
+    }
+}
+
+/// Thresholded risk for imminent top-out based on maximum column height.
 ///
 /// This metric penalizes:
 ///
@@ -427,7 +508,7 @@ impl MetricSource for SurfaceRoughnessMetric {
 ///
 /// - Heights up to `SAFE_THRESHOLD` (0.5 ≈ height 10 on 20-row board) are considered safe and map to 0.0.
 /// - Above the threshold, apply exponential escalation: `danger^2.5` where `danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)`.
-/// - This strongly discourages states close to top-out.
+/// - This metric behaves as a thresholded risk: negligible below the threshold, rapidly increasing above it.
 ///
 /// # Stats (10x20, self-play sampling)
 ///
@@ -462,14 +543,14 @@ impl MetricSource for SurfaceRoughnessMetric {
 /// - `NORMALIZATION_CAP` = 0.18 (applies to transformed value, not raw height).
 /// - `SIGNAL` = Negative (lower height is better).
 #[derive(Debug)]
-pub struct MaxHeightMetric;
+pub struct TopOutRisk;
 
-impl MetricSource for MaxHeightMetric {
+impl MetricSource for TopOutRisk {
     const NORMALIZATION_CAP: f32 = 0.18;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
-        "Max Height"
+        "Top-Out Risk"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -490,72 +571,7 @@ impl MetricSource for MaxHeightMetric {
     }
 }
 
-/// Penalizes excessively deep single-column wells that are difficult or impossible to recover from.
-///
-/// This metric penalizes:
-///
-/// - Over-committed vertical wells
-/// - Single columns with extreme depth
-/// - Structures with non-linear recovery difficulty
-///
-/// Only wells deeper than 1 are considered dangerous. Shallow wells (depth ≤ 1) are allowed to preserve freedom
-/// for controlled I-well construction. This metric is strictly a safety penalty and does NOT reward I-wells;
-/// combine with `IWellRewardMetric` for balanced evaluation.
-///
-/// # Raw measurement
-///
-/// - `raw = Σ (2 * max(depth - 1, 0))` across all columns.
-/// - Linear scaling with factor 2 penalizes over-committed vertical wells.
-///
-/// # Stats (raw values, 10x20, self-play sampling)
-///
-/// - Mean ≈ 6.45
-/// - P10 = 0
-/// - P25 = 0
-/// - Median = 2
-/// - P75 = 10
-/// - P90 = 20
-/// - P95 = 26
-/// - P99 = 40
-///
-/// # Interpretation (raw)
-///
-/// - 0-2: safe, no deep wells (≤Median)
-/// - 3-10: controlled wells (Median-P75)
-/// - 11-20: risky depth (P75-P90)
-/// - 21-26: dangerous (P90-P95)
-/// - 27+: near-fatal vertical structure (P95+)
-///
-/// # Normalization
-///
-/// - `NORMALIZATION_CAP` = 26 (set to P95; linear, uses raw directly).
-/// - `SIGNAL` = Negative (shallower wells is better).
-#[derive(Debug)]
-pub struct DeepWellRiskMetric;
-
-impl MetricSource for DeepWellRiskMetric {
-    const NORMALIZATION_CAP: f32 = 26.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
-
-    fn name() -> &'static str {
-        "Deep Well Risk"
-    }
-
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
-        let threshold = 1;
-        analysis
-            .column_well_depths
-            .iter()
-            .filter(|depth| **depth > threshold)
-            .map(|depth| {
-                let depth = u32::from(*depth - threshold);
-                2 * depth
-            })
-            .sum()
-    }
-}
-
-/// Penalizes global stacking pressure by summing all column heights.
+/// Smooth penalty for global stacking pressure by summing all column heights.
 ///
 /// This metric penalizes:
 ///
@@ -569,7 +585,7 @@ impl MetricSource for DeepWellRiskMetric {
 /// # Raw measurement
 ///
 /// - `raw = Σ (column_heights)` across all 10 columns.
-/// - Linear accumulation of individual column heights.
+/// - Linear accumulation for a smooth, continuous penalty.
 ///
 /// # Stats (raw values, 10x20, self-play sampling)
 ///
@@ -596,14 +612,14 @@ impl MetricSource for DeepWellRiskMetric {
 /// - `NORMALIZATION_CAP` = 93.0 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (lower total height is better).
 #[derive(Debug)]
-pub struct SumOfHeightsMetric;
+pub struct TotalHeightPenalty;
 
-impl MetricSource for SumOfHeightsMetric {
+impl MetricSource for TotalHeightPenalty {
     const NORMALIZATION_CAP: f32 = 93.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
-        "Sum of Heights"
+        "Total Height Penalty"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -611,7 +627,7 @@ impl MetricSource for SumOfHeightsMetric {
     }
 }
 
-/// Rewards line clears with strong emphasis on efficient 4-line clears (tetrises).
+/// Discrete bonus for line clears with strong emphasis on efficient 4-line clears (tetrises).
 ///
 /// This metric encourages:
 ///
@@ -629,7 +645,7 @@ impl MetricSource for SumOfHeightsMetric {
 ///
 /// # Transform
 ///
-/// - Discrete mapping: `[0→0.0, 1→0.0, 2→1.0, 3→2.0, 4→6.0]`
+/// - Discrete mapping: `[0→0.0, 1→0.0, 2→1.0, 3→2.0, 4→6.0]` (bonus weights)
 /// - Singles (1 line) are not rewarded to discourage inefficient clearing.
 /// - Tetrises receive 6× the reward of doubles, reflecting strategic importance.
 ///
@@ -650,14 +666,14 @@ impl MetricSource for SumOfHeightsMetric {
 /// - `NORMALIZATION_CAP` = 6.0 (maximum transformed value for tetris).
 /// - `SIGNAL` = Positive (more lines cleared is better).
 #[derive(Debug)]
-pub struct LineClearRewardMetric;
+pub struct LineClearBonus;
 
-impl MetricSource for LineClearRewardMetric {
+impl MetricSource for LineClearBonus {
     const NORMALIZATION_CAP: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
     fn name() -> &'static str {
-        "Lines Clear Reward"
+        "Lines Clear Bonus"
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
@@ -670,7 +686,7 @@ impl MetricSource for LineClearRewardMetric {
     }
 }
 
-/// Encourages maintaining an edge I-well for reliable tetrises without over-committing.
+/// Smooth reward for maintaining an edge I-well for reliable tetrises without over-committing.
 ///
 /// This metric encourages:
 ///
@@ -689,7 +705,7 @@ impl MetricSource for LineClearRewardMetric {
 /// # Transform
 ///
 /// - Gaussian centered at depth 4 with `σ = 2`: $f(d) = e^{-(d-4)^2/(2\sigma^2)}$.
-/// - Rewards tetris-ready wells most; decays for wells that are too shallow or too deep.
+/// - Smooth reward peaked at tetris-ready depth; decays for wells that are too shallow or too deep.
 ///
 /// # Normalization
 ///
@@ -709,9 +725,9 @@ impl MetricSource for LineClearRewardMetric {
 /// - Synergizes with `LineClearRewardMetric` to favor consistent tetrises.
 /// - The consumption guard discourages hoarding when an `I` piece is available.
 #[derive(Debug)]
-pub struct IWellRewardMetric;
+pub struct IWellReward;
 
-impl MetricSource for IWellRewardMetric {
+impl MetricSource for IWellReward {
     const NORMALIZATION_CAP: f32 = 1.0;
     const SIGNAL: MetricSignal = MetricSignal::Positive;
 
