@@ -8,6 +8,17 @@ pub struct WeightSet<const N: usize>([f32; N]);
 
 impl WeightSet<ALL_METRICS_COUNT> {
     pub const AGGRO: Self = WeightSet([
+        0.511_994_54,    // Holes Penalty (x4.608)
+        0.167_294_83,    // Row Transitions Penalty (x1.506)
+        0.008_827_965,   // Column Transitions Penalty (x0.079)
+        0.033_771_757,   // Surface Roughness Penalty (x0.304)
+        0.012_187_055,   // Well Depth Penalty (x0.110)
+        0.096_042_64,    // Top-Out Risk (x0.864)
+        0.002_790_085_3, // Total Height Penalty (x0.025)
+        0.084_101_796,   // Lines Clear Bonus (x0.757)
+        0.082_989_35,    // I-Well Reward (x0.747)
+    ]);
+    pub const DEFENSIVE: Self = WeightSet([
         0.474_424_78,    // Holes Penalty (x4.270)
         0.171_952,       // Row Transitions Penalty (x1.548)
         0.0,             // Column Transitions Penalty (x0.000)
@@ -17,17 +28,6 @@ impl WeightSet<ALL_METRICS_COUNT> {
         0.004_426_616_7, // Total Height Penalty (x0.040)
         0.039_479_937,   // Lines Clear Bonus (x0.355)
         0.081_666_134,   // I-Well Reward (x0.735)
-    ]);
-    pub const DEFENSIVE: Self = WeightSet([
-        0.272_437_7,   // Holes Penalty (x2.452)
-        0.244_961_93,  // Row Transitions Penalty (x2.205)
-        0.011_675_131, // Column Transitions Penalty (x0.105)
-        0.065_816_6,   // Surface Roughness Penalty (x0.592)
-        0.101_745_814, // Well Depth Penalty (x0.916)
-        0.147_184_9,   // Top-Out Risk (x1.325)
-        0.096_244_22,  // Total Height Penalty (x0.866)
-        0.028_712_424, // Lines Clear Bonus (x0.258)
-        0.031_221_299, // I-Well Reward (x0.281)
     ]);
 }
 

@@ -457,18 +457,18 @@ impl MetricSource for SurfaceRoughnessPenalty {
 ///
 /// # Raw measurement
 ///
-/// - `raw = Σ (2 * max(depth - 1, 0))` across all columns.
-/// - Smooth linear penalty (factor 2) for excess well depth.
+/// - `raw = Σ (depth - 1)` across all columns where `depth > 1`.
+/// - Linear penalty for excess well depth beyond the threshold.
 ///
 /// # Stats (raw values, 10x20, self-play sampling)
 ///
 /// - Mean ≈ 6.45
 /// - P01 = P05 = P10 = P25 = 0
-/// - Median = 2
-/// - P75 = 10
-/// - P90 = 20
-/// - P95 = 26
-/// - P99 = 40
+/// - Median = 1
+/// - P75 = 5
+/// - P90 = 10
+/// - P95 = 13
+/// - P99 = 20
 ///
 /// # Interpretation (raw)
 ///
@@ -500,10 +500,7 @@ impl MetricSource for WellDepthPenalty {
             .column_well_depths
             .iter()
             .filter(|depth| **depth > threshold)
-            .map(|depth| {
-                let depth = u32::from(*depth - threshold);
-                2 * depth
-            })
+            .map(|depth| u32::from(*depth - threshold))
             .sum()
     }
 }
