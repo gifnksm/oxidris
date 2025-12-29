@@ -498,54 +498,43 @@ impl MetricSource for MaxHeightMetric {
 /// - Single columns with extreme depth
 /// - Structures with non-linear recovery difficulty
 ///
-/// Only wells deeper than 2 are considered dangerous. Shallow wells (depth ≤ 2) are allowed to preserve freedom
+/// Only wells deeper than 1 are considered dangerous. Shallow wells (depth ≤ 1) are allowed to preserve freedom
 /// for controlled I-well construction. This metric is strictly a safety penalty and does NOT reward I-wells;
 /// combine with `IWellRewardMetric` for balanced evaluation.
 ///
 /// # Raw measurement
 ///
-/// - `raw = Σ (max(depth - 2, 0)^2)` across all columns.
-/// - Squaring aggressively penalizes over-committed vertical wells, reflecting non-linear recovery difficulty.
+/// - `raw = Σ (2 * max(depth - 1, 0))` across all columns.
+/// - Linear scaling with factor 2 penalizes over-committed vertical wells.
 ///
-/// # Transform
+/// # Stats (raw values, 10x20, self-play sampling)
 ///
-/// - `ln(1 + raw)`: logarithmic transform models exponential growth in recovery difficulty.
-///
-/// # Stats (10x20, self-play sampling)
-///
-/// Raw values:
-/// - Mean ≈ 10.49
+/// - Mean ≈ 6.45
 /// - P10 = 0
 /// - P25 = 0
-/// - Median = 0
-/// - P75 = 5
-/// - P90 = 34
-/// - P95 = 59
-/// - P99 = 136
-///
-/// Transformed values:
-/// - P75 ≈ 1.79
-/// - P90 ≈ 3.56
-/// - P95 ≈ 4.09
-/// - P99 ≈ 4.92
+/// - Median = 2
+/// - P75 = 10
+/// - P90 = 20
+/// - P95 = 26
+/// - P99 = 40
 ///
 /// # Interpretation (raw)
 ///
-/// - 0: safe, no deep wells (≤Median)
-/// - 1-5: controlled wells (Median-P75)
-/// - 6-34: risky depth (P75-P90)
-/// - 35-59: dangerous (P90-P95)
-/// - 60+: near-fatal vertical structure (P95+)
+/// - 0-2: safe, no deep wells (≤Median)
+/// - 3-10: controlled wells (Median-P75)
+/// - 11-20: risky depth (P75-P90)
+/// - 21-26: dangerous (P90-P95)
+/// - 27+: near-fatal vertical structure (P95+)
 ///
 /// # Normalization
 ///
-/// - `NORMALIZATION_CAP` = 4.09 (set to P95 transformed value: ln(1+59) ≈ 4.09).
+/// - `NORMALIZATION_CAP` = 26 (set to P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (shallower wells is better).
 #[derive(Debug)]
 pub struct DeepWellRiskMetric;
 
 impl MetricSource for DeepWellRiskMetric {
-    const NORMALIZATION_CAP: f32 = 4.09;
+    const NORMALIZATION_CAP: f32 = 26.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -553,20 +542,16 @@ impl MetricSource for DeepWellRiskMetric {
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+        let threshold = 1;
         analysis
             .column_well_depths
             .iter()
-            .filter(|depth| **depth > 2)
+            .filter(|depth| **depth > threshold)
             .map(|depth| {
-                let depth = u32::from(*depth - 2);
-                depth * depth
+                let depth = u32::from(*depth - threshold);
+                2 * depth
             })
             .sum()
-    }
-
-    #[expect(clippy::cast_precision_loss)]
-    fn transform(raw: u32) -> f32 {
-        (raw as f32).ln_1p()
     }
 }
 
