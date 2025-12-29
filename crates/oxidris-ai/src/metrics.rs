@@ -182,8 +182,8 @@ pub struct CoveredHolesMetric;
 // The normalization cap (~12) corresponds to ~6 practical holes.
 impl MetricSource for CoveredHolesMetric {
     /// Normalization cap chosen from empirical distribution:
-    /// P95 ≈ 6 holes → transformed ≈ 6^1.7 ≈ 21.03
-    const NORMALIZATION_CAP: f32 = 21.03;
+    /// P95 ≈ 6 holes → transformed ≈ 6.0
+    const NORMALIZATION_CAP: f32 = 6.0;
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -197,11 +197,6 @@ impl MetricSource for CoveredHolesMetric {
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
             .map(|(h, occ)| u32::from(h - occ))
             .sum()
-    }
-
-    #[expect(clippy::cast_precision_loss)]
-    fn transform(raw: u32) -> f32 {
-        (raw as f32).powf(1.7)
     }
 }
 
@@ -548,7 +543,7 @@ impl MetricSource for LineClearRewardMetric {
     }
 
     fn transform(raw: u32) -> f32 {
-        const WEIGHT: [f32; 5] = [0.0, 0.5, 1.0, 2.0, 6.0];
+        const WEIGHT: [f32; 5] = [0.0, 0.0, 1.0, 2.0, 6.0];
         WEIGHT[usize::try_from(raw).unwrap()]
     }
 }
@@ -564,39 +559,22 @@ impl MetricSource for IWellRewardMetric {
         "I-Well Reward"
     }
 
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
-        let mut best_reward = 0.0;
-        let mut best_depth = 0.0;
-        for (i, depth) in analysis.column_well_depths.into_iter().enumerate() {
-            if depth < 1 {
-                continue;
-            }
-            let depth = f32::from(depth);
-            let dist_to_edge = usize::min(i, BitBoard::PLAYABLE_WIDTH - 1 - i);
-            #[expect(clippy::cast_precision_loss)]
-            let dist = (dist_to_edge as f32) / (BitBoard::PLAYABLE_WIDTH as f32 / 2.0);
+        let left_well_depth = analysis.column_well_depths[0];
+        let right_well_depth = analysis.column_well_depths[BitBoard::PLAYABLE_WIDTH - 1];
+        let max_depth = u8::max(left_well_depth, right_well_depth);
 
-            let peak = 4.5;
-            let sigma = 2.0;
-            let depth_score = (-(depth - peak).powi(2) / (2.0 * sigma * sigma)).exp();
-
-            let edge_bonus = (-dist).exp();
-
-            let reward = depth_score * edge_bonus;
-            if reward > best_reward {
-                best_depth = depth;
-                best_reward = reward;
-            }
-        }
-        if best_depth >= 4.0 && analysis.placement.kind() == PieceKind::I {
+        if max_depth >= 4 && analysis.placement.kind() == PieceKind::I {
             return 0;
         }
-        (best_reward * 1000.0) as u32
+
+        u32::from(max_depth)
     }
 
     #[expect(clippy::cast_precision_loss)]
     fn transform(raw: u32) -> f32 {
-        (raw as f32) / 1000.0
+        let peak = 4.0;
+        let sigma = 2.0;
+        (-(raw as f32 - peak).powi(2) / (2.0 * sigma * sigma)).exp()
     }
 }
