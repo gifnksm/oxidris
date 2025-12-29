@@ -8,26 +8,26 @@ pub struct WeightSet<const N: usize>([f32; N]);
 
 impl WeightSet<ALL_METRICS_COUNT> {
     pub const AGGRO: Self = WeightSet([
-        0.450_067_88,
-        0.195_652_11,
-        0.012_712_488,
-        0.017_524_486,
-        0.117_334_455,
-        0.003_554_092_3,
-        0.009_438_448,
-        0.074_235_66,
-        0.119_480_394,
+        0.414_283_1,   // Covered Holes (x3.729)
+        0.181_405_57,  // Row Transitions (x1.633)
+        0.009_915_61,  // Column Transitions (x0.089)
+        0.045_901_358, // Surface Roughness (x0.413)
+        0.126_208_47,  // Max Height (x1.136)
+        0.004_029_349, // Deep Well Risk (x0.036)
+        0.009_261_049, // Sum of Heights (x0.083)
+        0.093_007_59,  // Lines Clear Reward (x0.837)
+        0.115_987_94,  // I-Well Reward (x1.044)
     ]);
     pub const DEFENSIVE: Self = WeightSet([
-        0.259_969_65,
-        0.214_204_95,
-        0.003_877_053_7,
-        0.006_266_368,
-        0.124_993_265,
-        0.190_868_87,
-        0.173_768_48,
-        0.016_066_618,
-        0.009_984_713,
+        0.240_808_22,  // Covered Holes (x2.167)
+        0.203_893_11,  // Row Transitions (x1.835)
+        0.028_583_506, // Column Transitions (x0.257)
+        0.037_466_74,  // Surface Roughness (x0.337)
+        0.031_979_535, // Max Height (x0.288)
+        0.215_694_52,  // Deep Well Risk (x1.941)
+        0.059_432_928, // Sum of Heights (x0.535)
+        0.169_650_54,  // Lines Clear Reward (x1.527)
+        0.012_490_933, // I-Well Reward (x0.112)
     ]);
 }
 
@@ -43,7 +43,7 @@ impl<const N: usize> WeightSet<N> {
         Self::from_array(array::from_fn(f))
     }
 
-    pub(crate) const fn to_array(&self) -> [f32; N] {
+    pub(crate) const fn as_array(&self) -> [f32; N] {
         self.0
     }
 
@@ -58,8 +58,8 @@ impl<const N: usize> WeightSet<N> {
     where
         R: Rng + ?Sized,
     {
-        let p1 = p1.to_array();
-        let p2 = p2.to_array();
+        let p1 = p1.as_array();
+        let p2 = p2.as_array();
         Self::from_fn(|i| {
             let x1 = p1[i];
             let x2 = p2[i];
@@ -76,7 +76,7 @@ impl<const N: usize> WeightSet<N> {
     where
         R: Rng + ?Sized,
     {
-        let mut weights = self.to_array();
+        let mut weights = self.as_array();
         let normal = Normal::new(0.0, sigma).unwrap();
         for w in &mut weights {
             if rng.random_bool(rate) {
@@ -87,7 +87,7 @@ impl<const N: usize> WeightSet<N> {
     }
 
     pub(crate) fn normalize_l1(&mut self) {
-        let mut weights = self.to_array();
+        let mut weights = self.as_array();
         let sum: f32 = weights.into_iter().sum();
         if sum > 0.0 {
             for w in &mut weights {

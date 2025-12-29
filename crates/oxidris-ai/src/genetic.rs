@@ -10,8 +10,8 @@ use rand::{
 use oxidris_engine::{GameField, GameStats};
 
 use crate::{
-    ALL_METRICS_COUNT, AiType, MetricsBasedPlacementEvaluator, turn_evaluator::TurnEvaluator,
-    weights::WeightSet,
+    ALL_METRICS, ALL_METRICS_COUNT, AiType, MetricsBasedPlacementEvaluator,
+    turn_evaluator::TurnEvaluator, weights::WeightSet,
 };
 
 const GAMES_PER_INDIVIDUALS: usize = 3;
@@ -151,7 +151,7 @@ pub fn learning(ai: AiType) {
                     ind.evaluate(fields, fitness_evaluator);
                     eprintln!(
                         "  {i:2}: {:.3?} => {:.3}",
-                        ind.weights.to_array(),
+                        ind.weights.as_array(),
                         ind.fitness
                     );
                 });
@@ -160,13 +160,13 @@ pub fn learning(ai: AiType) {
 
         let population_count = POPULATION_COUNT as f32;
 
-        let weights = |i| population.iter().map(move |ind| ind.weights.to_array()[i]);
+        let weights = |i| population.iter().map(move |ind| ind.weights.as_array()[i]);
         let weights_min = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| min(weights(i)));
         let weights_max = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| max(weights(i)));
         let weights_mean = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| mean(weights(i)));
         let weights_norm_stddev =
             WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
-        let weights_norm_stddev_mean = mean(weights_norm_stddev.to_array());
+        let weights_norm_stddev_mean = mean(weights_norm_stddev.as_array());
 
         let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
         let fitness_max = population
@@ -181,10 +181,10 @@ pub fn learning(ai: AiType) {
             .unwrap();
 
         eprintln!("  Weights Stats:");
-        eprintln!("    Min:        {:.3?}", weights_min.to_array());
-        eprintln!("    Max:        {:.3?}", weights_max.to_array());
-        eprintln!("    Mean:       {:.3?}", weights_mean.to_array());
-        eprintln!("    NormStddev: {:.3?}", weights_norm_stddev.to_array());
+        eprintln!("    Min:        {:.3?}", weights_min.as_array());
+        eprintln!("    Max:        {:.3?}", weights_max.as_array());
+        eprintln!("    Mean:       {:.3?}", weights_mean.as_array());
+        eprintln!("    NormStddev: {:.3?}", weights_norm_stddev.as_array());
         eprintln!("    => Mean:    {weights_norm_stddev_mean:.3}");
         eprintln!("  Fitness Stats:");
         eprintln!("    Min:  {fitness_min:.3}");
@@ -199,11 +199,20 @@ pub fn learning(ai: AiType) {
     eprintln!("Best Individuals:");
     population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
     for (i, ind) in population.iter().take(5).enumerate() {
-        eprintln!("  {i:2}: {:?} => {}", ind.weights.to_array(), ind.fitness);
+        eprintln!("  {i:2}: {:?} => {}", ind.weights.as_array(), ind.fitness);
     }
 
     eprintln!("Best individual weights saved to file:");
-    eprintln!("{:#?}", population[0].weights);
+    eprintln!("  [");
+    for (metric, weight) in iter::zip(ALL_METRICS.as_array(), population[0].weights.as_array()) {
+        let scale = weight / (1.0 / ALL_METRICS_COUNT as f32);
+        eprintln!(
+            "    {}, // {} (x{scale:.3})",
+            format_weight(weight),
+            metric.name()
+        );
+    }
+    eprintln!("  ]");
 
     eprintln!("{ai:?} AI learning completed.");
 }
@@ -303,4 +312,32 @@ where
     let a = population.choose(rng).unwrap();
     let b = population.choose(rng).unwrap();
     if a.fitness >= b.fitness { a } else { b }
+}
+
+fn format_weight(weight: f32) -> String {
+    let s = format!("{weight:?}");
+    let Some((int_part, frac_part)) = s
+        .split_once('.')
+        .filter(|(_int_part, frac_part)| frac_part.len() > 3)
+    else {
+        return s;
+    };
+    let (parts, tail) = frac_part.as_bytes().as_chunks::<3>();
+    let mut result = String::from(int_part);
+    result.push('.');
+    let mut first = true;
+    for part in parts {
+        if !first {
+            result.push('_');
+        }
+        result.push_str(str::from_utf8(part).unwrap());
+        first = false;
+    }
+    if !tail.is_empty() {
+        if !first {
+            result.push('_');
+        }
+        result.push_str(str::from_utf8(tail).unwrap());
+    }
+    result
 }
