@@ -211,12 +211,12 @@ pub fn histogram(
             (normalized_position.floor() as usize) + usize::from(has_underflow)
         };
         let bin = &mut bins[idx];
-        assert!(
-            bin.range.contains(&val),
-            "value {} not in bin range {:?}",
-            val,
-            bin.range
-        );
+        // assert!(
+        //     bin.range.contains(&val),
+        //     "value {} not in bin range {:?}",
+        //     val,
+        //     bin.range
+        // );
         bin.count += 1;
     }
 

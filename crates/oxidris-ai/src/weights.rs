@@ -8,26 +8,28 @@ pub struct WeightSet<const N: usize>([f32; N]);
 
 impl WeightSet<ALL_METRICS_COUNT> {
     pub const AGGRO: Self = WeightSet([
-        0.511_994_54,    // Holes Penalty (x4.608)
-        0.167_294_83,    // Row Transitions Penalty (x1.506)
-        0.008_827_965,   // Column Transitions Penalty (x0.079)
-        0.033_771_757,   // Surface Roughness Penalty (x0.304)
-        0.012_187_055,   // Well Depth Penalty (x0.110)
-        0.096_042_64,    // Top-Out Risk (x0.864)
-        0.002_790_085_3, // Total Height Penalty (x0.025)
-        0.084_101_796,   // Lines Clear Bonus (x0.757)
-        0.082_989_35,    // I-Well Reward (x0.747)
+        0.450_044_54,    // Holes Penalty (x4.500)
+        0.133_644,       // Row Transitions Penalty (x1.336)
+        0.002_653_806_5, // Column Transitions Penalty (x0.027)
+        0.028_636_364,   // Surface Roughness Penalty (x0.286)
+        0.019_406_16,    // Well Depth Penalty (x0.194)
+        0.127_770_99,    // Deep Well Risk (x1.278)
+        0.102_169_1,     // Top-Out Risk (x1.022)
+        0.003_343_727_4, // Total Height Penalty (x0.033)
+        0.062_952_705,   // Lines Clear Bonus (x0.630)
+        0.069_378_53,    // I-Well Reward (x0.694)
     ]);
     pub const DEFENSIVE: Self = WeightSet([
-        0.474_424_78,    // Holes Penalty (x4.270)
-        0.171_952,       // Row Transitions Penalty (x1.548)
-        0.0,             // Column Transitions Penalty (x0.000)
-        0.028_104_998,   // Surface Roughness Penalty (x0.253)
-        0.008_042_769,   // Well Depth Penalty (x0.072)
-        0.191_902_79,    // Top-Out Risk (x1.727)
-        0.004_426_616_7, // Total Height Penalty (x0.040)
-        0.039_479_937,   // Lines Clear Bonus (x0.355)
-        0.081_666_134,   // I-Well Reward (x0.735)
+        0.109_653,       // Holes Penalty (x1.097)
+        0.153_128_22,    // Row Transitions Penalty (x1.531)
+        0.004_127_479,   // Column Transitions Penalty (x0.041)
+        0.072_307_974,   // Surface Roughness Penalty (x0.723)
+        0.285_440_8,     // Well Depth Penalty (x2.854)
+        0.054_085_21,    // Deep Well Risk (x0.541)
+        0.076_833_904,   // Top-Out Risk (x0.768)
+        0.155_718_33,    // Total Height Penalty (x1.557)
+        0.084_585_75,    // Lines Clear Bonus (x0.846)
+        0.004_119_361_8, // I-Well Reward (x0.041)
     ]);
 }
 

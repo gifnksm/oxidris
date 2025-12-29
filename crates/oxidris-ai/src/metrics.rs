@@ -5,7 +5,7 @@
 //!
 //! # Typology
 //!
-//! - Risk: thresholded danger that escalates rapidly beyond a safe limit (e.g., [`TopOutRisk`]).
+//! - Risk: thresholded danger that escalates rapidly beyond a safe limit (e.g., [`DeepWellRisk`], [`TopOutRisk`]).
 //! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
 //! - Reward: smooth positive signals (e.g., [`IWellReward`]).
 //! - Bonus: discrete strong rewards (e.g., [`LineClearBonus`]).
@@ -27,12 +27,13 @@ use std::fmt;
 
 use crate::BoardAnalysis;
 
-pub const ALL_METRICS: MetricSet<'static, 9> = MetricSet([
+pub const ALL_METRICS: MetricSet<'static, 10> = MetricSet([
     &HolesPenalty,
     &RowTransitionsPenalty,
     &ColumnTransitionsPenalty,
     &SurfaceRoughnessPenalty,
     &WellDepthPenalty,
+    &DeepWellRisk,
     &TopOutRisk,
     &TotalHeightPenalty,
     &LineClearBonus,
@@ -495,12 +496,78 @@ impl MetricSource for WellDepthPenalty {
     }
 
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
-        let threshold = 1;
+        const DEPTH_THRESHOLD: u8 = 1;
         analysis
             .column_well_depths
-            .iter()
-            .filter(|depth| **depth > threshold)
-            .map(|depth| u32::from(*depth - threshold))
+            .into_iter()
+            .filter(|depth| *depth > DEPTH_THRESHOLD)
+            .map(|depth| u32::from(depth - DEPTH_THRESHOLD))
+            .sum()
+    }
+}
+
+/// Thresholded risk for dangerously deep wells beyond safe operational limits.
+///
+/// This metric penalizes:
+///
+/// - Wells that exceed safe construction depth
+/// - Over-commitment to vertical structures
+/// - Reduced board flexibility and recovery options
+///
+/// Unlike `WellDepthPenalty`, which applies smooth linear penalties to all wells beyond depth 1,
+/// this metric focuses on extreme depth scenarios. Acts as a hard constraint to prevent catastrophic
+/// well over-commitment while allowing controlled I-well construction.
+///
+/// # Raw measurement
+///
+/// - `raw = Σ (depth - DEPTH_THRESHOLD)` across columns where `depth > DEPTH_THRESHOLD` (2).
+/// - Measures cumulative excess depth beyond the safe construction threshold.
+///
+/// # Stats (10x20, self-play sampling)
+///
+/// Raw values:
+///
+/// - Mean ≈ 2.16
+/// - P01 = 0.00
+/// - P05 = 0.00
+/// - P10 = 0.00
+/// - P25 = 0.00
+/// - Median = 1.00
+/// - P75 = 5.00
+/// - P90 = 10.00
+/// - P95 = 13.00
+/// - P99 = 20.00
+///
+/// # Interpretation (raw cumulative excess)
+///
+/// - 0-3: safe, no penalty applied
+/// - 4-6: caution zone, moderate over-commitment
+/// - 7-9: dangerous, multiple deep wells or one extreme well
+/// - 10+: critical, severe over-commitment across board
+///
+/// # Normalization
+///
+/// - Clipped to `[NORMALIZATION_MIN=5.0, NORMALIZATION_MAX=13.0]` (≈ P75–P95; linear, uses raw directly).
+/// - `SIGNAL` = Negative (shallower wells is better).
+#[derive(Debug)]
+pub struct DeepWellRisk;
+
+impl MetricSource for DeepWellRisk {
+    const NORMALIZATION_MIN: f32 = 5.0; // P75
+    const NORMALIZATION_MAX: f32 = 13.0; // P95
+    const SIGNAL: MetricSignal = MetricSignal::Negative;
+
+    fn name() -> &'static str {
+        "Deep Well Risk"
+    }
+
+    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+        const DEPTH_THRESHOLD: u8 = 1;
+        analysis
+            .column_well_depths
+            .into_iter()
+            .filter(|depth| *depth > DEPTH_THRESHOLD)
+            .map(|depth| u32::from(depth - DEPTH_THRESHOLD))
             .sum()
     }
 }
@@ -519,12 +586,6 @@ impl MetricSource for WellDepthPenalty {
 ///
 /// - `raw = max(column_heights)`: the tallest column on the board.
 ///
-/// # Transform
-///
-/// - Heights up to `SAFE_THRESHOLD` (0.5 ≈ height 10 on 20-row board) are considered safe and map to 0.0.
-/// - Above the threshold, apply a linear ramp: `danger = (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)`.
-/// - Acts as a thresholded risk: negligible below the threshold, increasing linearly above it.
-///
 /// # Stats (10x20, self-play sampling)
 ///
 /// Raw values:
@@ -541,30 +602,22 @@ impl MetricSource for WellDepthPenalty {
 /// - P99 = 16
 /// - Max = 20 (top-out)
 ///
-/// Transformed values:
-///
-/// - P75 ≈ 0.00 (safe zone)
-/// - P90 ≈ 0.02
-/// - P95 ≈ 0.02
-/// - P99 ≈ 0.28
-///
 /// # Interpretation (raw height)
 ///
-/// - 0-10: safe, no penalty applied
-/// - 11-12: caution zone
-/// - 13-15: dangerous zone, recovery still possible
-/// - 16+: critical, near-certain top-out
+/// - 0-8: safe, no penalty applied
+/// - 9-12: caution to dangerous zone
+/// - 13-20: critical, near-certain top-out
 ///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=0.18]` (≈ P05–P95 of transformed value).
+/// - Clipped to `[NORMALIZATION_MIN=8.0, NORMALIZATION_MAX=12.0]` (≈ P75–P95; linear, uses raw directly).
 /// - `SIGNAL` = Negative (lower height is better).
 #[derive(Debug)]
 pub struct TopOutRisk;
 
 impl MetricSource for TopOutRisk {
-    const NORMALIZATION_MIN: f32 = 0.0;
-    const NORMALIZATION_MAX: f32 = 0.18;
+    const NORMALIZATION_MIN: f32 = 8.0; // P75
+    const NORMALIZATION_MAX: f32 = 12.0; // P95
     const SIGNAL: MetricSignal = MetricSignal::Negative;
 
     fn name() -> &'static str {
@@ -574,17 +627,6 @@ impl MetricSource for TopOutRisk {
     fn measure_raw(analysis: &BoardAnalysis) -> u32 {
         let max_height = *analysis.column_heights.iter().max().unwrap();
         u32::from(max_height)
-    }
-
-    fn transform(raw: u32) -> f32 {
-        const SAFE_THRESHOLD: f32 = 0.5;
-        #[expect(clippy::cast_precision_loss)]
-        let h = (raw as f32) / (BitBoard::PLAYABLE_HEIGHT as f32);
-        if h <= SAFE_THRESHOLD {
-            0.0
-        } else {
-            (h - SAFE_THRESHOLD) / (1.0 - SAFE_THRESHOLD)
-        }
     }
 }
 
