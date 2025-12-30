@@ -1,11 +1,16 @@
-use std::path::PathBuf;
-
 use clap::{Parser, Subcommand};
 use oxidris_ai::AiType;
+
+use self::{
+    generate_boards::GenerateBoardsArg,
+    play::{AutoPlayArg, ManualPlayArg},
+    train_ai::TrainAiArg,
+};
 
 mod data;
 mod generate_boards;
 mod play;
+mod train_ai;
 mod tune_metrics;
 mod ui;
 
@@ -20,31 +25,29 @@ struct Cli {
 #[derive(Debug, Clone, Subcommand)]
 enum Mode {
     /// Run normal play
-    Normal,
+    #[command(name = "play")]
+    ManualPlay(#[clap(flatten)] ManualPlayArg),
     /// Run auto play
-    Auto {
-        #[arg(long, default_value = "aggro")]
-        ai: AiType,
-    },
-    /// Learning with genetic algorithm
-    Learning {
-        #[arg(long, default_value = "aggro")]
-        ai: AiType,
-    },
+    AutoPlay(#[clap(flatten)] AutoPlayArg),
+    /// Train AI using genetic algorithm
+    TrainAi(#[clap(flatten)] TrainAiArg),
     /// Generate boards for training data
-    GenerateBoards,
+    GenerateBoards(#[clap(flatten)] GenerateBoardsArg),
     /// Tune metrics weights
-    TuneMetrics { boards_file: PathBuf },
+    TuneMetrics(#[clap(flatten)] tune_metrics::GenerateBoardsArg),
 }
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    match cli.mode.unwrap_or(Mode::Normal) {
-        Mode::Normal => play::normal()?,
-        Mode::Auto { ai } => play::auto(ai)?,
-        Mode::Learning { ai } => oxidris_ai::genetic::learning(ai),
-        Mode::GenerateBoards => generate_boards::run(),
-        Mode::TuneMetrics { boards_file } => tune_metrics::run(&boards_file)?,
+    match cli
+        .mode
+        .unwrap_or(Mode::ManualPlay(ManualPlayArg::default()))
+    {
+        Mode::ManualPlay(arg) => play::manual(&arg)?,
+        Mode::AutoPlay(arg) => play::auto(&arg)?,
+        Mode::TrainAi(arg) => train_ai::run(&arg),
+        Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
+        Mode::TuneMetrics(arg) => tune_metrics::run(&arg)?,
     }
     Ok(())
 }

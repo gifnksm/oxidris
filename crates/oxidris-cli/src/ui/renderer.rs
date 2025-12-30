@@ -324,7 +324,7 @@ impl Renderer {
         let mut board_buf = board.clone();
 
         // Show ghost piece only in normal mode
-        if self.mode == PlayMode::Normal {
+        if self.mode == PlayMode::Manual {
             let dropped = game.simulate_drop_position();
             board_buf.fill_piece_as(dropped, Block::Ghost);
         }

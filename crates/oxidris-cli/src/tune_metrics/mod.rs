@@ -1,11 +1,19 @@
-use std::path::Path;
+use std::path::PathBuf;
 
 mod analysis;
 mod data;
 mod index;
 mod ui;
 
-pub fn run(boards_file: &Path) -> anyhow::Result<()> {
+#[derive(Default, Debug, Clone, clap::Args)]
+pub(crate) struct GenerateBoardsArg {
+    /// Output file path
+    boards_file: PathBuf,
+}
+
+pub fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
+    let GenerateBoardsArg { boards_file } = arg;
+
     eprintln!("Loading boards from {}...", boards_file.display());
     let boards = data::load_board(boards_file)?;
     eprintln!("Loaded {} boards", boards.len());

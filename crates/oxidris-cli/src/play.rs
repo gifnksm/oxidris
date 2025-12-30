@@ -16,14 +16,14 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PlayMode {
-    Normal,
+    Manual,
     Auto,
 }
 
 impl PlayMode {
     pub(crate) fn controls(self) -> &'static [(&'static str, &'static str)] {
         match self {
-            PlayMode::Normal => &[
+            PlayMode::Manual => &[
                 ("Left", "Move left"),
                 ("Right", "Move right"),
                 ("Down", "Soft drop"),
@@ -40,7 +40,7 @@ impl PlayMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NormalModeAction {
+enum ManualPlayAction {
     MoveLeft,
     MoveRight,
     RotateLeft,
@@ -52,18 +52,18 @@ enum NormalModeAction {
     Quit,
 }
 
-impl NormalModeAction {
+impl ManualPlayAction {
     fn from_key(key: KeyCode) -> Option<Self> {
         match key {
-            KeyCode::Left => Some(NormalModeAction::MoveLeft),
-            KeyCode::Right => Some(NormalModeAction::MoveRight),
-            KeyCode::Down => Some(NormalModeAction::SoftDrop),
-            KeyCode::Up => Some(NormalModeAction::HardDrop),
-            KeyCode::Char('z') => Some(NormalModeAction::RotateLeft),
-            KeyCode::Char('x') => Some(NormalModeAction::RotateRight),
-            KeyCode::Char(' ') => Some(NormalModeAction::Hold),
-            KeyCode::Char('p') => Some(NormalModeAction::Pause),
-            KeyCode::Char('q') => Some(NormalModeAction::Quit),
+            KeyCode::Left => Some(ManualPlayAction::MoveLeft),
+            KeyCode::Right => Some(ManualPlayAction::MoveRight),
+            KeyCode::Down => Some(ManualPlayAction::SoftDrop),
+            KeyCode::Up => Some(ManualPlayAction::HardDrop),
+            KeyCode::Char('z') => Some(ManualPlayAction::RotateLeft),
+            KeyCode::Char('x') => Some(ManualPlayAction::RotateRight),
+            KeyCode::Char(' ') => Some(ManualPlayAction::Hold),
+            KeyCode::Char('p') => Some(ManualPlayAction::Pause),
+            KeyCode::Char('q') => Some(ManualPlayAction::Quit),
             _ => None,
         }
     }
@@ -103,25 +103,29 @@ where
     Ok(())
 }
 
-pub(crate) fn normal() -> io::Result<()> {
-    run_game_loop(PlayMode::Normal, |input, game| {
+#[derive(Default, Debug, Clone, clap::Args)]
+pub(crate) struct ManualPlayArg {}
+
+pub(crate) fn manual(arg: &ManualPlayArg) -> io::Result<()> {
+    let ManualPlayArg {} = arg;
+    run_game_loop(PlayMode::Manual, |input, game| {
         while let Some(key) = input.try_read()? {
-            if let Some(action) = NormalModeAction::from_key(key) {
+            if let Some(action) = ManualPlayAction::from_key(key) {
                 match game.session_state() {
                     SessionState::Playing => match action {
-                        NormalModeAction::MoveLeft => _ = game.try_move_left(),
-                        NormalModeAction::MoveRight => _ = game.try_move_right(),
-                        NormalModeAction::RotateLeft => _ = game.try_rotate_left(),
-                        NormalModeAction::RotateRight => _ = game.try_rotate_right(),
-                        NormalModeAction::SoftDrop => _ = game.try_soft_drop(),
-                        NormalModeAction::HardDrop => game.hard_drop_and_complete(),
-                        NormalModeAction::Hold => _ = game.try_hold(),
-                        NormalModeAction::Pause => game.toggle_pause(),
-                        NormalModeAction::Quit => return Ok(ControlFlow::Break(())),
+                        ManualPlayAction::MoveLeft => _ = game.try_move_left(),
+                        ManualPlayAction::MoveRight => _ = game.try_move_right(),
+                        ManualPlayAction::RotateLeft => _ = game.try_rotate_left(),
+                        ManualPlayAction::RotateRight => _ = game.try_rotate_right(),
+                        ManualPlayAction::SoftDrop => _ = game.try_soft_drop(),
+                        ManualPlayAction::HardDrop => game.hard_drop_and_complete(),
+                        ManualPlayAction::Hold => _ = game.try_hold(),
+                        ManualPlayAction::Pause => game.toggle_pause(),
+                        ManualPlayAction::Quit => return Ok(ControlFlow::Break(())),
                     },
                     SessionState::Paused => match action {
-                        NormalModeAction::Pause => game.toggle_pause(),
-                        NormalModeAction::Quit => return Ok(ControlFlow::Break(())),
+                        ManualPlayAction::Pause => game.toggle_pause(),
+                        ManualPlayAction::Quit => return Ok(ControlFlow::Break(())),
                         _ => {}
                     },
                     SessionState::GameOver => unreachable!(),
@@ -140,8 +144,15 @@ pub(crate) fn normal() -> io::Result<()> {
     })
 }
 
-pub(crate) fn auto(ai: AiType) -> io::Result<()> {
-    let placement_evaluator = MetricsBasedPlacementEvaluator::from_ai_type(ai);
+#[derive(Default, Debug, Clone, clap::Args)]
+pub(crate) struct AutoPlayArg {
+    #[arg(long, default_value = "aggro")]
+    ai: AiType,
+}
+
+pub(crate) fn auto(arg: &AutoPlayArg) -> io::Result<()> {
+    let AutoPlayArg { ai } = arg;
+    let placement_evaluator = MetricsBasedPlacementEvaluator::from_ai_type(*ai);
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
     let mut best_turn = None;
     run_game_loop(PlayMode::Auto, |input, game| {

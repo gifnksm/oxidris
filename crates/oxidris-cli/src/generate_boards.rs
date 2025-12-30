@@ -1,3 +1,6 @@
+use std::{fs::File, io, path::PathBuf};
+
+use anyhow::Context;
 use oxidris_ai::{DumpPlacementEvaluator, TurnEvaluator};
 use oxidris_engine::{GameField, GameStats};
 
@@ -7,7 +10,15 @@ const MAX_TURNS: usize = 500;
 const TURNS_HISTOGRAM_WIDTH: usize = 10;
 const HEIGHT_HISTOGRAM_WIDTH: usize = 2;
 
-pub(crate) fn run() {
+#[derive(Default, Debug, Clone, clap::Args)]
+pub(crate) struct GenerateBoardsArg {
+    /// Output file path
+    #[arg(long)]
+    output: Option<PathBuf>,
+}
+
+pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
+    let GenerateBoardsArg { output } = arg;
     let placement_evaluator = DumpPlacementEvaluator;
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
 
@@ -65,7 +76,6 @@ pub(crate) fn run() {
         boards: captured_boards,
     };
 
-    serde_json::to_writer(std::io::stdout().lock(), &captured_boards).unwrap();
     eprintln!(
         "Captured {} boards from {} games.",
         captured_boards.boards.len(),
@@ -83,4 +93,21 @@ pub(crate) fn run() {
         let min = i * HEIGHT_HISTOGRAM_WIDTH;
         eprintln!("  {min:2}- : {count:5} {}", "#".repeat(count / 50));
     }
+
+    let writer = if let Some(output_path) = output {
+        let file = File::create(output_path)
+            .with_context(|| format!("Failed to create output file: {}", output_path.display()))?;
+        Box::new(file) as Box<dyn io::Write>
+    } else {
+        Box::new(io::stdout().lock()) as Box<dyn io::Write>
+    };
+    serde_json::to_writer(writer, &captured_boards).with_context(|| {
+        format!(
+            "Failed to write captured boards to {}",
+            output
+                .as_ref()
+                .map_or_else(|| "stdout".to_string(), |p| p.display().to_string())
+        )
+    })?;
+    Ok(())
 }
