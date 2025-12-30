@@ -12,13 +12,16 @@ const HEIGHT_HISTOGRAM_WIDTH: usize = 2;
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct GenerateBoardsArg {
+    /// Number of boards to generate
+    #[arg(long, default_value_t = 100000)]
+    num_boards: usize,
     /// Output file path
     #[arg(long)]
     output: Option<PathBuf>,
 }
 
 pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
-    let GenerateBoardsArg { output } = arg;
+    let GenerateBoardsArg { num_boards, output } = arg;
     let placement_evaluator = DumpPlacementEvaluator;
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
 
@@ -29,7 +32,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let mut turns_histogram = [0; MAX_TURNS / TURNS_HISTOGRAM_WIDTH + 1];
     let mut height_histogram = [0; 10];
 
-    while captured_boards.len() < 20000 {
+    while captured_boards.len() < *num_boards {
         total_games += 1;
         let mut captured_heights = [false; 4];
         let mut field = GameField::new();
