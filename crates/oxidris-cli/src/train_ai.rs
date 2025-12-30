@@ -10,7 +10,7 @@ use oxidris_ai::{
 use oxidris_engine::GameField;
 
 const GAMES_PER_INDIVIDUAL: usize = 3;
-const TURN_LIMIT: usize = 800;
+const TURN_LIMIT: usize = 3000;
 
 const POPULATION_COUNT: usize = 30;
 
