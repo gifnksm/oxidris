@@ -800,13 +800,11 @@ name = "oxidris-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arrayvec",
  "clap",
  "crossterm",
  "oxidris-ai",
  "oxidris-engine",
  "rand 0.9.2",
- "rand_distr",
  "ratatui",
  "serde",
  "serde_json",

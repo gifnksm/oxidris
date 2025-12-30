@@ -1,6 +1,6 @@
 use std::array;
 
-use oxidris_ai::ALL_BOARD_FEATURES;
+use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
 
 use super::data::BoardFeatures;
 

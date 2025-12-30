@@ -29,7 +29,7 @@
 use oxidris_engine::{BitBoard, Piece, PieceKind};
 use std::fmt;
 
-use crate::BoardAnalysis;
+use crate::board_analysis::BoardAnalysis;
 
 pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 11> = BoardFeatureSet([
     &HolesPenalty,
@@ -93,7 +93,7 @@ pub struct BoardFeatureValue {
     pub normalized: f32,
 }
 
-pub trait BoardFeatureSource: fmt::Debug {
+pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
     const NORMALIZATION_MIN: f32;
     const NORMALIZATION_MAX: f32;
     const SIGNAL: FeatureSignal;
@@ -133,7 +133,7 @@ pub trait BoardFeatureSource: fmt::Debug {
     }
 }
 
-pub trait DynBoardFeatureSource: fmt::Debug {
+pub trait DynBoardFeatureSource: fmt::Debug + Send + Sync {
     #[must_use]
     fn name(&self) -> &'static str;
     #[must_use]

@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use oxidris_ai::ALL_BOARD_FEATURES;
+use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
 use ratatui::{
     Frame,
     buffer::Buffer,

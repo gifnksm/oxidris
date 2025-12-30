@@ -1,342 +1,179 @@
-use std::{array, iter, thread};
+use std::{array, thread};
 
-use arrayvec::ArrayVec;
-use rand::{
-    Rng,
-    distr::{Distribution, StandardUniform},
-    seq::IndexedRandom,
-};
+use rand::{Rng, seq::IndexedRandom};
 
-use oxidris_engine::{GameField, GameStats};
+use oxidris_engine::GameField;
 
 use crate::{
-    ALL_BOARD_FEATURES, ALL_BOARD_FEATURES_COUNT, AiType, FeatureBasedPlacementEvaluator,
-    turn_evaluator::TurnEvaluator, weights::WeightSet,
+    board_feature::BoardFeatureSet, placement_evaluator::FeatureBasedPlacementEvaluator,
+    session_evaluator::SessionEvaluator, statistics::Statistics, turn_evaluator::TurnEvaluator,
+    weights::WeightSet,
 };
 
-const GAMES_PER_INDIVIDUALS: usize = 3;
-const MAX_PIECES_PER_GAME: usize = 800;
-
-const POPULATION_COUNT: usize = 30;
-
-const ELITE_COUNT: usize = 2;
-const TOURNAMENT_SIZE: usize = 2;
-
-// evolution parameters
-const MAX_GENERATIONS: usize = 200;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EvolutaionPhase {
-    Exploration,
-    Transition,
-    Convergence,
-}
-
-impl EvolutaionPhase {
-    fn from_generation(generation: usize) -> Self {
-        match generation {
-            0..30 => Self::Exploration,
-            30..80 => Self::Transition,
-            _ => Self::Convergence,
-        }
-    }
-}
-
-const fn max_weight_by_phase(phase: EvolutaionPhase) -> f32 {
-    match phase {
-        EvolutaionPhase::Exploration => 0.5,
-        EvolutaionPhase::Transition => 0.8,
-        EvolutaionPhase::Convergence => 1.0,
-    }
-}
-
-const MUTATION_RATE: f64 = 0.3;
-const fn mutation_sigma_by_phase(phase: EvolutaionPhase) -> f32 {
-    match phase {
-        EvolutaionPhase::Exploration => 0.05,
-        EvolutaionPhase::Transition => 0.02,
-        EvolutaionPhase::Convergence => 0.01,
-    }
-}
-
-const BLX_ALPHA: f32 = 0.2;
-
 #[derive(Debug, Clone)]
-struct Individual {
-    weights: WeightSet<ALL_BOARD_FEATURES_COUNT>,
+pub struct Individual<const FEATURE_COUNT: usize> {
+    weights: WeightSet<FEATURE_COUNT>,
     fitness: f32,
 }
 
-impl Individual {
-    #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&mut self, fields: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
-        let turn_evaluator = TurnEvaluator::new(FeatureBasedPlacementEvaluator::from_weights(
-            self.weights.clone(),
-        ));
-        self.fitness = 0.0;
-        for mut field in fields.iter().cloned() {
-            let mut stats = GameStats::new();
-            for _ in 0..MAX_PIECES_PER_GAME {
-                let (_cleared_lines, result) = turn_evaluator
-                    .select_best_turn(&field)
-                    .unwrap()
-                    .apply(&mut field, &mut stats);
-                if result.is_err() {
-                    break;
-                }
-            }
-
-            self.fitness += fitness_evaluator.evaluate(&field, &stats);
-        }
-        self.fitness /= fields.len() as f32;
-    }
-}
-
-trait FitnessEvaluator: Send + Sync {
-    fn evaluate(&self, field: &GameField, stats: &GameStats) -> f32;
-}
-
-#[derive(Debug)]
-struct AggroFitnessEvaluator;
-
-impl FitnessEvaluator for AggroFitnessEvaluator {
-    #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&self, _field: &GameField, stats: &GameStats) -> f32 {
-        const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
-
-        let survived = stats.completed_pieces() as f32;
-        let max_pieces = MAX_PIECES_PER_GAME as f32;
-        let survived_ratio = survived / max_pieces;
-        let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, stats.line_cleared_counter())
-            .map(|(w, c)| f32::from(w) * (*c as f32))
-            .sum::<f32>();
-        let efficiency = weighted_line_count / survived.max(1.0);
-        survival_bonus + efficiency * survived_ratio
-    }
-}
-
-#[derive(Debug)]
-struct DefensiveFitnessEvaluator;
-
-impl FitnessEvaluator for DefensiveFitnessEvaluator {
-    #[expect(clippy::cast_precision_loss)]
-    fn evaluate(&self, field: &GameField, stats: &GameStats) -> f32 {
-        let survived = stats.completed_pieces() as f32;
-        let max_pieces = MAX_PIECES_PER_GAME as f32;
-        let survived_ratio = survived / max_pieces;
-        let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let line_count = stats.total_cleared_lines() as f32;
-        let efficiency = line_count / survived.max(1.0);
-        let height_penalty = (field.board().max_height() as f32) / 20.0;
-        survival_bonus + efficiency * survived_ratio - height_penalty
-    }
-}
-
-#[expect(clippy::cast_precision_loss)]
-pub fn learning(ai: AiType) {
-    let fitness_evaluator = match ai {
-        AiType::Aggro => &AggroFitnessEvaluator as &dyn FitnessEvaluator,
-        AiType::Defensive => &DefensiveFitnessEvaluator as &dyn FitnessEvaluator,
-    };
-    let mut rng = rand::rng();
-    let mut population = gen_first_generation(&mut rng);
-    for generation in 0..MAX_GENERATIONS {
-        let phase = EvolutaionPhase::from_generation(generation);
-        eprintln!("Generation #{generation} ({phase:?}):");
-        let fields: &[_; GAMES_PER_INDIVIDUALS] = &array::from_fn(|_| GameField::new());
-        thread::scope(|s| {
-            for (i, ind) in population.iter_mut().enumerate() {
-                s.spawn(move || {
-                    ind.evaluate(fields, fitness_evaluator);
-                    eprintln!(
-                        "  {i:2}: {:.3?} => {:.3}",
-                        ind.weights.as_array(),
-                        ind.fitness
-                    );
-                });
-            }
-        });
-
-        let population_count = POPULATION_COUNT as f32;
-
-        let weights = |i| population.iter().map(move |ind| ind.weights.as_array()[i]);
-        let weights_min = WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| min(weights(i)));
-        let weights_max = WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| max(weights(i)));
-        let weights_mean = WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| mean(weights(i)));
-        let weights_norm_stddev =
-            WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
-        let weights_norm_stddev_mean = mean(weights_norm_stddev.as_array());
-
-        let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
-        let fitness_max = population
-            .iter()
-            .map(|i| i.fitness)
-            .max_by(f32::total_cmp)
-            .unwrap();
-        let fitness_min = population
-            .iter()
-            .map(|i| i.fitness)
-            .min_by(f32::total_cmp)
-            .unwrap();
-
-        eprintln!("  Weights Stats:");
-        eprintln!("    Min:        {:.3?}", weights_min.as_array());
-        eprintln!("    Max:        {:.3?}", weights_max.as_array());
-        eprintln!("    Mean:       {:.3?}", weights_mean.as_array());
-        eprintln!("    NormStddev: {:.3?}", weights_norm_stddev.as_array());
-        eprintln!("    => Mean:    {weights_norm_stddev_mean:.3}");
-        eprintln!("  Fitness Stats:");
-        eprintln!("    Min:  {fitness_min:.3}");
-        eprintln!("    Max:  {fitness_max:.3}");
-        eprintln!("    Mean: {fitness_mean:.3}");
-
-        if generation + 1 < MAX_GENERATIONS {
-            gen_next_generation(&mut population, phase, &mut rng);
-        }
-    }
-
-    eprintln!("Best Individuals:");
-    population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
-    for (i, ind) in population.iter().take(5).enumerate() {
-        eprintln!("  {i:2}: {:?} => {}", ind.weights.as_array(), ind.fitness);
-    }
-
-    eprintln!("Best individual weights saved to file:");
-    eprintln!("  [");
-    for (f, w) in iter::zip(
-        ALL_BOARD_FEATURES.as_array(),
-        population[0].weights.as_array(),
-    ) {
-        let scale = w / (1.0 / ALL_BOARD_FEATURES_COUNT as f32);
-        eprintln!("    {}, // {} (x{scale:.3})", format_weight(w), f.name());
-    }
-    eprintln!("  ]");
-
-    eprintln!("{ai:?} AI learning completed.");
-}
-
-fn mean(values: impl IntoIterator<Item = f32>) -> f32 {
-    let (sum, count) = values
-        .into_iter()
-        .fold((0.0, 0.0), |(sum, count), x| (sum + x, count + 1.0));
-    if count == 0.0 {
-        return f32::NAN;
-    }
-    sum / count
-}
-
-fn max(values: impl IntoIterator<Item = f32>) -> f32 {
-    values.into_iter().max_by(f32::total_cmp).unwrap()
-}
-
-fn min(values: impl IntoIterator<Item = f32>) -> f32 {
-    values.into_iter().min_by(f32::total_cmp).unwrap()
-}
-
-fn normalized_stddev(values: impl IntoIterator<Item = f32> + Clone) -> f32 {
-    let m = mean(values.clone());
-    let variance = mean(values.clone().into_iter().map(|x| (x - m).powi(2)));
-    let stddev = variance.sqrt();
-
-    let max_v = max(values.clone());
-    let min_v = min(values);
-
-    let range = max_v - min_v;
-    if range.abs() < f32::EPSILON {
-        return 0.0;
-    }
-    stddev / range
-}
-
-impl Distribution<Individual> for StandardUniform {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Individual {
-        let max_w = max_weight_by_phase(EvolutaionPhase::Exploration);
-        let mut weights = WeightSet::random(rng, max_w);
+impl<const FEATURE_COUNT: usize> Individual<FEATURE_COUNT> {
+    pub fn random<R>(rng: &mut R, max_weight: f32) -> Self
+    where
+        R: Rng + ?Sized,
+    {
+        let mut weights = WeightSet::random(rng, max_weight);
         weights.normalize_l1();
-        Individual {
+        Self {
             weights,
             fitness: f32::MIN,
         }
     }
+
+    #[must_use]
+    pub fn weights(&self) -> &WeightSet<FEATURE_COUNT> {
+        &self.weights
+    }
+
+    #[must_use]
+    pub fn fitness(&self) -> f32 {
+        self.fitness
+    }
 }
 
-fn gen_first_generation<R>(rng: &mut R) -> [Individual; POPULATION_COUNT]
-where
-    R: Rng + ?Sized,
-{
-    rng.random::<[Individual; POPULATION_COUNT]>()
+#[derive(Debug)]
+pub struct Population<const FEATURE_COUNT: usize> {
+    individuals: Vec<Individual<FEATURE_COUNT>>,
 }
 
-fn gen_next_generation<R>(
-    population: &mut [Individual; POPULATION_COUNT],
-    phase: EvolutaionPhase,
-    rng: &mut R,
-) where
-    R: Rng + ?Sized,
-{
-    let sigma = mutation_sigma_by_phase(phase);
-    let max_w = max_weight_by_phase(phase);
+impl<const FEATURE_COUNT: usize> Population<FEATURE_COUNT> {
+    #[must_use]
+    pub fn random<R>(count: usize, rng: &mut R, max_weight: f32) -> Self
+    where
+        R: Rng + ?Sized,
+    {
+        let individuals = (0..count)
+            .map(|_| Individual::random(rng, max_weight))
+            .collect();
+        Population { individuals }
+    }
 
-    let mut next = ArrayVec::<Individual, POPULATION_COUNT>::new();
+    #[must_use]
+    pub fn individuals(&self) -> &[Individual<FEATURE_COUNT>] {
+        &self.individuals
+    }
 
-    // elite selection
-    population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
-    next.extend(population[..ELITE_COUNT].iter().cloned());
-
-    // generate the rest individuals
-    while next.len() < POPULATION_COUNT {
-        let p1 = tournament_select(population, rng);
-        let p2 = tournament_select(population, rng);
-
-        let mut child = WeightSet::blx_alpha(&p1.weights, &p2.weights, BLX_ALPHA, max_w, rng);
-        child.mutate(sigma, max_w, MUTATION_RATE, rng);
-        child.normalize_l1();
-
-        next.push(Individual {
-            weights: child,
-            fitness: 0.0,
+    pub fn evaluate_fitness(
+        &mut self,
+        fields: &[GameField],
+        session_evaluator: &dyn SessionEvaluator,
+        board_features: &BoardFeatureSet<'static, FEATURE_COUNT>,
+    ) {
+        thread::scope(|s| {
+            for ind in &mut self.individuals {
+                let placement_evaluator = FeatureBasedPlacementEvaluator::new(
+                    board_features.clone(),
+                    ind.weights.clone(),
+                );
+                let turn_evaluator = TurnEvaluator::new(placement_evaluator);
+                s.spawn(move || {
+                    ind.fitness =
+                        session_evaluator.play_and_evaluate_sessions(fields, &turn_evaluator);
+                });
+            }
         });
+
+        // sort by fitness descending
+        self.individuals
+            .sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
     }
 
-    *population = next.into_inner().unwrap();
+    #[must_use]
+    pub fn compute_weight_stats(&self) -> [Statistics; FEATURE_COUNT] {
+        array::from_fn(|i| {
+            let weights = self
+                .individuals()
+                .iter()
+                .map(|ind| ind.weights.as_array()[i]);
+            Statistics::compute(weights).unwrap()
+        })
+    }
+
+    #[must_use]
+    pub fn compute_fitness_stats(&self) -> Statistics {
+        Statistics::compute(self.individuals.iter().map(|ind| ind.fitness)).unwrap()
+    }
 }
 
-fn tournament_select<'a, R>(population: &'a [Individual], rng: &mut R) -> &'a Individual
+#[derive(Debug)]
+pub struct PopulationEvolver {
+    pub elite_count: usize,
+    pub max_weight: f32,
+    pub tournament_size: usize,
+    pub mutation_sigma: f32,
+    pub blx_alpha: f32,
+    pub mutation_rate: f32,
+}
+
+impl PopulationEvolver {
+    #[must_use]
+    pub fn evolve<const FEATURE_COUNT: usize>(
+        &self,
+        population: &Population<FEATURE_COUNT>,
+    ) -> Population<FEATURE_COUNT> {
+        let mut rng = rand::rng();
+        let mut next_individuals = vec![];
+        assert!(
+            population
+                .individuals
+                .is_sorted_by(|a, b| a.fitness >= b.fitness)
+        );
+
+        // elite selection
+        next_individuals.extend(population.individuals[..self.elite_count].iter().cloned());
+
+        // generate the rest individuals
+        while next_individuals.len() < population.individuals.len() {
+            let p1 = tournament_select(&population.individuals, self.tournament_size, &mut rng);
+            let p2 = tournament_select(&population.individuals, self.tournament_size, &mut rng);
+
+            let mut child = WeightSet::blx_alpha(
+                &p1.weights,
+                &p2.weights,
+                self.blx_alpha,
+                self.max_weight,
+                &mut rng,
+            );
+            child.mutate(
+                self.mutation_sigma,
+                self.max_weight,
+                self.mutation_rate,
+                &mut rng,
+            );
+            child.normalize_l1();
+
+            next_individuals.push(Individual {
+                weights: child,
+                fitness: 0.0,
+            });
+        }
+
+        Population {
+            individuals: next_individuals,
+        }
+    }
+}
+
+fn tournament_select<'a, R, const FEATURE_COUNT: usize>(
+    population: &'a [Individual<FEATURE_COUNT>],
+    tournament_size: usize,
+    rng: &mut R,
+) -> &'a Individual<FEATURE_COUNT>
 where
     R: Rng + ?Sized,
 {
-    // k = 2
-    const _: () = assert!(TOURNAMENT_SIZE == 2);
-    let a = population.choose(rng).unwrap();
-    let b = population.choose(rng).unwrap();
-    if a.fitness >= b.fitness { a } else { b }
-}
-
-fn format_weight(weight: f32) -> String {
-    let s = format!("{weight:?}");
-    let Some((int_part, frac_part)) = s
-        .split_once('.')
-        .filter(|(_int_part, frac_part)| frac_part.len() > 3)
-    else {
-        return s;
-    };
-    let (parts, tail) = frac_part.as_bytes().as_chunks::<3>();
-    let mut result = String::from(int_part);
-    result.push('.');
-    let mut first = true;
-    for part in parts {
-        if !first {
-            result.push('_');
-        }
-        result.push_str(str::from_utf8(part).unwrap());
-        first = false;
-    }
-    if !tail.is_empty() {
-        if !first {
-            result.push('_');
-        }
-        result.push_str(str::from_utf8(tail).unwrap());
-    }
-    result
+    assert!(tournament_size > 0);
+    population
+        .choose_multiple(rng, tournament_size)
+        .max_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap())
+        .unwrap()
 }

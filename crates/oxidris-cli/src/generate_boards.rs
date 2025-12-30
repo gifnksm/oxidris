@@ -1,7 +1,7 @@
 use std::{fs::File, io, path::PathBuf};
 
 use anyhow::Context;
-use oxidris_ai::{DumpPlacementEvaluator, TurnEvaluator};
+use oxidris_ai::{placement_evaluator::DumpPlacementEvaluator, turn_evaluator::TurnEvaluator};
 use oxidris_engine::{GameField, GameStats};
 
 use crate::data::{BoardAndPlacement, BoardCollection};

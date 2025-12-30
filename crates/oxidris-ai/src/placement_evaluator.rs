@@ -3,23 +3,31 @@ use std::{fmt, iter};
 use oxidris_engine::{BitBoard, Piece};
 
 use crate::{
-    ALL_BOARD_FEATURES, ALL_BOARD_FEATURES_COUNT, AiType, BoardAnalysis, BoardFeatureSet,
-    BoardFeatureSource as _, HolesPenalty, TopOutRisk, WeightSet,
+    AiType,
+    board_analysis::BoardAnalysis,
+    board_feature::{
+        ALL_BOARD_FEATURES, ALL_BOARD_FEATURES_COUNT, BoardFeatureSet, BoardFeatureSource as _,
+        HolesPenalty, TopOutRisk,
+    },
+    weights::WeightSet,
 };
 
-pub trait PlacementEvaluator: fmt::Debug {
+pub trait PlacementEvaluator: fmt::Debug + Send + Sync {
     fn evaluate_placement(&self, board: &BitBoard, placement: Piece) -> f32;
 }
 
 #[derive(Debug, Clone)]
-pub struct FeatureBasedPlacementEvaluator<'a, const N: usize> {
-    features: BoardFeatureSet<'a, N>,
-    weights: WeightSet<N>,
+pub struct FeatureBasedPlacementEvaluator<'a, const FEATURE_COUNT: usize> {
+    features: BoardFeatureSet<'a, FEATURE_COUNT>,
+    weights: WeightSet<FEATURE_COUNT>,
 }
 
-impl<'a, const N: usize> FeatureBasedPlacementEvaluator<'a, N> {
+impl<'a, const FEATURE_COUNT: usize> FeatureBasedPlacementEvaluator<'a, FEATURE_COUNT> {
     #[must_use]
-    pub fn new(features: BoardFeatureSet<'a, N>, weights: WeightSet<N>) -> Self {
+    pub fn new(
+        features: BoardFeatureSet<'a, FEATURE_COUNT>,
+        weights: WeightSet<FEATURE_COUNT>,
+    ) -> Self {
         Self { features, weights }
     }
 }

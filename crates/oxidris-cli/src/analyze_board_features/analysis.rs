@@ -1,6 +1,6 @@
 use std::array;
 
-use oxidris_ai::{ALL_BOARD_FEATURES, BoardFeatureValue};
+use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue};
 
 use crate::{analyze_board_features::data::HistogramBin, data::BoardAndPlacement};
 

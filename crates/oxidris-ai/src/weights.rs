@@ -47,18 +47,25 @@ impl<const N: usize> WeightSet<N> {
         Self::from_array(array::from_fn(f))
     }
 
-    pub(crate) const fn as_array(&self) -> [f32; N] {
+    #[must_use]
+    pub const fn as_array(&self) -> [f32; N] {
         self.0
     }
 
-    pub(crate) fn random<R>(rng: &mut R, max_w: f32) -> Self
+    pub(crate) fn random<R>(rng: &mut R, max_weight: f32) -> Self
     where
         R: Rng + ?Sized,
     {
-        Self::from_fn(|_| rng.random_range(0.0..=max_w))
+        Self::from_fn(|_| rng.random_range(0.0..=max_weight))
     }
 
-    pub(crate) fn blx_alpha<R>(p1: &Self, p2: &Self, alpha: f32, max_w: f32, rng: &mut R) -> Self
+    pub(crate) fn blx_alpha<R>(
+        p1: &Self,
+        p2: &Self,
+        alpha: f32,
+        max_weight: f32,
+        rng: &mut R,
+    ) -> Self
     where
         R: Rng + ?Sized,
     {
@@ -72,19 +79,19 @@ impl<const N: usize> WeightSet<N> {
             let d = max - min;
             let lower = min - alpha * d;
             let upper = max + alpha * d;
-            rng.random_range(lower..=upper).clamp(0.0, max_w)
+            rng.random_range(lower..=upper).clamp(0.0, max_weight)
         })
     }
 
-    pub(crate) fn mutate<R>(&mut self, sigma: f32, max_w: f32, rate: f64, rng: &mut R)
+    pub(crate) fn mutate<R>(&mut self, sigma: f32, max_weight: f32, rate: f32, rng: &mut R)
     where
         R: Rng + ?Sized,
     {
         let mut weights = self.as_array();
         let normal = Normal::new(0.0, sigma).unwrap();
         for w in &mut weights {
-            if rng.random_bool(rate) {
-                *w = (*w + rng.sample(normal)).clamp(0.0, max_w);
+            if rng.random_bool(rate.into()) {
+                *w = (*w + rng.sample(normal)).clamp(0.0, max_weight);
             }
         }
         *self = Self::from_array(weights);

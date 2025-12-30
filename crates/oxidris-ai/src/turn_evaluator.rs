@@ -3,7 +3,7 @@ use std::iter;
 use arrayvec::ArrayVec;
 use oxidris_engine::{BitBoard, CompletePieceDropError, GameField, GameStats, Piece};
 
-use crate::PlacementEvaluator;
+use crate::placement_evaluator::PlacementEvaluator;
 
 #[derive(Debug, Clone, Copy)]
 pub struct TurnPlan {
@@ -69,6 +69,21 @@ impl TurnEvaluator {
         }
 
         best_result
+    }
+
+    #[must_use]
+    pub fn play_session(&self, field: &mut GameField, turn_limit: usize) -> GameStats {
+        let mut stats = GameStats::new();
+        for _ in 0..turn_limit {
+            let (_cleared_lines, result) = self
+                .select_best_turn(field)
+                .unwrap()
+                .apply(field, &mut stats);
+            if result.is_err() {
+                break;
+            }
+        }
+        stats
     }
 }
 

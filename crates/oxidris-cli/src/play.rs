@@ -6,7 +6,10 @@ use std::{
 };
 
 use crossterm::event::KeyCode;
-use oxidris_ai::{FeatureBasedPlacementEvaluator, TurnEvaluator, TurnPlan};
+use oxidris_ai::{
+    placement_evaluator::FeatureBasedPlacementEvaluator,
+    turn_evaluator::{TurnEvaluator, TurnPlan},
+};
 use oxidris_engine::{GameSession, SessionState};
 
 use crate::{

@@ -176,6 +176,8 @@ impl PiecePosition {
 
     #[must_use]
     pub const fn new(x: u8, y: u8) -> Self {
+        assert!((x as usize) < BitBoard::TOTAL_WIDTH);
+        assert!((y as usize) < BitBoard::TOTAL_HEIGHT);
         Self { x, y }
     }
 

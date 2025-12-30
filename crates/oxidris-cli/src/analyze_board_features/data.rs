@@ -1,7 +1,7 @@
 use std::{fs::File, io::BufReader, ops::Range, path::Path};
 
 use anyhow::{Context, bail};
-use oxidris_ai::{ALL_BOARD_FEATURES, BoardFeatureValue};
+use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue};
 
 use crate::data::{BoardAndPlacement, BoardCollection};
 
