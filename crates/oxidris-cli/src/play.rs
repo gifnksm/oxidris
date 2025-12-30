@@ -6,7 +6,7 @@ use std::{
 };
 
 use crossterm::event::KeyCode;
-use oxidris_ai::{MetricsBasedPlacementEvaluator, TurnEvaluator, TurnPlan};
+use oxidris_ai::{FeatureBasedPlacementEvaluator, TurnEvaluator, TurnPlan};
 use oxidris_engine::{GameSession, SessionState};
 
 use crate::{
@@ -152,7 +152,7 @@ pub(crate) struct AutoPlayArg {
 
 pub(crate) fn auto(arg: &AutoPlayArg) -> io::Result<()> {
     let AutoPlayArg { ai } = arg;
-    let placement_evaluator = MetricsBasedPlacementEvaluator::from_ai_type(*ai);
+    let placement_evaluator = FeatureBasedPlacementEvaluator::from_ai_type(*ai);
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
     let mut best_turn = None;
     run_game_loop(PlayMode::Auto, |input, game| {

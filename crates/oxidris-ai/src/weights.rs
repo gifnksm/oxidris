@@ -1,4 +1,4 @@
-use super::metrics::ALL_METRICS_COUNT;
+use super::board_feature::ALL_BOARD_FEATURES_COUNT;
 use rand::Rng;
 use rand_distr::Normal;
 use std::array;
@@ -6,7 +6,7 @@ use std::array;
 #[derive(Debug, Clone)]
 pub struct WeightSet<const N: usize>([f32; N]);
 
-impl WeightSet<ALL_METRICS_COUNT> {
+impl WeightSet<ALL_BOARD_FEATURES_COUNT> {
     pub const AGGRO: Self = WeightSet([
         0.335_840_02,    // Holes Penalty (x3.694)
         0.154_844_2,     // Hole Depth Penalty (x1.703)

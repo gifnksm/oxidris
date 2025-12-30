@@ -77,10 +77,10 @@ train-ai-aggro:
 train-ai-defensive:
 	cargo run --release -- train-ai --ai defensive
 
-## Start the metric tuning TUI application
-.PHONY: tune-metrics
-tune-metrics:
-	cargo run --release -- tune-metrics $(DATA_DIR)/boards.json
+## Start the TUI for analyzing board features
+.PHONY: analyze-board-features
+analyze-board-features:
+	cargo run --release -- analyze-board-features $(DATA_DIR)/boards.json
 
 ## Clean build artifacts
 .PHONY: clean

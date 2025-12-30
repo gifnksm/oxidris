@@ -1,50 +1,50 @@
 use crossterm::event::{self, Event, KeyEventKind};
-use oxidris_ai::ALL_METRICS;
+use oxidris_ai::ALL_BOARD_FEATURES;
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::tune_metrics::{
-    data::{BoardMetrics, MetricStatistics},
+use crate::analyze_board_features::{
+    data::{BoardFeatures, FeatureStatistics},
     index::BoardIndex,
 };
 
-use super::screens::metrics_list::MetricsListScreen;
+use super::screens::feature_list::FeatureListScreen;
 
 #[derive(Debug)]
 pub struct App {
     data: AppData,
     screen: Screen,
-    metrics_list_screen: MetricsListScreen,
+    features_list_screen: FeatureListScreen,
 }
 
 #[derive(Debug)]
 pub struct AppData {
-    pub boards_metrics: Vec<BoardMetrics>,
-    pub statistics: [MetricStatistics; ALL_METRICS.len()],
+    pub boards_features: Vec<BoardFeatures>,
+    pub statistics: [FeatureStatistics; ALL_BOARD_FEATURES.len()],
     pub board_index: BoardIndex,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     #[default]
-    MetricsList,
+    FeaturesList,
     Exiting,
 }
 
 impl App {
     pub fn new(
-        boards_metrics: Vec<BoardMetrics>,
-        statistics: [MetricStatistics; ALL_METRICS.len()],
+        boards_features: Vec<BoardFeatures>,
+        statistics: [FeatureStatistics; ALL_BOARD_FEATURES.len()],
         board_index: BoardIndex,
     ) -> Self {
         let data = AppData {
-            boards_metrics,
+            boards_features,
             statistics,
             board_index,
         };
         Self {
             data,
             screen: Screen::default(),
-            metrics_list_screen: MetricsListScreen::default(),
+            features_list_screen: FeatureListScreen::default(),
         }
     }
 
@@ -58,8 +58,8 @@ impl App {
 
     fn draw(&self, frame: &mut Frame) {
         match self.screen {
-            Screen::MetricsList => {
-                self.metrics_list_screen.draw(frame, &self.data);
+            Screen::FeaturesList => {
+                self.features_list_screen.draw(frame, &self.data);
             }
             Screen::Exiting => { /* Nothing to draw */ }
         }
@@ -77,8 +77,8 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: event::KeyEvent) {
         match self.screen {
-            Screen::MetricsList => {
-                self.metrics_list_screen
+            Screen::FeaturesList => {
+                self.features_list_screen
                     .handle_input(key_event, &mut self.screen);
             }
             Screen::Exiting => { /* No input handling when exiting */ }

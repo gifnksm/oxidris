@@ -1,39 +1,39 @@
 use std::array;
 
-use oxidris_ai::{ALL_METRICS, MetricMeasurement};
+use oxidris_ai::{ALL_BOARD_FEATURES, BoardFeatureValue};
 
-use crate::{data::BoardAndPlacement, tune_metrics::data::HistogramBin};
+use crate::{analyze_board_features::data::HistogramBin, data::BoardAndPlacement};
 
-use super::data::{BoardMetrics, Histogram, MetricStatistics, ValueStats};
+use super::data::{BoardFeatures, FeatureStatistics, Histogram, ValueStats};
 
-pub fn compute_all_metrics(boards: &[BoardAndPlacement]) -> Vec<BoardMetrics> {
-    boards.iter().map(compute_board_metrics).collect()
+pub fn compute_all_features(boards: &[BoardAndPlacement]) -> Vec<BoardFeatures> {
+    boards.iter().map(compute_board_features).collect()
 }
 
-fn compute_board_metrics(board: &BoardAndPlacement) -> BoardMetrics {
-    let metrics = ALL_METRICS.measure(&board.board, board.placement);
-    BoardMetrics {
+fn compute_board_features(board: &BoardAndPlacement) -> BoardFeatures {
+    let features = ALL_BOARD_FEATURES.measure(&board.board, board.placement);
+    BoardFeatures {
         board: board.clone(),
-        metrics,
+        features,
     }
 }
 
 pub fn coimpute_statistics(
-    boards_metrics: &[BoardMetrics],
-) -> [MetricStatistics; ALL_METRICS.len()] {
-    array::from_fn(|i| compute_metric_statistics(&boards_metrics.iter().map(|bm| bm.metrics[i])))
+    board_features: &[BoardFeatures],
+) -> [FeatureStatistics; ALL_BOARD_FEATURES.len()] {
+    array::from_fn(|i| compute_feature_statistics(&board_features.iter().map(|bf| bf.features[i])))
 }
 
 #[expect(clippy::cast_precision_loss)]
-fn compute_metric_statistics<I>(values: &I) -> MetricStatistics
+fn compute_feature_statistics<I>(values: &I) -> FeatureStatistics
 where
-    I: ExactSizeIterator<Item = MetricMeasurement> + Clone,
+    I: ExactSizeIterator<Item = BoardFeatureValue> + Clone,
 {
-    let raw_values = values.clone().map(|m| m.raw as f32);
-    let transformed_values = values.clone().map(|m| m.transformed);
-    let normalized_values = values.clone().map(|m| m.normalized);
+    let raw_values = values.clone().map(|f| f.raw as f32);
+    let transformed_values = values.clone().map(|f| f.transformed);
+    let normalized_values = values.clone().map(|f| f.normalized);
 
-    MetricStatistics {
+    FeatureStatistics {
         raw: compute_value_stats(raw_values, 11, Some(0.0), None, Some(1.0)),
         transformed: compute_value_stats(transformed_values, 11, Some(0.0), None, None),
         normalized: compute_value_stats(normalized_values, 11, Some(0.0), Some(1.0), Some(0.1)),

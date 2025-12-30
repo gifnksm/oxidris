@@ -18,19 +18,19 @@ pub fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let boards = data::load_board(boards_file)?;
     eprintln!("Loaded {} boards", boards.len());
 
-    eprintln!("Computing metrics for all boards...");
-    let boards_metrics = analysis::compute_all_metrics(&boards);
-    eprintln!("Metrics computed");
+    eprintln!("Computing featuress for all boards...");
+    let boards_features = analysis::compute_all_features(&boards);
+    eprintln!("Features computed");
 
     eprintln!("Computing statistics");
-    let statistics = analysis::coimpute_statistics(&boards_metrics);
+    let statistics = analysis::coimpute_statistics(&boards_features);
     eprintln!("Statistics computed");
 
     eprintln!("Building board index...");
-    let board_index = index::BoardIndex::new(&boards_metrics);
+    let board_index = index::BoardIndex::new(&boards_features);
     eprintln!("Board index built");
 
-    ui::run_tui(boards_metrics, statistics, board_index)?;
+    ui::run_tui(boards_features, statistics, board_index)?;
 
     Ok(())
 }

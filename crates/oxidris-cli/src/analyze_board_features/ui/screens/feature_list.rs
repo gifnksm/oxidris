@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use oxidris_ai::ALL_METRICS;
+use oxidris_ai::ALL_BOARD_FEATURES;
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -14,20 +14,20 @@ use ratatui::{
     },
 };
 
-use crate::tune_metrics::{
+use crate::analyze_board_features::{
     data::ValueStats,
     ui::app::{AppData, Screen},
 };
 
 #[derive(Default, Debug)]
-pub struct MetricsListScreen {
-    selected_metric: usize,
+pub struct FeatureListScreen {
+    selected_feature: usize,
 }
 
-impl MetricsListScreen {
+impl FeatureListScreen {
     #[expect(clippy::cast_precision_loss)]
     pub fn draw(&self, frame: &mut Frame, data: &AppData) {
-        let metric_stats = &data.statistics[self.selected_metric];
+        let feature_stats = &data.statistics[self.selected_feature];
 
         let panes = Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
             .spacing(Spacing::Overlap(1))
@@ -49,63 +49,63 @@ impl MetricsListScreen {
         .spacing(Spacing::Overlap(1))
         .split(panes[1]);
 
-        let metric_list_pane = MetricSelector {
-            selected_metric: self.selected_metric,
+        let feature_list_pane = FeatureSelector {
+            selected_feature: self.selected_feature,
         };
 
-        let raw_pane = MetricStatistics {
+        let raw_pane = FeatureStatistics {
             label: "Raw",
-            stats: &metric_stats.raw,
+            stats: &feature_stats.raw,
         };
-        let transformed_pane = MetricStatistics {
+        let transformed_pane = FeatureStatistics {
             label: "Transformed",
-            stats: &metric_stats.transformed,
+            stats: &feature_stats.transformed,
         };
-        let normalized_pane = MetricStatistics {
+        let normalized_pane = FeatureStatistics {
             label: "Normalized",
-            stats: &metric_stats.normalized,
+            stats: &feature_stats.normalized,
         };
 
         let raw_trans_data = data
-            .boards_metrics
+            .boards_features
             .iter()
-            .map(|bm| {
+            .map(|fm| {
                 (
-                    f64::from(bm.metrics[self.selected_metric].raw as f32),
-                    f64::from(bm.metrics[self.selected_metric].transformed),
+                    f64::from(fm.features[self.selected_feature].raw as f32),
+                    f64::from(fm.features[self.selected_feature].transformed),
                 )
             })
             .collect::<Vec<(f64, f64)>>();
 
-        let raw_trans_chart = MetricScatter {
+        let raw_trans_chart = FeatureScatter {
             label: "Raw vs Transformed",
             data: &raw_trans_data,
             x_title: "Raw",
-            x_bounds: [0.0, f64::from(metric_stats.raw.max)],
+            x_bounds: [0.0, f64::from(feature_stats.raw.max)],
             y_title: "Transformed",
-            y_bounds: [0.0, f64::from(metric_stats.transformed.max)],
+            y_bounds: [0.0, f64::from(feature_stats.transformed.max)],
         };
 
         let raw_norm_data = data
-            .boards_metrics
+            .boards_features
             .iter()
             .map(|bm| {
                 (
-                    f64::from(bm.metrics[self.selected_metric].raw as f32),
-                    f64::from(bm.metrics[self.selected_metric].normalized),
+                    f64::from(bm.features[self.selected_feature].raw as f32),
+                    f64::from(bm.features[self.selected_feature].normalized),
                 )
             })
             .collect::<Vec<(f64, f64)>>();
-        let raw_norm_chart = MetricScatter {
+        let raw_norm_chart = FeatureScatter {
             label: "Raw vs Normalized",
             data: &raw_norm_data,
             x_title: "Raw",
-            x_bounds: [0.0, f64::from(metric_stats.raw.max)],
+            x_bounds: [0.0, f64::from(feature_stats.raw.max)],
             y_title: "Normalized",
             y_bounds: [0.0, 1.0],
         };
 
-        frame.render_widget(metric_list_pane, left_panes[0]);
+        frame.render_widget(feature_list_pane, left_panes[0]);
         frame.render_widget(raw_trans_chart, left_panes[1]);
         frame.render_widget(raw_norm_chart, left_panes[2]);
 
@@ -120,17 +120,17 @@ impl MetricsListScreen {
                 *screen = Screen::Exiting;
             }
             KeyCode::Up => {
-                if self.selected_metric == 0 {
-                    self.selected_metric = ALL_METRICS.len() - 1;
+                if self.selected_feature == 0 {
+                    self.selected_feature = ALL_BOARD_FEATURES.len() - 1;
                 } else {
-                    self.selected_metric -= 1;
+                    self.selected_feature -= 1;
                 }
             }
             KeyCode::Down => {
-                if self.selected_metric + 1 >= ALL_METRICS.len() {
-                    self.selected_metric = 0;
+                if self.selected_feature + 1 >= ALL_BOARD_FEATURES.len() {
+                    self.selected_feature = 0;
                 } else {
-                    self.selected_metric += 1;
+                    self.selected_feature += 1;
                 }
             }
             _ => {}
@@ -138,21 +138,21 @@ impl MetricsListScreen {
     }
 }
 
-struct MetricSelector {
-    selected_metric: usize,
+struct FeatureSelector {
+    selected_feature: usize,
 }
 
-impl Widget for MetricSelector {
+impl Widget for FeatureSelector {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized,
     {
-        let items = ALL_METRICS
+        let items = ALL_BOARD_FEATURES
             .as_array()
             .iter()
             .enumerate()
-            .map(|(i, metric)| {
-                let content = format!("{i}: {}", metric.name());
+            .map(|(i, f)| {
+                let content = format!("{i}: {}", f.name());
                 ListItem::new(content)
             })
             .collect::<Vec<_>>();
@@ -160,7 +160,7 @@ impl Widget for MetricSelector {
         let list = List::new(items)
             .block(
                 Block::bordered()
-                    .title("Metrics")
+                    .title("Features")
                     .merge_borders(MergeStrategy::Exact),
             )
             .highlight_style(
@@ -171,18 +171,18 @@ impl Widget for MetricSelector {
             .highlight_symbol(">> ");
 
         let mut list_state = ListState::default();
-        list_state.select(Some(self.selected_metric));
+        list_state.select(Some(self.selected_feature));
 
         StatefulWidget::render(list, area, buf, &mut list_state);
     }
 }
 
-struct MetricStatistics<'a> {
+struct FeatureStatistics<'a> {
     label: &'a str,
     stats: &'a ValueStats,
 }
 
-impl Widget for MetricStatistics<'_> {
+impl Widget for FeatureStatistics<'_> {
     #[expect(clippy::cast_precision_loss)]
     fn render(self, area: Rect, buf: &mut Buffer)
     where
@@ -237,7 +237,7 @@ impl Widget for MetricStatistics<'_> {
     }
 }
 
-struct MetricScatter<'a> {
+struct FeatureScatter<'a> {
     label: &'a str,
     data: &'a [(f64, f64)],
     x_title: &'a str,
@@ -246,7 +246,7 @@ struct MetricScatter<'a> {
     y_bounds: [f64; 2],
 }
 
-impl Widget for MetricScatter<'_> {
+impl Widget for FeatureScatter<'_> {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized,

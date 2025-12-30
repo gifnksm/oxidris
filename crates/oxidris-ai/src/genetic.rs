@@ -10,7 +10,7 @@ use rand::{
 use oxidris_engine::{GameField, GameStats};
 
 use crate::{
-    ALL_METRICS, ALL_METRICS_COUNT, AiType, MetricsBasedPlacementEvaluator,
+    ALL_BOARD_FEATURES, ALL_BOARD_FEATURES_COUNT, AiType, FeatureBasedPlacementEvaluator,
     turn_evaluator::TurnEvaluator, weights::WeightSet,
 };
 
@@ -63,14 +63,14 @@ const BLX_ALPHA: f32 = 0.2;
 
 #[derive(Debug, Clone)]
 struct Individual {
-    weights: WeightSet<ALL_METRICS_COUNT>,
+    weights: WeightSet<ALL_BOARD_FEATURES_COUNT>,
     fitness: f32,
 }
 
 impl Individual {
     #[expect(clippy::cast_precision_loss)]
     fn evaluate(&mut self, fields: &[GameField], fitness_evaluator: &dyn FitnessEvaluator) {
-        let turn_evaluator = TurnEvaluator::new(MetricsBasedPlacementEvaluator::from_weights(
+        let turn_evaluator = TurnEvaluator::new(FeatureBasedPlacementEvaluator::from_weights(
             self.weights.clone(),
         ));
         self.fitness = 0.0;
@@ -161,11 +161,11 @@ pub fn learning(ai: AiType) {
         let population_count = POPULATION_COUNT as f32;
 
         let weights = |i| population.iter().map(move |ind| ind.weights.as_array()[i]);
-        let weights_min = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| min(weights(i)));
-        let weights_max = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| max(weights(i)));
-        let weights_mean = WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| mean(weights(i)));
+        let weights_min = WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| min(weights(i)));
+        let weights_max = WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| max(weights(i)));
+        let weights_mean = WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| mean(weights(i)));
         let weights_norm_stddev =
-            WeightSet::<ALL_METRICS_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
+            WeightSet::<ALL_BOARD_FEATURES_COUNT>::from_fn(|i| normalized_stddev(weights(i)));
         let weights_norm_stddev_mean = mean(weights_norm_stddev.as_array());
 
         let fitness_mean = population.iter().map(|i| i.fitness).sum::<f32>() / population_count;
@@ -204,13 +204,12 @@ pub fn learning(ai: AiType) {
 
     eprintln!("Best individual weights saved to file:");
     eprintln!("  [");
-    for (metric, weight) in iter::zip(ALL_METRICS.as_array(), population[0].weights.as_array()) {
-        let scale = weight / (1.0 / ALL_METRICS_COUNT as f32);
-        eprintln!(
-            "    {}, // {} (x{scale:.3})",
-            format_weight(weight),
-            metric.name()
-        );
+    for (f, w) in iter::zip(
+        ALL_BOARD_FEATURES.as_array(),
+        population[0].weights.as_array(),
+    ) {
+        let scale = w / (1.0 / ALL_BOARD_FEATURES_COUNT as f32);
+        eprintln!("    {}, // {} (x{scale:.3})", format_weight(w), f.name());
     }
     eprintln!("  ]");
 

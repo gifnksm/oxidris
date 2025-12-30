@@ -7,11 +7,11 @@ use self::{
     train_ai::TrainAiArg,
 };
 
+mod analyze_board_features;
 mod data;
 mod generate_boards;
 mod play;
 mod train_ai;
-mod tune_metrics;
 mod ui;
 
 #[derive(Debug, Clone, Parser)]
@@ -33,8 +33,8 @@ enum Mode {
     TrainAi(#[clap(flatten)] TrainAiArg),
     /// Generate boards for training data
     GenerateBoards(#[clap(flatten)] GenerateBoardsArg),
-    /// Tune metrics weights
-    TuneMetrics(#[clap(flatten)] tune_metrics::GenerateBoardsArg),
+    /// Analyze board features with TUI
+    AnalyzeBoardFeatures(#[clap(flatten)] analyze_board_features::GenerateBoardsArg),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -47,7 +47,7 @@ fn main() -> anyhow::Result<()> {
         Mode::AutoPlay(arg) => play::auto(&arg)?,
         Mode::TrainAi(arg) => train_ai::run(&arg),
         Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
-        Mode::TuneMetrics(arg) => tune_metrics::run(&arg)?,
+        Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,
     }
     Ok(())
 }

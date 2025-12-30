@@ -3,8 +3,8 @@ use std::{fmt, iter};
 use oxidris_engine::{BitBoard, Piece};
 
 use crate::{
-    ALL_METRICS, ALL_METRICS_COUNT, AiType, BoardAnalysis, HolesPenalty, MetricSet,
-    MetricSource as _, TopOutRisk, WeightSet,
+    ALL_BOARD_FEATURES, ALL_BOARD_FEATURES_COUNT, AiType, BoardAnalysis, BoardFeatureSet,
+    BoardFeatureSource as _, HolesPenalty, TopOutRisk, WeightSet,
 };
 
 pub trait PlacementEvaluator: fmt::Debug {
@@ -12,22 +12,22 @@ pub trait PlacementEvaluator: fmt::Debug {
 }
 
 #[derive(Debug, Clone)]
-pub struct MetricsBasedPlacementEvaluator<'a, const N: usize> {
-    metrics: MetricSet<'a, N>,
+pub struct FeatureBasedPlacementEvaluator<'a, const N: usize> {
+    features: BoardFeatureSet<'a, N>,
     weights: WeightSet<N>,
 }
 
-impl<'a, const N: usize> MetricsBasedPlacementEvaluator<'a, N> {
+impl<'a, const N: usize> FeatureBasedPlacementEvaluator<'a, N> {
     #[must_use]
-    pub fn new(metrics: MetricSet<'a, N>, weights: WeightSet<N>) -> Self {
-        Self { metrics, weights }
+    pub fn new(features: BoardFeatureSet<'a, N>, weights: WeightSet<N>) -> Self {
+        Self { features, weights }
     }
 }
 
-impl MetricsBasedPlacementEvaluator<'static, ALL_METRICS_COUNT> {
+impl FeatureBasedPlacementEvaluator<'static, ALL_BOARD_FEATURES_COUNT> {
     #[must_use]
-    pub fn from_weights(weights: WeightSet<ALL_METRICS_COUNT>) -> Self {
-        Self::new(ALL_METRICS, weights)
+    pub fn from_weights(weights: WeightSet<ALL_BOARD_FEATURES_COUNT>) -> Self {
+        Self::new(ALL_BOARD_FEATURES, weights)
     }
 
     #[must_use]
@@ -49,12 +49,12 @@ impl MetricsBasedPlacementEvaluator<'static, ALL_METRICS_COUNT> {
     }
 }
 
-impl<const N: usize> PlacementEvaluator for MetricsBasedPlacementEvaluator<'_, N> {
+impl<const N: usize> PlacementEvaluator for FeatureBasedPlacementEvaluator<'_, N> {
     #[inline]
     fn evaluate_placement(&self, board: &BitBoard, placement: Piece) -> f32 {
-        let metric_values = self.metrics.measure_normalized(board, placement);
-        iter::zip(metric_values, self.weights.as_array())
-            .map(|(m, w)| m * w)
+        let feature_values = self.features.measure_normalized(board, placement);
+        iter::zip(feature_values, self.weights.as_array())
+            .map(|(f, w)| f * w)
             .sum()
     }
 }
@@ -69,8 +69,8 @@ impl PlacementEvaluator for DumpPlacementEvaluator {
         let mut board = board.clone();
         board.fill_piece(placement);
         let analysis = BoardAnalysis::from_board(&board, placement);
-        let max_height = TopOutRisk::measure_raw(&analysis);
-        let covered_holes = HolesPenalty::measure_raw(&analysis);
+        let max_height = TopOutRisk::extract_raw(&analysis);
+        let covered_holes = HolesPenalty::extract_raw(&analysis);
         -(max_height as f32) - (covered_holes as f32)
     }
 }

@@ -1,18 +1,18 @@
 use std::{fs::File, io::BufReader, ops::Range, path::Path};
 
 use anyhow::{Context, bail};
-use oxidris_ai::{ALL_METRICS, MetricMeasurement};
+use oxidris_ai::{ALL_BOARD_FEATURES, BoardFeatureValue};
 
 use crate::data::{BoardAndPlacement, BoardCollection};
 
 #[derive(Debug, Clone)]
-pub struct BoardMetrics {
+pub struct BoardFeatures {
     pub board: BoardAndPlacement,
-    pub metrics: [MetricMeasurement; ALL_METRICS.len()],
+    pub features: [BoardFeatureValue; ALL_BOARD_FEATURES.len()],
 }
 
 #[derive(Debug, Clone)]
-pub struct MetricStatistics {
+pub struct FeatureStatistics {
     pub raw: ValueStats,
     pub transformed: ValueStats,
     pub normalized: ValueStats,

@@ -1,7 +1,7 @@
-//! Normalized evaluation metrics for Tetris board states.
+//! Normalized evaluation features for Tetris board states.
 //!
-//! Provides board evaluation metrics for Tetris, each producing a normalized score in \[0.0, 1.0\].
-//! Higher is always better after normalization; negative metrics are inverted via `MetricSignal::Negative`.
+//! Provides board evaluation features for Tetris, each producing a normalized score in \[0.0, 1.0\].
+//! Higher is always better after normalization; negative features are inverted via [`FeatureSignal::Negative`].
 //!
 //! # Typology
 //!
@@ -13,21 +13,25 @@
 //! # Design
 //!
 //! - Normalization clips to practical in-game spans (≈ P05–P95) via `NORMALIZATION_MIN`/`NORMALIZATION_MAX`.
-//! - `MetricSource` defines `measure_raw` → optional `transform` → `normalize` with min/max span and signal.
-//! - Transforms are metric-specific: e.g., [`TopOutRisk`] uses a thresholded linear ramp above a safe height; [`IWellReward`] uses a triangular peak centered at depth 4.
-//! - `ALL_METRICS` lists the active metrics and supports batch measurement.
+//! - [`BoardFeatureSource`] defines [`extract_raw`] → optional [`transform`] → [`normalize`] with min/max span and signal.
+//! - Transforms are feature-specific: e.g., [`TopOutRisk`] uses a thresholded linear ramp above a safe height; [`IWellReward`] uses a triangular peak centered at depth 4.
+//! - [`ALL_BOARD_FEATURES`] lists the active features and supports batch measurement.
+//!
+//! [`extract_raw`]: BoardFeatureSource::extract_raw
+//! [`transform`]: BoardFeatureSource::transform
+//! [`normalize`]: BoardFeatureSource::normalize
 //!
 //! # Usage
 //!
-//! - `ALL_METRICS.measure(board, placement)` returns raw/transformed/normalized per metric.
-//! - `ALL_METRICS.measure_normalized(board, placement)` returns normalized scores for weighting.
+//! - `ALL_BOARD_FEATURES.measure(board, placement)` returns raw/transformed/normalized per feature.
+//! - `ALL_BOARD_FEATURES.measure_normalized(board, placement)` returns normalized scores for weighting.
 
 use oxidris_engine::{BitBoard, Piece, PieceKind};
 use std::fmt;
 
 use crate::BoardAnalysis;
 
-pub const ALL_METRICS: MetricSet<'static, 11> = MetricSet([
+pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 11> = BoardFeatureSet([
     &HolesPenalty,
     &HoleDepthPenalty,
     &RowTransitionsPenalty,
@@ -41,12 +45,12 @@ pub const ALL_METRICS: MetricSet<'static, 11> = MetricSet([
     &IWellReward,
 ]);
 
-pub(crate) const ALL_METRICS_COUNT: usize = ALL_METRICS.0.len();
+pub(crate) const ALL_BOARD_FEATURES_COUNT: usize = ALL_BOARD_FEATURES.0.len();
 
 #[derive(Debug, Clone)]
-pub struct MetricSet<'a, const N: usize>([&'a dyn DynMetricSource; N]);
+pub struct BoardFeatureSet<'a, const N: usize>([&'a dyn DynBoardFeatureSource; N]);
 
-impl<'a, const N: usize> MetricSet<'a, N> {
+impl<'a, const N: usize> BoardFeatureSet<'a, N> {
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         N == 0
@@ -58,46 +62,47 @@ impl<'a, const N: usize> MetricSet<'a, N> {
     }
 
     #[must_use]
-    pub const fn as_array(&self) -> [&'a dyn DynMetricSource; N] {
+    pub const fn as_array(&self) -> [&'a dyn DynBoardFeatureSource; N] {
         self.0
     }
 
     #[must_use]
-    pub fn measure(&self, board: &BitBoard, placement: Piece) -> [MetricMeasurement; N] {
+    pub fn measure(&self, board: &BitBoard, placement: Piece) -> [BoardFeatureValue; N] {
         let analysis = BoardAnalysis::from_board(board, placement);
-        self.0.map(|metric| metric.measure(&analysis))
+        self.0.map(|f| f.compute_feature_value(&analysis))
     }
 
     #[must_use]
     pub fn measure_normalized(&self, board: &BitBoard, placement: Piece) -> [f32; N] {
         let analysis = BoardAnalysis::from_board(board, placement);
-        self.0.map(|metric| metric.measure(&analysis).normalized)
+        self.0
+            .map(|f| f.compute_feature_value(&analysis).normalized)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MetricSignal {
+pub enum FeatureSignal {
     Positive,
     Negative,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct MetricMeasurement {
+pub struct BoardFeatureValue {
     pub raw: u32,
     pub transformed: f32,
     pub normalized: f32,
 }
 
-pub trait MetricSource: fmt::Debug {
+pub trait BoardFeatureSource: fmt::Debug {
     const NORMALIZATION_MIN: f32;
     const NORMALIZATION_MAX: f32;
-    const SIGNAL: MetricSignal;
+    const SIGNAL: FeatureSignal;
 
     #[must_use]
     fn name() -> &'static str;
 
     #[must_use]
-    fn measure_raw(analysis: &BoardAnalysis) -> u32;
+    fn extract_raw(analysis: &BoardAnalysis) -> u32;
 
     #[must_use]
     #[expect(clippy::cast_precision_loss)]
@@ -110,17 +115,17 @@ pub trait MetricSource: fmt::Debug {
         let span = Self::NORMALIZATION_MAX - Self::NORMALIZATION_MIN;
         let norm = ((transformed - Self::NORMALIZATION_MIN) / span).clamp(0.0, 1.0);
         match Self::SIGNAL {
-            MetricSignal::Positive => norm,
-            MetricSignal::Negative => 1.0 - norm,
+            FeatureSignal::Positive => norm,
+            FeatureSignal::Negative => 1.0 - norm,
         }
     }
 
     #[must_use]
-    fn measure(analysis: &BoardAnalysis) -> MetricMeasurement {
-        let raw = Self::measure_raw(analysis);
+    fn compute_feature_value(analysis: &BoardAnalysis) -> BoardFeatureValue {
+        let raw = Self::extract_raw(analysis);
         let transformed = Self::transform(raw);
         let normalized = Self::normalize(transformed);
-        MetricMeasurement {
+        BoardFeatureValue {
             raw,
             transformed,
             normalized,
@@ -128,7 +133,7 @@ pub trait MetricSource: fmt::Debug {
     }
 }
 
-pub trait DynMetricSource: fmt::Debug {
+pub trait DynBoardFeatureSource: fmt::Debug {
     #[must_use]
     fn name(&self) -> &'static str;
     #[must_use]
@@ -136,20 +141,20 @@ pub trait DynMetricSource: fmt::Debug {
     #[must_use]
     fn normalization_max(&self) -> f32;
     #[must_use]
-    fn signal(&self) -> MetricSignal;
+    fn signal(&self) -> FeatureSignal;
     #[must_use]
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32;
+    fn extract_raw(&self, analysis: &BoardAnalysis) -> u32;
     #[must_use]
     fn transform(&self, raw: u32) -> f32;
     #[must_use]
     fn normalize(&self, transformed: f32) -> f32;
     #[must_use]
-    fn measure(&self, analysis: &BoardAnalysis) -> MetricMeasurement;
+    fn compute_feature_value(&self, analysis: &BoardAnalysis) -> BoardFeatureValue;
 }
 
-impl<T> DynMetricSource for T
+impl<T> DynBoardFeatureSource for T
 where
-    T: MetricSource,
+    T: BoardFeatureSource,
 {
     fn name(&self) -> &'static str {
         T::name()
@@ -163,12 +168,12 @@ where
         T::NORMALIZATION_MAX
     }
 
-    fn signal(&self) -> MetricSignal {
+    fn signal(&self) -> FeatureSignal {
         T::SIGNAL
     }
 
-    fn measure_raw(&self, analysis: &BoardAnalysis) -> u32 {
-        T::measure_raw(analysis)
+    fn extract_raw(&self, analysis: &BoardAnalysis) -> u32 {
+        T::extract_raw(analysis)
     }
 
     fn transform(&self, raw: u32) -> f32 {
@@ -179,14 +184,14 @@ where
         T::normalize(transformed)
     }
 
-    fn measure(&self, analysis: &BoardAnalysis) -> MetricMeasurement {
-        T::measure(analysis)
+    fn compute_feature_value(&self, analysis: &BoardAnalysis) -> BoardFeatureValue {
+        T::compute_feature_value(analysis)
     }
 }
 
 /// Smooth penalty for covered holes (empty cells with blocks above).
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Early hole creation
 /// - Unrecoverable board states
@@ -222,16 +227,16 @@ where
 #[derive(Debug)]
 pub struct HolesPenalty;
 
-impl MetricSource for HolesPenalty {
+impl BoardFeatureSource for HolesPenalty {
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 6.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Holes Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
             .map(|(h, occ)| u32::from(h - occ))
             .sum()
@@ -240,7 +245,7 @@ impl MetricSource for HolesPenalty {
 
 /// Smooth penalty for cumulative hole depth (weighted by blocks above each hole).
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Deeply buried holes that are costly to clear
 /// - Stacking that traps holes under tall columns
@@ -283,16 +288,16 @@ impl MetricSource for HolesPenalty {
 #[derive(Debug)]
 pub struct HoleDepthPenalty;
 
-impl MetricSource for HoleDepthPenalty {
+impl BoardFeatureSource for HoleDepthPenalty {
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 31.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Hole Depth Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let mut depth_sum = 0u32;
         for x in BitBoard::PLAYABLE_X_RANGE {
             let mut blocks_above = 0u32;
@@ -311,7 +316,7 @@ impl MetricSource for HoleDepthPenalty {
 
 /// Smooth penalty for horizontal fragmentation by counting occupancy changes between adjacent cells within each row.
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Horizontally fragmented structures
 /// - Narrow gaps and broken rows
@@ -324,7 +329,7 @@ impl MetricSource for HoleDepthPenalty {
 /// - Board walls are intentionally ignored to preserve left–right symmetry and avoid artificial incentives for edge stacking.
 ///
 /// This differs from typical implementations that treat walls as filled cells, which can bias AI toward center placement.
-/// By excluding walls, this metric evaluates edge and center placements fairly.
+/// By excluding walls, this feature evaluates edge and center placements fairly.
 ///
 /// # Stats (raw values, 10x20, weak–mid AI)
 ///
@@ -355,16 +360,16 @@ impl MetricSource for HoleDepthPenalty {
 #[derive(Debug)]
 pub struct RowTransitionsPenalty;
 
-impl MetricSource for RowTransitionsPenalty {
+impl BoardFeatureSource for RowTransitionsPenalty {
     const NORMALIZATION_MIN: f32 = 4.0;
     const NORMALIZATION_MAX: f32 = 32.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Row Transitions Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
         for row in analysis.board.playable_rows() {
             let mut cells = row.iter_playable_cells();
@@ -382,7 +387,7 @@ impl MetricSource for RowTransitionsPenalty {
 
 /// Smooth penalty for vertical fragmentation within columns by counting occupancy changes from top to bottom.
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Vertical fragmentation inside columns
 /// - Internal splits and covered holes
@@ -423,16 +428,16 @@ impl MetricSource for RowTransitionsPenalty {
 #[derive(Debug)]
 pub struct ColumnTransitionsPenalty;
 
-impl MetricSource for ColumnTransitionsPenalty {
+impl BoardFeatureSource for ColumnTransitionsPenalty {
     const NORMALIZATION_MIN: f32 = 5.0;
     const NORMALIZATION_MAX: f32 = 19.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Column Transitions Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
         for x in BitBoard::PLAYABLE_X_RANGE {
             let mut prev_occupied = analysis.board.playable_row(0).is_cell_occupied(x);
@@ -450,7 +455,7 @@ impl MetricSource for ColumnTransitionsPenalty {
 
 /// Smooth penalty for local surface curvature using second-order height differences (discrete Laplacian).
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Small-scale surface unevenness
 /// - Local height variations that increase future instability
@@ -493,16 +498,16 @@ impl MetricSource for ColumnTransitionsPenalty {
 #[derive(Debug)]
 pub struct SurfaceRoughnessPenalty;
 
-impl MetricSource for SurfaceRoughnessPenalty {
+impl BoardFeatureSource for SurfaceRoughnessPenalty {
     const NORMALIZATION_MIN: f32 = 5.0;
     const NORMALIZATION_MAX: f32 = 37.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Surface Roughness Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         analysis
             .column_heights
             .windows(3)
@@ -518,15 +523,15 @@ impl MetricSource for SurfaceRoughnessPenalty {
 
 /// Smooth penalty for excessive single-column well depth; thresholds shallow wells.
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Over-committed vertical wells
 /// - Single columns with extreme depth
 /// - Over-commitment that reduces recovery options
 ///
 /// Only wells deeper than 1 are considered dangerous. Shallow wells (depth ≤ 1) are allowed to preserve freedom
-/// for controlled I-well construction. This metric is strictly a safety penalty and does NOT reward I-wells;
-/// combine with `IWellRewardMetric` for balanced evaluation.
+/// for controlled I-well construction. This feature is strictly a safety penalty and does NOT reward I-wells;
+/// combine with [`IWellReward`] for balanced evaluation.
 ///
 /// # Raw measurement
 ///
@@ -558,16 +563,16 @@ impl MetricSource for SurfaceRoughnessPenalty {
 #[derive(Debug)]
 pub struct WellDepthPenalty;
 
-impl MetricSource for WellDepthPenalty {
+impl BoardFeatureSource for WellDepthPenalty {
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 26.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Well Depth Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         const DEPTH_THRESHOLD: u8 = 1;
         analysis
             .column_well_depths
@@ -580,14 +585,14 @@ impl MetricSource for WellDepthPenalty {
 
 /// Thresholded risk for dangerously deep wells beyond safe operational limits.
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Wells that exceed safe construction depth
 /// - Over-commitment to vertical structures
 /// - Reduced board flexibility and recovery options
 ///
-/// Unlike `WellDepthPenalty`, which applies smooth linear penalties to all wells beyond depth 1,
-/// this metric focuses on extreme depth scenarios. Acts as a hard constraint to prevent catastrophic
+/// Unlike [`WellDepthPenalty`], which applies smooth linear penalties to all wells beyond depth 1,
+/// this feature focuses on extreme depth scenarios. Acts as a hard constraint to prevent catastrophic
 /// well over-commitment while allowing controlled I-well construction.
 ///
 /// # Raw measurement
@@ -624,16 +629,16 @@ impl MetricSource for WellDepthPenalty {
 #[derive(Debug)]
 pub struct DeepWellRisk;
 
-impl MetricSource for DeepWellRisk {
+impl BoardFeatureSource for DeepWellRisk {
     const NORMALIZATION_MIN: f32 = 5.0; // P75
     const NORMALIZATION_MAX: f32 = 13.0; // P95
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Deep Well Risk"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         const DEPTH_THRESHOLD: u8 = 1;
         analysis
             .column_well_depths
@@ -646,12 +651,12 @@ impl MetricSource for DeepWellRisk {
 
 /// Thresholded risk for imminent top-out based on maximum column height.
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Approaching the ceiling (irreversible top-out risk)
 /// - States close to game over
 ///
-/// Unlike other metrics, max height is intentionally ignored for most of the game and only penalized near the ceiling,
+/// Unlike other features, max height is intentionally ignored for most of the game and only penalized near the ceiling,
 /// reflecting the irreversible nature of top-out. Acts as a hard constraint rather than a general board quality measure.
 ///
 /// # Raw measurement
@@ -687,16 +692,16 @@ impl MetricSource for DeepWellRisk {
 #[derive(Debug)]
 pub struct TopOutRisk;
 
-impl MetricSource for TopOutRisk {
+impl BoardFeatureSource for TopOutRisk {
     const NORMALIZATION_MIN: f32 = 8.0; // P75
     const NORMALIZATION_MAX: f32 = 12.0; // P95
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Top-Out Risk"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let max_height = *analysis.column_heights.iter().max().unwrap();
         u32::from(max_height)
     }
@@ -704,13 +709,13 @@ impl MetricSource for TopOutRisk {
 
 /// Smooth penalty for global stacking pressure by summing all column heights.
 ///
-/// This metric penalizes:
+/// This feature penalizes:
 ///
 /// - Gradual accumulation of blocks across the entire board
 /// - Overall board pressure not captured by local roughness or transitions
 /// - High average stack height
 ///
-/// Unlike `MaxHeightMetric`, which focuses on top-out danger from the tallest column, this metric captures
+/// Unlike [`TopOutRisk`], which focuses on top-out danger from the tallest column, this feature captures
 /// cumulative pressure across all columns. It reflects the total "weight" of the board state.
 ///
 /// # Raw measurement
@@ -747,23 +752,23 @@ impl MetricSource for TopOutRisk {
 #[derive(Debug)]
 pub struct TotalHeightPenalty;
 
-impl MetricSource for TotalHeightPenalty {
+impl BoardFeatureSource for TotalHeightPenalty {
     const NORMALIZATION_MIN: f32 = 8.0;
     const NORMALIZATION_MAX: f32 = 93.0;
-    const SIGNAL: MetricSignal = MetricSignal::Negative;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
         "Total Height Penalty"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         analysis.column_heights.iter().map(|&h| u32::from(h)).sum()
     }
 }
 
 /// Discrete bonus for line clears with strong emphasis on efficient 4-line clears (tetrises).
 ///
-/// This metric encourages:
+/// This feature encourages:
 ///
 /// - Clearing multiple lines in a single placement
 /// - Prioritizing tetrises (4-line clears) over singles/doubles
@@ -785,7 +790,7 @@ impl MetricSource for TotalHeightPenalty {
 ///
 /// # Stats
 ///
-/// This is a per-placement reward, not a cumulative board state metric. Distribution depends on
+/// This is a per-placement reward, not a cumulative board state feature. Distribution depends on
 /// play style and board construction strategy.
 ///
 /// # Interpretation (raw)
@@ -802,16 +807,16 @@ impl MetricSource for TotalHeightPenalty {
 #[derive(Debug)]
 pub struct LineClearBonus;
 
-impl MetricSource for LineClearBonus {
+impl BoardFeatureSource for LineClearBonus {
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 6.0;
-    const SIGNAL: MetricSignal = MetricSignal::Positive;
+    const SIGNAL: FeatureSignal = FeatureSignal::Positive;
 
     fn name() -> &'static str {
         "Lines Clear Bonus"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         u32::try_from(analysis.cleared_lines).unwrap()
     }
 
@@ -823,7 +828,7 @@ impl MetricSource for LineClearBonus {
 
 /// Smooth reward for maintaining an edge I-well for reliable tetrises without over-committing.
 ///
-/// This metric encourages:
+/// This feature encourages:
 ///
 /// - Building a single-column well at the board edge
 /// - Maintaining tetris-ready depth (around 4)
@@ -856,22 +861,22 @@ impl MetricSource for LineClearBonus {
 ///
 /// # Rationale and interplay
 ///
-/// - Complements `DeepWellRiskMetric` by penalizing excessive vertical wells.
-/// - Synergizes with `LineClearRewardMetric` to favor consistent tetrises.
+/// - Complements [`DeepWellRisk`] by penalizing excessive vertical wells.
+/// - Synergizes with [`LineClearBonus`] to favor consistent tetrises.
 /// - The consumption guard discourages hoarding when an `I` piece is available.
 #[derive(Debug)]
 pub struct IWellReward;
 
-impl MetricSource for IWellReward {
+impl BoardFeatureSource for IWellReward {
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 1.0;
-    const SIGNAL: MetricSignal = MetricSignal::Positive;
+    const SIGNAL: FeatureSignal = FeatureSignal::Positive;
 
     fn name() -> &'static str {
         "I-Well Reward"
     }
 
-    fn measure_raw(analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let left_well_depth = analysis.column_well_depths[0];
         let right_well_depth = analysis.column_well_depths[BitBoard::PLAYABLE_WIDTH - 1];
         let max_depth = u8::max(left_well_depth, right_well_depth);
