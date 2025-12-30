@@ -31,6 +31,8 @@ use std::fmt;
 
 use crate::board_analysis::BoardAnalysis;
 
+mod stats;
+
 pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 11> = BoardFeatureSet([
     &HolesPenalty,
     &HoleDepthPenalty,
@@ -137,6 +139,8 @@ pub trait DynBoardFeatureSource: fmt::Debug + Send + Sync {
     #[must_use]
     fn name(&self) -> &'static str;
     #[must_use]
+    fn type_name(&self) -> &'static str;
+    #[must_use]
     fn normalization_min(&self) -> f32;
     #[must_use]
     fn normalization_max(&self) -> f32;
@@ -158,6 +162,10 @@ where
 {
     fn name(&self) -> &'static str {
         T::name()
+    }
+
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<T>()
     }
 
     fn normalization_min(&self) -> f32 {
@@ -202,32 +210,16 @@ where
 /// - For each column, compute `column_height - occupied_cells`; sum across columns.
 /// - Counts empty cells that have at least one block above them.
 ///
-/// # Stats (raw values, 10x20, weak–mid AI, long run)
-///
-/// - Mean ≈ 1.62
-/// - P05 = P10 = P25 = 0
-/// - Median = 1
-/// - P75 = 2
-/// - P90 = 4
-/// - P95 = 6
-///
-/// # Interpretation (raw hole count)
-///
-/// - 0: ideal (≤Median)
-/// - 1-3: moderate risk (Median-P90)
-/// - 4-5: high risk (P90-P95)
-/// - 6+: critical (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=6.0]` (P05–P95 span; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer holes is better).
 #[derive(Debug)]
 pub struct HolesPenalty;
 
 impl BoardFeatureSource for HolesPenalty {
-    const NORMALIZATION_MIN: f32 = 0.0;
-    const NORMALIZATION_MAX: f32 = 6.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -258,35 +250,16 @@ impl BoardFeatureSource for HolesPenalty {
 ///   the cumulative sum where `blocks_above` is the count of occupied cells seen above the hole in that column.
 /// - `raw = Σ (blocks_above for each hole)` across all columns.
 ///
-/// # Stats (10x20, self-play sampling)
-///
-/// - Mean ≈ 7.07
-/// - P05 = 0
-/// - P10 = 0
-/// - P25 = 0
-/// - Median = 2
-/// - P75 = 9
-/// - P90 = 21
-/// - P95 = 32
-///
-/// # Interpretation (raw cumulative depth)
-///
-/// - 0-1: shallow/absent holes (<Median)
-/// - 2-8: moderate depth (Median-P75)
-/// - 9-20: heavy depth (P75-P90)
-/// - 21-31: severe (P90-P95)
-/// - 32+: critical (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=32.0]` (≈ P05–P95; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower holes is better).
 #[derive(Debug)]
 pub struct HoleDepthPenalty;
 
 impl BoardFeatureSource for HoleDepthPenalty {
-    const NORMALIZATION_MIN: f32 = 0.0;
-    const NORMALIZATION_MAX: f32 = 32.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -327,36 +300,16 @@ impl BoardFeatureSource for HoleDepthPenalty {
 /// This differs from typical implementations that treat walls as filled cells, which can bias AI toward center placement.
 /// By excluding walls, this feature evaluates edge and center placements fairly.
 ///
-/// # Stats (raw values, 10x20, weak–mid AI)
-///
-/// - Mean ≈ 13.73
-/// - P05 = 4
-/// - P10 = 5
-/// - P25 = 7
-/// - Median = 11
-/// - P75 = 18
-/// - P90 = 27
-/// - P95 = 32
-///
-/// # Interpretation (raw transition count)
-///
-/// - 0-6: very clean (<P25)
-/// - 7-10: clean (P25-Median)
-/// - 11-17: normal mid-game (Median-P75)
-/// - 18-26: increased fragmentation (P75-P90)
-/// - 27-31: high fragmentation (P90-P95)
-/// - 32+: critical instability (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=4.0, NORMALIZATION_MAX=32.0]` (≈ P05–P95; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
 pub struct RowTransitionsPenalty;
 
 impl BoardFeatureSource for RowTransitionsPenalty {
-    const NORMALIZATION_MIN: f32 = 4.0;
-    const NORMALIZATION_MAX: f32 = 32.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -392,36 +345,16 @@ impl BoardFeatureSource for RowTransitionsPenalty {
 /// - For each column, scan from top to bottom within the playable area.
 /// - Count transitions where adjacent cells differ in occupancy (empty ↔ filled).
 ///
-/// # Stats (raw values, 10x20, self-play sampling)
-///
-/// - Mean ≈ 11.45
-/// - P05 = 6
-/// - P10 = 8
-/// - P25 = 9
-/// - Median = 11
-/// - P75 = 13
-/// - P90 = 17
-/// - P95 = 19
-///
-/// # Interpretation (raw transition count)
-///
-/// - 0-8: very clean (<P25)
-/// - 9-10: clean (P25-Median)
-/// - 11-12: normal (Median-P75)
-/// - 13-16: increased fragmentation (P75-P90)
-/// - 17-18: high fragmentation (P90-P95)
-/// - 19+: severe instability (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=6.0, NORMALIZATION_MAX=19.0]` (≈ P05–P95; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
 #[derive(Debug)]
 pub struct ColumnTransitionsPenalty;
 
 impl BoardFeatureSource for ColumnTransitionsPenalty {
-    const NORMALIZATION_MIN: f32 = 6.0;
-    const NORMALIZATION_MAX: f32 = 19.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -459,36 +392,16 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
 /// - For each triplet of adjacent columns, compute the discrete Laplacian: `|(right - mid) - (mid - left)|`.
 /// - Sum across all triplets.
 ///
-/// # Stats (raw values, 10x20, self-play sampling)
-///
-/// - Mean ≈ 14.99
-/// - P05 = 5
-/// - P10 = 6
-/// - P25 = 8
-/// - Median = 12
-/// - P75 = 18
-/// - P90 = 28
-/// - P95 = 37
-///
-/// # Interpretation (raw roughness)
-///
-/// - 0-7: flat surface (<P25)
-/// - 8-11: smooth (P25-Median)
-/// - 12-17: normal roughness (Median-P75)
-/// - 18-27: increased unevenness (P75-P90)
-/// - 28-36: high roughness (P90-P95)
-/// - 37+: critical chaos (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=5.0, NORMALIZATION_MAX=37.0]` (≈ P05–P95; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`
 /// - `SIGNAL` = Negative (flatter surface is better).
 #[derive(Debug)]
 pub struct SurfaceRoughnessPenalty;
 
 impl BoardFeatureSource for SurfaceRoughnessPenalty {
-    const NORMALIZATION_MIN: f32 = 5.0;
-    const NORMALIZATION_MAX: f32 = 37.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -526,33 +439,16 @@ impl BoardFeatureSource for SurfaceRoughnessPenalty {
 /// - `raw = Σ (depth - 1)` across all columns where `depth > 1`.
 /// - Linear penalty for excess well depth beyond the threshold.
 ///
-/// # Stats (raw values, 10x20, self-play sampling)
-///
-/// - Mean ≈ 3.27
-/// - P05 = P10 = P25 = 0
-/// - Median = 1
-/// - P75 = 5
-/// - P90 = 10
-/// - P95 = 13
-///
-/// # Interpretation (raw)
-///
-/// - 0: safe, no deep wells (<Median)
-/// - 1-4: controlled wells (Median-P75)
-/// - 5-9: risky depth (P75-P90)
-/// - 10-12: dangerous (P90-P95)
-/// - 13+: near-fatal vertical structure (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=13.0]` (≈ P05–P95; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
 #[derive(Debug)]
 pub struct WellDepthPenalty;
 
 impl BoardFeatureSource for WellDepthPenalty {
-    const NORMALIZATION_MIN: f32 = 0.0;
-    const NORMALIZATION_MAX: f32 = 13.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -587,34 +483,16 @@ impl BoardFeatureSource for WellDepthPenalty {
 /// - `raw = Σ (depth - DEPTH_THRESHOLD)` across columns where `depth > DEPTH_THRESHOLD` (2).
 /// - Measures cumulative excess depth beyond the safe construction threshold.
 ///
-/// # Stats (10x20, self-play sampling)
-///
-/// Raw values:
-///
-/// - Mean ≈ 3.27
-/// - P05 = P10 = P25 = 0
-/// - Median = 1
-/// - P75 = 5
-/// - P90 = 10
-/// - P95 = 13
-///
-/// # Interpretation (raw cumulative excess)
-///
-/// - 0-4: safe, no penalty applied
-/// - 5-9: caution zone, moderate over-commitment
-/// - 10-12: dangerous, multiple deep wells or one extreme well
-/// - 13+: critical, severe over-commitment across board
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=5.0, NORMALIZATION_MAX=13.0]` (≈ P75–P95; linear, uses raw directly).
+/// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
 #[derive(Debug)]
 pub struct DeepWellRisk;
 
 impl BoardFeatureSource for DeepWellRisk {
-    const NORMALIZATION_MIN: f32 = 5.0; // P75
-    const NORMALIZATION_MAX: f32 = 13.0; // P95
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -646,35 +524,16 @@ impl BoardFeatureSource for DeepWellRisk {
 ///
 /// - `raw = max(column_heights)`: the tallest column on the board.
 ///
-/// # Stats (10x20, self-play sampling)
-///
-/// Raw values:
-///
-/// - Mean ≈ 5.68
-/// - P05 = 2
-/// - P10 = 2
-/// - P25 = 3
-/// - Median = 4
-/// - P75 = 8
-/// - P90 = 12
-/// - P95 = 12
-///
-/// # Interpretation (raw height)
-///
-/// - 0-7: safe, no penalty applied
-/// - 8-11: caution to dangerous zone
-/// - 12- critical, near-certain top-out
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=8.0, NORMALIZATION_MAX=12.0]` (≈ P75–P95; linear, uses raw directly).
+/// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (lower height is better).
 #[derive(Debug)]
 pub struct TopOutRisk;
 
 impl BoardFeatureSource for TopOutRisk {
-    const NORMALIZATION_MIN: f32 = 8.0; // P75
-    const NORMALIZATION_MAX: f32 = 12.0; // P95
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -703,36 +562,16 @@ impl BoardFeatureSource for TopOutRisk {
 /// - `raw = Σ (column_heights)` across all 10 columns.
 /// - Linear accumulation for a smooth, continuous penalty.
 ///
-/// # Stats (raw values, 10x20, self-play sampling)
-///
-/// - Mean ≈ 40.26
-/// - P05 = 10
-/// - P10 = 14
-/// - P25 = 15
-/// - Median ≈ 27
-/// - P75 = 58
-/// - P90 ≈ 84
-/// - P95 ≈ 95
-///
-/// # Interpretation (raw)
-///
-/// - 0-14: very low pressure (≤P25)
-/// - 15-26: low pressure, early-game state (P25-Median)
-/// - 27-57: moderate pressure (Median-P75)
-/// - 58-83: elevated pressure (P75-P90)
-/// - 84-94: high pressure, limited recovery options (P90-P95)
-/// - 95+: near top-out danger (P95+)
-///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=10.0, NORMALIZATION_MAX=95.0]` (≈ P05–P95; linear, uses raw directly).
+/// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower total height is better).
 #[derive(Debug)]
 pub struct TotalHeightPenalty;
 
 impl BoardFeatureSource for TotalHeightPenalty {
-    const NORMALIZATION_MIN: f32 = 10.0;
-    const NORMALIZATION_MAX: f32 = 95.0;
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
     fn name() -> &'static str {
@@ -780,7 +619,7 @@ impl BoardFeatureSource for TotalHeightPenalty {
 ///
 /// # Normalization
 ///
-/// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=6.0]` (transformed range).
+/// - Clipped to `[0.0, 6.0]` (transformed range).
 /// - `SIGNAL` = Positive (more lines cleared is better).
 #[derive(Debug)]
 pub struct LineClearBonus;
@@ -829,13 +668,6 @@ impl BoardFeatureSource for LineClearBonus {
 ///
 /// - Clipped to `[NORMALIZATION_MIN=0.0, NORMALIZATION_MAX=1.0]` (transformed range already within bounds).
 /// - `SIGNAL` = Positive (higher is better).
-///
-/// # Interpretation (edge well depth)
-///
-/// - 0–1: negligible reward (no/very shallow well)
-/// - 2–3: moderate reward (well construction in progress)
-/// - 4: peak reward (ideal tetris-ready well)
-/// - 5+: decreasing reward (over-commitment discouraged)
 ///
 /// # Rationale and interplay
 ///

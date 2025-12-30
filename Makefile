@@ -64,8 +64,14 @@ generate-board-data: $(DATA_DIR)/boards.json
 
 ## Regenerate board data JSON file (force rebuild)
 .PHONY: regenerate-board-data
-regenerate-board-data: FORCE_REBUILD=1
+regenerate-board-data: REGENERATE_BOARDS_JSON=1
 regenerate-board-data: $(DATA_DIR)/boards.json | $(DATA_DIR)/
+
+.PHONY: regenerate-board-feature-stats
+regenerate-board-feature-stats: $(DATA_DIR)/boards.json
+	cargo run --release -- generate-board-feature-stats \
+		$(DATA_DIR)/boards.json \
+		--output crates/oxidris-ai/src/board_feature/stats.rs
 
 ## Train an aggressive AI using genetic algorithms
 .PHONY: train-ai-aggro
@@ -94,9 +100,9 @@ purge: clean
 
 # Artifact generation rules
 
-FORCE_REBUILD=
+REGENERATE_BOARDS_JSON=
 
-$(DATA_DIR)/boards.json: $$(if $$(FORCE_REBUILD),FORCE) | $(DATA_DIR)/
+$(DATA_DIR)/boards.json: $$(if $$(REGENERATE_BOARDS_JSON),FORCE) | $(DATA_DIR)/
 	cargo run --release -- generate-boards --output $@
 
 # Pattern rule to create directories as needed

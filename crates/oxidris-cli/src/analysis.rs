@@ -2,9 +2,9 @@ use std::array;
 
 use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue};
 
-use crate::{analyze_board_features::data::HistogramBin, data::BoardAndPlacement};
-
-use super::data::{BoardFeatures, FeatureStatistics, Histogram, ValueStats};
+use crate::data::{
+    BoardAndPlacement, BoardFeatures, FeatureStatistics, Histogram, HistogramBin, ValueStats,
+};
 
 pub fn compute_all_features(boards: &[BoardAndPlacement]) -> Vec<BoardFeatures> {
     boards.iter().map(compute_board_features).collect()

@@ -1,18 +1,18 @@
 use std::path::PathBuf;
 
-mod analysis;
-mod data;
+use crate::{analysis, data};
+
 mod index;
 mod ui;
 
 #[derive(Default, Debug, Clone, clap::Args)]
-pub(crate) struct GenerateBoardsArg {
-    /// Output file path
+pub(crate) struct AnalyzeBoardFeaturesArg {
+    /// Boards data file path
     boards_file: PathBuf,
 }
 
-pub fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
-    let GenerateBoardsArg { boards_file } = arg;
+pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
+    let AnalyzeBoardFeaturesArg { boards_file } = arg;
 
     eprintln!("Loading boards from {}...", boards_file.display());
     let boards = data::load_board(boards_file)?;

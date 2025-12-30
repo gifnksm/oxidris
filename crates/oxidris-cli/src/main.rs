@@ -2,17 +2,22 @@ use clap::{Parser, Subcommand};
 use oxidris_ai::AiType;
 
 use self::{
+    analyze_board_features::AnalyzeBoardFeaturesArg,
+    generate_board_feature_stats::GenerateBoardFeatureStatsArg,
     generate_boards::GenerateBoardsArg,
     play::{AutoPlayArg, ManualPlayArg},
     train_ai::TrainAiArg,
 };
 
+mod analysis;
 mod analyze_board_features;
 mod data;
+mod generate_board_feature_stats;
 mod generate_boards;
 mod play;
 mod train_ai;
 mod ui;
+mod util;
 
 #[derive(Debug, Clone, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -34,7 +39,8 @@ enum Mode {
     /// Generate boards for training data
     GenerateBoards(#[clap(flatten)] GenerateBoardsArg),
     /// Analyze board features with TUI
-    AnalyzeBoardFeatures(#[clap(flatten)] analyze_board_features::GenerateBoardsArg),
+    AnalyzeBoardFeatures(#[clap(flatten)] AnalyzeBoardFeaturesArg),
+    GenerateBoardFeatureStats(#[clap(flatten)] GenerateBoardFeatureStatsArg),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -48,6 +54,7 @@ fn main() -> anyhow::Result<()> {
         Mode::TrainAi(arg) => train_ai::run(&arg),
         Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
         Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,
+        Mode::GenerateBoardFeatureStats(arg) => generate_board_feature_stats::run(&arg)?,
     }
     Ok(())
 }

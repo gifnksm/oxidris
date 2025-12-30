@@ -1,4 +1,8 @@
-use std::{fs::File, io, path::PathBuf};
+use std::{
+    fs::File,
+    io::{self, BufWriter, Write as _},
+    path::PathBuf,
+};
 
 use anyhow::Context;
 use oxidris_ai::{placement_evaluator::DumpPlacementEvaluator, turn_evaluator::TurnEvaluator};
@@ -104,7 +108,16 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     } else {
         Box::new(io::stdout().lock()) as Box<dyn io::Write>
     };
-    serde_json::to_writer(writer, &captured_boards).with_context(|| {
+    let mut writer = BufWriter::new(writer);
+    serde_json::to_writer(&mut writer, &captured_boards).with_context(|| {
+        format!(
+            "Failed to write captured boards to {}",
+            output
+                .as_ref()
+                .map_or_else(|| "stdout".to_string(), |p| p.display().to_string())
+        )
+    })?;
+    writer.flush().with_context(|| {
         format!(
             "Failed to write captured boards to {}",
             output

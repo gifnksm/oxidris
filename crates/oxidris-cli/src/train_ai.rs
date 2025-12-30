@@ -9,6 +9,8 @@ use oxidris_ai::{
 };
 use oxidris_engine::GameField;
 
+use crate::util;
+
 const GAMES_PER_INDIVIDUAL: usize = 3;
 const TURN_LIMIT: usize = 3000;
 
@@ -159,37 +161,9 @@ pub(crate) fn run(arg: &TrainAiArg) {
         best_individual.weights().as_array(),
     ) {
         let scale = w / (1.0 / ALL_BOARD_FEATURES.len() as f32);
-        eprintln!("    {}, // {} (x{scale:.3})", format_weight(w), f.name());
+        eprintln!("    {}, // {} (x{scale:.3})", util::format_f32(w), f.name());
     }
     eprintln!("]");
 
     eprintln!("{ai:?} AI learning completed.");
-}
-
-fn format_weight(weight: f32) -> String {
-    let s = format!("{weight:?}");
-    let Some((int_part, frac_part)) = s
-        .split_once('.')
-        .filter(|(_int_part, frac_part)| frac_part.len() > 3)
-    else {
-        return s;
-    };
-    let (parts, tail) = frac_part.as_bytes().as_chunks::<3>();
-    let mut result = String::from(int_part);
-    result.push('.');
-    let mut first = true;
-    for part in parts {
-        if !first {
-            result.push('_');
-        }
-        result.push_str(str::from_utf8(part).unwrap());
-        first = false;
-    }
-    if !tail.is_empty() {
-        if !first {
-            result.push('_');
-        }
-        result.push_str(str::from_utf8(tail).unwrap());
-    }
-    result
 }
