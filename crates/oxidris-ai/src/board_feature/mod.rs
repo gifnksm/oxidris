@@ -6,7 +6,7 @@
 //! # Typology
 //!
 //! - Risk: thresholded danger that escalates rapidly beyond a safe limit (e.g., [`DeepWellRisk`], [`TopOutRisk`]).
-//! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`HoleDepthPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
+//! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`HoleDepthPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceBumpinessPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
 //! - Reward: smooth positive signals (e.g., [`IWellReward`]).
 //! - Bonus: discrete strong rewards (e.g., [`LineClearBonus`]).
 //!
@@ -33,11 +33,12 @@ use crate::board_analysis::BoardAnalysis;
 
 mod stats;
 
-pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 11> = BoardFeatureSet([
+pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 12> = BoardFeatureSet([
     &HolesPenalty,
     &HoleDepthPenalty,
     &RowTransitionsPenalty,
     &ColumnTransitionsPenalty,
+    &SurfaceBumpinessPenalty,
     &SurfaceRoughnessPenalty,
     &WellDepthPenalty,
     &DeepWellRisk,
@@ -377,6 +378,52 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
     }
 }
 
+/// Smooth penalty for surface height variation between adjacent columns.
+///
+/// This feature penalizes:
+///
+/// - Overall height differences between adjacent columns
+/// - Step-like surface patterns
+/// - Non-flat board surfaces that complicate piece placement
+///
+/// Differs from [`SurfaceRoughnessPenalty`] which measures curvature (second-order differences);
+/// this feature directly measures first-order height differences, making it more sensitive
+/// to simple step patterns and overall surface flatness.
+///
+/// # Raw measurement
+///
+/// - For each pair of adjacent columns, compute `|height_right - height_left|`.
+/// - Sum across all adjacent pairs.
+///
+/// # Normalization
+///
+/// - Clipped to `[P05, P95]`.
+/// - `SIGNAL` = Negative (flatter surface is better).
+#[derive(Debug)]
+pub struct SurfaceBumpinessPenalty;
+
+impl BoardFeatureSource for SurfaceBumpinessPenalty {
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
+
+    fn name() -> &'static str {
+        "Surface Bumpiness Penalty"
+    }
+
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
+        analysis
+            .column_heights
+            .windows(2)
+            .map(|w| {
+                let left = i32::from(w[0]);
+                let right = i32::from(w[1]);
+                (right - left).unsigned_abs()
+            })
+            .sum()
+    }
+}
+
 /// Smooth penalty for local surface curvature using second-order height differences (discrete Laplacian).
 ///
 /// This feature penalizes:
@@ -385,7 +432,10 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
 /// - Local height variations that increase future instability
 /// - Shapes that are prone to creating holes
 ///
-/// Complements row and column transitions by remaining sensitive even when the overall stack is low.
+/// Differs from [`SurfaceBumpinessPenalty`] which measures first-order height differences;
+/// this feature uses second-order differences (curvature) and is more sensitive to local
+/// irregularities while tolerating gradual slopes. Complements row and column transitions
+/// by remaining sensitive even when the overall stack is low.
 ///
 /// # Raw measurement
 ///

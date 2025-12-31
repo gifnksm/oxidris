@@ -94,6 +94,30 @@ impl crate::board_feature::ColumnTransitionsPenalty {
     pub const NORMALIZED_P99: f32 = 1.0;
 }
 
+impl crate::board_feature::SurfaceBumpinessPenalty {
+    pub const RAW_P01: f32 = 2.0;
+    pub const RAW_P05: f32 = 4.0;
+    pub const RAW_P25: f32 = 6.0;
+    pub const RAW_P50: f32 = 9.0;
+    pub const RAW_P75: f32 = 14.0;
+    pub const RAW_P95: f32 = 28.0;
+    pub const RAW_P99: f32 = 39.0;
+    pub const TRANSFORMED_P01: f32 = 2.0;
+    pub const TRANSFORMED_P05: f32 = 4.0;
+    pub const TRANSFORMED_P25: f32 = 6.0;
+    pub const TRANSFORMED_P50: f32 = 9.0;
+    pub const TRANSFORMED_P75: f32 = 14.0;
+    pub const TRANSFORMED_P95: f32 = 28.0;
+    pub const TRANSFORMED_P99: f32 = 39.0;
+    pub const NORMALIZED_P01: f32 = 0.0;
+    pub const NORMALIZED_P05: f32 = 0.0;
+    pub const NORMALIZED_P25: f32 = 0.583_333_4;
+    pub const NORMALIZED_P50: f32 = 0.791_666_7;
+    pub const NORMALIZED_P75: f32 = 0.916_666_7;
+    pub const NORMALIZED_P95: f32 = 1.0;
+    pub const NORMALIZED_P99: f32 = 1.0;
+}
+
 impl crate::board_feature::SurfaceRoughnessPenalty {
     pub const RAW_P01: f32 = 3.0;
     pub const RAW_P05: f32 = 5.0;
