@@ -33,7 +33,7 @@ use crate::board_analysis::BoardAnalysis;
 
 mod stats;
 
-pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 12> = BoardFeatureSet([
+pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 14> = BoardFeatureSet([
     &HolesPenalty,
     &HoleDepthPenalty,
     &RowTransitionsPenalty,
@@ -42,6 +42,8 @@ pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 12> = BoardFeatureSet([
     &SurfaceRoughnessPenalty,
     &WellDepthPenalty,
     &DeepWellRisk,
+    &MaxHeightPenalty,
+    &CenterColumnsPenalty,
     &TopOutRisk,
     &TotalHeightPenalty,
     &LineClearBonus,
@@ -556,6 +558,86 @@ impl BoardFeatureSource for DeepWellRisk {
             .into_iter()
             .filter(|depth| *depth > DEPTH_THRESHOLD)
             .map(|depth| u32::from(depth - DEPTH_THRESHOLD))
+            .sum()
+    }
+}
+
+/// Smooth penalty for maximum column height across the board.
+///
+/// This feature penalizes:
+///
+/// - The tallest column on the board
+/// - Localized vertical pressure
+/// - Risk of reduced placement options
+///
+/// Unlike [`TopOutRisk`], which uses a thresholded approach focused on imminent danger,
+/// this feature provides a smooth, continuous penalty throughout the game. It complements
+/// [`TotalHeightPenalty`] by focusing on peak height rather than cumulative pressure.
+///
+/// # Raw measurement
+///
+/// - `raw = max(column_heights)`: the height of the tallest column.
+///
+/// # Normalization
+///
+/// - Clipped to `[P05, P95]`.
+/// - `SIGNAL` = Negative (lower maximum height is better).
+#[derive(Debug)]
+pub struct MaxHeightPenalty;
+
+impl BoardFeatureSource for MaxHeightPenalty {
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
+
+    fn name() -> &'static str {
+        "Max Height Penalty"
+    }
+
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
+        let max_height = *analysis.column_heights.iter().max().unwrap();
+        u32::from(max_height)
+    }
+}
+
+/// Smooth penalty for cumulative height in the center four columns.
+///
+/// This feature penalizes:
+///
+/// - Building high stacks in the center of the board
+/// - Reduced flexibility for piece placement
+/// - Difficulty in maintaining edge wells for tetrises
+///
+/// The center columns (indices 3-6 in the 10-column playable area) are strategically
+/// important as they limit placement options more severely than edge columns.
+/// High center stacks make it harder to build and maintain effective I-wells.
+///
+/// # Raw measurement
+///
+/// - `raw = Σ (column_heights[3..=6])`: sum of heights in columns 3, 4, 5, and 6.
+///
+/// # Normalization
+///
+/// - Clipped to `[P05, P95]`.
+/// - `SIGNAL` = Negative (lower center height is better).
+#[derive(Debug)]
+pub struct CenterColumnsPenalty;
+
+impl BoardFeatureSource for CenterColumnsPenalty {
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
+
+    fn name() -> &'static str {
+        "Center Columns Penalty"
+    }
+
+    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
+        const CENTER_START: usize = 3;
+        const CENTER_END: usize = 6;
+        analysis.column_heights[CENTER_START..=CENTER_END]
+            .iter()
+            .map(|&h| u32::from(h))
             .sum()
     }
 }
