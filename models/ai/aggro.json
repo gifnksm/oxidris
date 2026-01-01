@@ -1,21 +1,21 @@
 {
   "name": "aggro",
-  "trained_at": "2026-01-01T10:01:37.345367160Z",
-  "final_fitness": 2.627889,
+  "trained_at": "2026-01-01T10:13:17.446829612Z",
+  "final_fitness": 2.5327778,
   "placement_weights": {
-    "center_columns_penalty": 0.0078585455,
-    "column_transitions_penalty": 0.0,
-    "deep_well_risk": 0.10529373,
-    "hole_depth_penalty": 0.14523599,
-    "holes_penalty": 0.3716414,
-    "i_well_reward": 0.06640036,
-    "line_clear_bonus": 0.044470508,
-    "max_height_penalty": 0.016824847,
-    "row_transitions_penalty": 0.0039244327,
-    "surface_bumpiness_penalty": 0.07521715,
-    "surface_roughness_penalty": 0.033390075,
-    "top_out_risk": 0.10964847,
-    "total_height_penalty": 0.0072852634,
-    "well_depth_penalty": 0.01280922
+    "center_columns_penalty": 0.002233016,
+    "column_transitions_penalty": 0.0006086955,
+    "deep_well_risk": 0.11429311,
+    "hole_depth_penalty": 0.10741088,
+    "holes_penalty": 0.34699047,
+    "i_well_reward": 0.07289727,
+    "line_clear_bonus": 0.043721523,
+    "max_height_penalty": 0.017843965,
+    "row_transitions_penalty": 0.11112489,
+    "surface_bumpiness_penalty": 0.031924102,
+    "surface_roughness_penalty": 0.011684118,
+    "top_out_risk": 0.119656555,
+    "total_height_penalty": 0.019611431,
+    "well_depth_penalty": 0.0
   }
 }

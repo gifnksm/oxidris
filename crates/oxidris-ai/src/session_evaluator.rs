@@ -45,7 +45,7 @@ impl SessionEvaluator for AggroSessionEvaluator {
     }
 
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate_session_stats(&self, _field: &GameField, stats: &GameStats) -> f32 {
+    fn evaluate_session_stats(&self, field: &GameField, stats: &GameStats) -> f32 {
         const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
 
         let survived = stats.completed_pieces() as f32;
@@ -56,7 +56,8 @@ impl SessionEvaluator for AggroSessionEvaluator {
             .map(|(w, c)| f32::from(w) * (*c as f32))
             .sum::<f32>();
         let efficiency = weighted_line_count / survived.max(1.0);
-        survival_bonus + efficiency * survived_ratio
+        let height_penalty = (field.board().max_height() as f32) / 20.0;
+        survival_bonus + efficiency * survived_ratio - height_penalty
     }
 }
 
