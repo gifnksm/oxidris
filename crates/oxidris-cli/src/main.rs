@@ -39,6 +39,7 @@ enum Mode {
     GenerateBoards(#[clap(flatten)] GenerateBoardsArg),
     /// Analyze board features with TUI
     AnalyzeBoardFeatures(#[clap(flatten)] AnalyzeBoardFeaturesArg),
+    /// Generate statistics about board features
     GenerateBoardFeatureStats(#[clap(flatten)] GenerateBoardFeatureStatsArg),
 }
 
