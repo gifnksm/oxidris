@@ -182,7 +182,7 @@ pub(crate) fn auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
             best_turn = turn_evaluator.select_best_turn(game.field());
         }
 
-        if let Some(target) = best_turn
+        if let Some((target, _)) = best_turn
             && operate_game(game, target)
         {
             best_turn = None;

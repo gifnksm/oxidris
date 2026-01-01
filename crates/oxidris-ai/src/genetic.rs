@@ -71,11 +71,10 @@ impl Population {
         &self.individuals
     }
 
-    pub fn evaluate_fitness(
-        &mut self,
-        fields: &[GameField],
-        session_evaluator: &dyn SessionEvaluator,
-    ) {
+    pub fn evaluate_fitness<E>(&mut self, fields: &[GameField], session_evaluator: &E)
+    where
+        E: SessionEvaluator + ?Sized,
+    {
         thread::scope(|s| {
             for ind in &mut self.individuals {
                 let placement_evaluator = FeatureBasedPlacementEvaluator::new(

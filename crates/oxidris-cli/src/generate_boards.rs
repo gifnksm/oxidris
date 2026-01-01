@@ -40,13 +40,13 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         let mut captured_heights = [false; 4];
         let mut field = GameField::new();
         let mut stats = GameStats::new();
-        while let Some(turn) = turn_evaluator.select_best_turn(&field) {
+        while let Some((turn, analysis)) = turn_evaluator.select_best_turn(&field) {
             let t = stats.completed_pieces();
             let capture_board = BoardAndPlacement {
                 board: field.board().clone(),
                 placement: turn.placement(),
             };
-            let (_cleared_lines, result) = turn.apply(&mut field, &mut stats);
+            let (_cleared_lines, result) = turn.apply(&analysis, &mut field, &mut stats);
             if result.is_err() {
                 break;
             }

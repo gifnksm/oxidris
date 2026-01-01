@@ -3,7 +3,22 @@ use std::iter;
 use arrayvec::ArrayVec;
 use oxidris_engine::{BitBoard, CompletePieceDropError, GameField, GameStats, Piece};
 
-use crate::placement_evaluator::PlacementEvaluator;
+use crate::{board_analysis::BoardAnalysis, placement_evaluator::PlacementEvaluator};
+
+pub trait SessionStats: Sized {
+    fn new() -> Self;
+    fn complete_piece_drop(&mut self, analysis: &BoardAnalysis);
+}
+
+impl SessionStats for GameStats {
+    fn new() -> Self {
+        GameStats::new()
+    }
+
+    fn complete_piece_drop(&mut self, analysis: &BoardAnalysis) {
+        self.complete_piece_drop(analysis.cleared_lines);
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct TurnPlan {
@@ -22,18 +37,22 @@ impl TurnPlan {
         self.placement
     }
 
-    pub fn apply(
+    pub fn apply<S>(
         &self,
+        analysis: &BoardAnalysis,
         field: &mut GameField,
-        stats: &mut GameStats,
-    ) -> (usize, Result<(), CompletePieceDropError>) {
+        stats: &mut S,
+    ) -> (usize, Result<(), CompletePieceDropError>)
+    where
+        S: SessionStats,
+    {
         if self.use_hold {
             field.try_hold().unwrap();
         }
         assert_eq!(field.falling_piece().kind(), self.placement.kind());
         field.set_falling_piece_unchecked(self.placement);
         let (cleared_lines, result) = field.complete_piece_drop();
-        stats.complete_piece_drop(cleared_lines);
+        stats.complete_piece_drop(analysis);
         (cleared_lines, result)
     }
 }
@@ -54,17 +73,16 @@ impl TurnEvaluator {
     }
 
     #[must_use]
-    pub fn select_best_turn(&self, field: &GameField) -> Option<TurnPlan> {
+    pub fn select_best_turn(&self, field: &GameField) -> Option<(TurnPlan, BoardAnalysis)> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
 
         for turn in available_turns(field).into_iter().flatten() {
-            let score = self
-                .placement_evaluator
-                .evaluate_placement(field.board(), turn.placement);
+            let analysis = BoardAnalysis::from_board(field.board(), turn.placement());
+            let score = self.placement_evaluator.evaluate_placement(&analysis);
             if score > best_score {
                 best_score = score;
-                best_result = Some(turn);
+                best_result = Some((turn, analysis));
             }
         }
 
@@ -72,13 +90,16 @@ impl TurnEvaluator {
     }
 
     #[must_use]
-    pub fn play_session(&self, field: &mut GameField, turn_limit: usize) -> GameStats {
-        let mut stats = GameStats::new();
+    pub fn play_session<S>(&self, field: &mut GameField, turn_limit: usize) -> S
+    where
+        S: SessionStats,
+    {
+        let mut stats = S::new();
         for _ in 0..turn_limit {
-            let (_cleared_lines, result) = self
-                .select_best_turn(field)
-                .unwrap()
-                .apply(field, &mut stats);
+            let Some((turn, analysis)) = self.select_best_turn(field) else {
+                return stats;
+            };
+            let (_cleared_lines, result) = turn.apply(&analysis, field, &mut stats);
             if result.is_err() {
                 break;
             }

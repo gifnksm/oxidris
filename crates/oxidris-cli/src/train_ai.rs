@@ -5,7 +5,9 @@ use oxidris_ai::{
     AiType,
     board_feature::ALL_BOARD_FEATURES,
     genetic::{Population, PopulationEvolver},
-    session_evaluator::{AggroSessionEvaluator, DefensiveSessionEvaluator, SessionEvaluator},
+    session_evaluator::{
+        AggroSessionEvaluator, DefaultSessionEvaluator, DefensiveSessionEvaluator, SessionEvaluator,
+    },
     statistics,
 };
 use oxidris_engine::GameField;
@@ -81,8 +83,12 @@ pub(crate) struct TrainAiArg {
 pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
     let TrainAiArg { ai, output } = arg;
     let session_evaluator = match ai {
-        AiType::Aggro => &AggroSessionEvaluator::new(TURN_LIMIT) as &dyn SessionEvaluator,
-        AiType::Defensive => &DefensiveSessionEvaluator::new(TURN_LIMIT) as &dyn SessionEvaluator,
+        AiType::Aggro => &DefaultSessionEvaluator::new(TURN_LIMIT, AggroSessionEvaluator::new())
+            as &dyn SessionEvaluator,
+        AiType::Defensive => {
+            &DefaultSessionEvaluator::new(TURN_LIMIT, DefensiveSessionEvaluator::new())
+                as &dyn SessionEvaluator
+        }
     };
     let board_features = ALL_BOARD_FEATURES;
 

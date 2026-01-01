@@ -2,15 +2,55 @@ use std::{fmt, iter};
 
 use oxidris_engine::{GameField, GameStats};
 
-use crate::turn_evaluator::TurnEvaluator;
+use crate::{
+    board_analysis::BoardAnalysis,
+    turn_evaluator::{SessionStats, TurnEvaluator},
+};
+
+pub trait EvaluateSessionStats {
+    type Stats: SessionStats;
+    fn evaluate_session_stats(
+        &self,
+        field: &GameField,
+        stats: &Self::Stats,
+        turn_limit: usize,
+    ) -> f32;
+}
 
 pub trait SessionEvaluator: fmt::Debug + Send + Sync {
-    fn turn_limit(&self) -> usize;
-    fn evaluate_session_stats(&self, field: &GameField, stats: &GameStats) -> f32;
+    fn play_and_evaluate_session(&self, field: &GameField, turn_evaluator: &TurnEvaluator) -> f32;
+    #[expect(clippy::cast_precision_loss)]
+    fn play_and_evaluate_sessions(
+        &self,
+        fields: &[GameField],
+        turn_evaluator: &TurnEvaluator,
+    ) -> f32;
+}
 
+#[derive(Debug)]
+pub struct DefaultSessionEvaluator<E> {
+    turn_limit: usize,
+    evaluator: E,
+}
+
+impl<E> DefaultSessionEvaluator<E> {
+    pub fn new(turn_limit: usize, evaluator: E) -> Self {
+        Self {
+            turn_limit,
+            evaluator,
+        }
+    }
+}
+
+impl<S, E> SessionEvaluator for DefaultSessionEvaluator<E>
+where
+    E: EvaluateSessionStats<Stats = S> + fmt::Debug + Send + Sync,
+    S: SessionStats,
+{
     fn play_and_evaluate_session(&self, field: &GameField, turn_evaluator: &TurnEvaluator) -> f32 {
-        let stats = turn_evaluator.play_session(&mut field.clone(), self.turn_limit());
-        self.evaluate_session_stats(field, &stats)
+        let stats = turn_evaluator.play_session(&mut field.clone(), self.turn_limit);
+        self.evaluator
+            .evaluate_session_stats(field, &stats, self.turn_limit)
     }
 
     #[expect(clippy::cast_precision_loss)]
@@ -28,65 +68,91 @@ pub trait SessionEvaluator: fmt::Debug + Send + Sync {
 }
 
 #[derive(Debug)]
-pub struct AggroSessionEvaluator {
-    turn_limit: usize,
+pub struct DefaultSessionStats {
+    game_stats: GameStats,
+    worst_max_height: u8,
 }
+
+impl SessionStats for DefaultSessionStats {
+    fn new() -> Self {
+        Self {
+            game_stats: GameStats::new(),
+            worst_max_height: 0,
+        }
+    }
+
+    fn complete_piece_drop(&mut self, analysis: &BoardAnalysis) {
+        self.game_stats.complete_piece_drop(analysis.cleared_lines);
+        let max_height = analysis.column_heights.into_iter().max().unwrap();
+        if max_height > self.worst_max_height {
+            self.worst_max_height = max_height;
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct AggroSessionEvaluator {}
 
 impl AggroSessionEvaluator {
     #[must_use]
-    pub fn new(turn_limit: usize) -> Self {
-        Self { turn_limit }
+    pub const fn new() -> Self {
+        Self {}
     }
 }
 
-impl SessionEvaluator for AggroSessionEvaluator {
-    fn turn_limit(&self) -> usize {
-        self.turn_limit
-    }
+impl EvaluateSessionStats for AggroSessionEvaluator {
+    type Stats = DefaultSessionStats;
 
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate_session_stats(&self, field: &GameField, stats: &GameStats) -> f32 {
+    fn evaluate_session_stats(
+        &self,
+        _field: &GameField,
+        stats: &Self::Stats,
+        turn_limit: usize,
+    ) -> f32 {
         const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
 
-        let survived = stats.completed_pieces() as f32;
-        let max_pieces = self.turn_limit as f32;
+        let survived = stats.game_stats.completed_pieces() as f32;
+        let max_pieces = turn_limit as f32;
         let survived_ratio = survived / max_pieces;
         let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let weighted_line_count = iter::zip(LINE_CLEAR_WEIGHT, stats.line_cleared_counter())
-            .map(|(w, c)| f32::from(w) * (*c as f32))
-            .sum::<f32>();
+        let weighted_line_count =
+            iter::zip(LINE_CLEAR_WEIGHT, stats.game_stats.line_cleared_counter())
+                .map(|(w, c)| f32::from(w) * (*c as f32))
+                .sum::<f32>();
         let efficiency = weighted_line_count / survived.max(1.0);
-        let height_penalty = (field.board().max_height() as f32) / 20.0;
+        let height_penalty = ((u8::max(stats.worst_max_height, 10) - 10) as f32) / 5.0;
         survival_bonus + efficiency * survived_ratio - height_penalty
     }
 }
 
-#[derive(Debug)]
-pub struct DefensiveSessionEvaluator {
-    turn_limit: usize,
-}
+#[derive(Default, Debug)]
+pub struct DefensiveSessionEvaluator {}
 
 impl DefensiveSessionEvaluator {
     #[must_use]
-    pub fn new(turn_limit: usize) -> Self {
-        Self { turn_limit }
+    pub const fn new() -> Self {
+        Self {}
     }
 }
 
-impl SessionEvaluator for DefensiveSessionEvaluator {
-    fn turn_limit(&self) -> usize {
-        self.turn_limit
-    }
+impl EvaluateSessionStats for DefensiveSessionEvaluator {
+    type Stats = DefaultSessionStats;
 
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate_session_stats(&self, field: &GameField, stats: &GameStats) -> f32 {
-        let survived = stats.completed_pieces() as f32;
-        let max_pieces = self.turn_limit as f32;
+    fn evaluate_session_stats(
+        &self,
+        _field: &GameField,
+        stats: &Self::Stats,
+        turn_limit: usize,
+    ) -> f32 {
+        let survived = stats.game_stats.completed_pieces() as f32;
+        let max_pieces = turn_limit as f32;
         let survived_ratio = survived / max_pieces;
         let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let line_count = stats.total_cleared_lines() as f32;
+        let line_count = stats.game_stats.total_cleared_lines() as f32;
         let efficiency = line_count / survived.max(1.0);
-        let height_penalty = (field.board().max_height() as f32) / 20.0;
+        let height_penalty = (stats.worst_max_height as f32) / 20.0;
         survival_bonus + efficiency * survived_ratio - height_penalty
     }
 }
