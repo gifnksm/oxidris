@@ -18,13 +18,13 @@ pub struct BoardAndPlacement {
 }
 
 #[derive(Debug, Clone)]
-pub struct BoardFeatures {
+pub struct BoardSample {
     pub board: BoardAndPlacement,
-    pub features: Vec<BoardFeatureValue>,
+    pub feature_vector: Vec<BoardFeatureValue>,
 }
 
 #[derive(Debug, Clone)]
-pub struct FeatureStatistics {
+pub struct BoardFeatureStatistics {
     pub raw: ValueStats,
     pub transformed: ValueStats,
     pub normalized: ValueStats,

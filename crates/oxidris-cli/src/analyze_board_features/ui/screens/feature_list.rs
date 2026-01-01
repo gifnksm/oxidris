@@ -67,12 +67,12 @@ impl FeatureListScreen {
         };
 
         let raw_trans_data = data
-            .boards_features
+            .board_samples
             .iter()
             .map(|fm| {
                 (
-                    f64::from(fm.features[self.selected_feature].raw as f32),
-                    f64::from(fm.features[self.selected_feature].transformed),
+                    f64::from(fm.feature_vector[self.selected_feature].raw as f32),
+                    f64::from(fm.feature_vector[self.selected_feature].transformed),
                 )
             })
             .collect::<Vec<(f64, f64)>>();
@@ -87,12 +87,12 @@ impl FeatureListScreen {
         };
 
         let raw_norm_data = data
-            .boards_features
+            .board_samples
             .iter()
             .map(|bm| {
                 (
-                    f64::from(bm.features[self.selected_feature].raw as f32),
-                    f64::from(bm.features[self.selected_feature].normalized),
+                    f64::from(bm.feature_vector[self.selected_feature].raw as f32),
+                    f64::from(bm.feature_vector[self.selected_feature].normalized),
                 )
             })
             .collect::<Vec<(f64, f64)>>();

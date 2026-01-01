@@ -19,18 +19,18 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     eprintln!("Loaded {} boards", boards.len());
 
     eprintln!("Computing featuress for all boards...");
-    let boards_features = analysis::compute_all_features(&boards);
+    let board_samples = analysis::extract_all_board_features(&boards);
     eprintln!("Features computed");
 
     eprintln!("Computing statistics");
-    let statistics = analysis::coimpute_statistics(&boards_features);
+    let statistics = analysis::coimpute_statistics(&board_samples);
     eprintln!("Statistics computed");
 
     eprintln!("Building board index...");
-    let board_index = index::BoardIndex::new(&boards_features);
+    let board_index = index::BoardIndex::new(&board_samples);
     eprintln!("Board index built");
 
-    ui::run_tui(boards_features, statistics, board_index)?;
+    ui::run_tui(board_samples, statistics, board_index)?;
 
     Ok(())
 }

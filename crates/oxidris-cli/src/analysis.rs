@@ -6,33 +6,35 @@ use oxidris_ai::{
 };
 
 use crate::data::{
-    BoardAndPlacement, BoardFeatures, FeatureStatistics, Histogram, HistogramBin, ValueStats,
+    BoardAndPlacement, BoardFeatureStatistics, BoardSample, Histogram, HistogramBin, ValueStats,
 };
 
-pub fn compute_all_features(boards: &[BoardAndPlacement]) -> Vec<BoardFeatures> {
-    boards.iter().map(compute_board_features).collect()
+pub fn extract_all_board_features(boards: &[BoardAndPlacement]) -> Vec<BoardSample> {
+    boards.iter().map(extract_board_features).collect()
 }
 
-fn compute_board_features(board: &BoardAndPlacement) -> BoardFeatures {
+fn extract_board_features(board: &BoardAndPlacement) -> BoardSample {
     let analysis = BoardAnalysis::from_board(&board.board, board.placement);
-    let features = ALL_BOARD_FEATURES
+    let feature_vector = ALL_BOARD_FEATURES
         .iter()
         .map(|feature| feature.compute_feature_value(&analysis))
         .collect();
-    BoardFeatures {
+    BoardSample {
         board: board.clone(),
-        features,
+        feature_vector,
     }
 }
 
 pub fn coimpute_statistics(
-    board_features: &[BoardFeatures],
-) -> [FeatureStatistics; ALL_BOARD_FEATURES.len()] {
-    array::from_fn(|i| compute_feature_statistics(&board_features.iter().map(|bf| bf.features[i])))
+    board_samples: &[BoardSample],
+) -> [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()] {
+    array::from_fn(|i| {
+        compute_feature_statistics(&board_samples.iter().map(|bf| bf.feature_vector[i]))
+    })
 }
 
 #[expect(clippy::cast_precision_loss)]
-fn compute_feature_statistics<I>(values: &I) -> FeatureStatistics
+fn compute_feature_statistics<I>(values: &I) -> BoardFeatureStatistics
 where
     I: ExactSizeIterator<Item = BoardFeatureValue> + Clone,
 {
@@ -40,7 +42,7 @@ where
     let transformed_values = values.clone().map(|f| f.transformed);
     let normalized_values = values.clone().map(|f| f.normalized);
 
-    FeatureStatistics {
+    BoardFeatureStatistics {
         raw: compute_value_stats(raw_values, 11, Some(0.0), None, Some(1.0)),
         transformed: compute_value_stats(transformed_values, 11, Some(0.0), None, None),
         normalized: compute_value_stats(normalized_values, 11, Some(0.0), Some(1.0), Some(0.1)),

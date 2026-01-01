@@ -2,7 +2,7 @@ use std::array;
 
 use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
 
-use super::data::BoardFeatures;
+use super::data::BoardSample;
 
 #[derive(Debug, Clone)]
 pub struct BoardIndex {
@@ -10,13 +10,13 @@ pub struct BoardIndex {
 }
 
 impl BoardIndex {
-    pub fn new(boards_features: &[BoardFeatures]) -> Self {
+    pub fn new(board_samples: &[BoardSample]) -> Self {
         Self {
             sorted_indices: array::from_fn(|feature_idx| {
-                let mut indices = (0..boards_features.len()).collect::<Vec<_>>();
+                let mut indices = (0..board_samples.len()).collect::<Vec<_>>();
                 indices.sort_by(|&a, &b| {
-                    let val_a = boards_features[a].features[feature_idx].normalized;
-                    let val_b = boards_features[b].features[feature_idx].normalized;
+                    let val_a = board_samples[a].feature_vector[feature_idx].normalized;
+                    let val_b = board_samples[b].feature_vector[feature_idx].normalized;
                     val_b.total_cmp(&val_a)
                 });
                 indices

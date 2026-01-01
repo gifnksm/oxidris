@@ -3,7 +3,7 @@ use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::analyze_board_features::{
-    data::{BoardFeatures, FeatureStatistics},
+    data::{BoardFeatureStatistics, BoardSample},
     index::BoardIndex,
 };
 
@@ -18,8 +18,8 @@ pub struct App {
 
 #[derive(Debug)]
 pub struct AppData {
-    pub boards_features: Vec<BoardFeatures>,
-    pub statistics: [FeatureStatistics; ALL_BOARD_FEATURES.len()],
+    pub board_samples: Vec<BoardSample>,
+    pub statistics: [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()],
     pub board_index: BoardIndex,
 }
 
@@ -32,12 +32,12 @@ pub enum Screen {
 
 impl App {
     pub fn new(
-        boards_features: Vec<BoardFeatures>,
-        statistics: [FeatureStatistics; ALL_BOARD_FEATURES.len()],
+        board_samples: Vec<BoardSample>,
+        statistics: [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()],
         board_index: BoardIndex,
     ) -> Self {
         let data = AppData {
-            boards_features,
+            board_samples,
             statistics,
             board_index,
         };
