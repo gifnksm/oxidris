@@ -26,14 +26,14 @@
 //! - `ALL_BOARD_FEATURES.measure(board, placement)` returns raw/transformed/normalized per feature.
 //! - `ALL_BOARD_FEATURES.measure_normalized(board, placement)` returns normalized scores for weighting.
 
-use oxidris_engine::{BitBoard, Piece, PieceKind};
+use oxidris_engine::{BitBoard, PieceKind};
 use std::fmt;
 
 use crate::board_analysis::BoardAnalysis;
 
 mod stats;
 
-pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 14> = BoardFeatureSet([
+pub const ALL_BOARD_FEATURES: &[&dyn DynBoardFeatureSource] = &[
     &HolesPenalty,
     &HoleDepthPenalty,
     &RowTransitionsPenalty,
@@ -48,42 +48,7 @@ pub const ALL_BOARD_FEATURES: BoardFeatureSet<'static, 14> = BoardFeatureSet([
     &TotalHeightPenalty,
     &LineClearBonus,
     &IWellReward,
-]);
-
-pub(crate) const ALL_BOARD_FEATURES_COUNT: usize = ALL_BOARD_FEATURES.0.len();
-
-#[derive(Debug, Clone)]
-pub struct BoardFeatureSet<'a, const N: usize>([&'a dyn DynBoardFeatureSource; N]);
-
-impl<'a, const N: usize> BoardFeatureSet<'a, N> {
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        N == 0
-    }
-
-    #[must_use]
-    pub const fn len(&self) -> usize {
-        N
-    }
-
-    #[must_use]
-    pub const fn as_array(&self) -> [&'a dyn DynBoardFeatureSource; N] {
-        self.0
-    }
-
-    #[must_use]
-    pub fn measure(&self, board: &BitBoard, placement: Piece) -> [BoardFeatureValue; N] {
-        let analysis = BoardAnalysis::from_board(board, placement);
-        self.0.map(|f| f.compute_feature_value(&analysis))
-    }
-
-    #[must_use]
-    pub fn measure_normalized(&self, board: &BitBoard, placement: Piece) -> [f32; N] {
-        let analysis = BoardAnalysis::from_board(board, placement);
-        self.0
-            .map(|f| f.compute_feature_value(&analysis).normalized)
-    }
-}
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FeatureSignal {

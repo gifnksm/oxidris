@@ -84,10 +84,11 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         AiType::Aggro => &AggroSessionEvaluator::new(TURN_LIMIT) as &dyn SessionEvaluator,
         AiType::Defensive => &DefensiveSessionEvaluator::new(TURN_LIMIT) as &dyn SessionEvaluator,
     };
-    let board_features = &ALL_BOARD_FEATURES;
+    let board_features = ALL_BOARD_FEATURES;
 
     let mut rng = rand::rng();
     let mut population = Population::random(
+        board_features.to_owned(),
         POPULATION_COUNT,
         &mut rng,
         max_weight_by_phase(EvolutaionPhase::default()),
@@ -99,7 +100,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         let fields: Vec<GameField> = (0..GAMES_PER_INDIVIDUAL)
             .map(|_| GameField::new())
             .collect();
-        population.evaluate_fitness(&fields, session_evaluator, board_features);
+        population.evaluate_fitness(&fields, session_evaluator);
 
         let weight_stats = population.compute_weight_stats();
         let weight_norm_std_dev_mean = {
@@ -111,29 +112,28 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
 
         eprintln!("  Individuals:");
         for (i, ind) in population.individuals().iter().enumerate() {
-            eprintln!(
-                "  {i:2}: {:.3?} => {:.3}",
-                ind.weights().as_array(),
-                ind.fitness()
-            );
+            eprintln!("  {i:2}: {:.3?} => {:.3}", ind.weights(), ind.fitness());
         }
 
         eprintln!("  Weights Stats:");
         eprintln!(
             "    Min:        {:.3?}",
-            weight_stats.each_ref().map(|s| s.min)
+            weight_stats.iter().map(|s| s.min).collect::<Vec<_>>(),
         );
         eprintln!(
             "    Max:        {:.3?}",
-            weight_stats.each_ref().map(|s| s.max)
+            weight_stats.iter().map(|s| s.max).collect::<Vec<_>>(),
         );
         eprintln!(
             "    Mean:       {:.3?}",
-            weight_stats.each_ref().map(|s| s.mean)
+            weight_stats.iter().map(|s| s.mean).collect::<Vec<_>>(),
         );
         eprintln!(
             "    NormStddev: {:.3?}",
-            weight_stats.each_ref().map(|s| s.normalized_std_dev)
+            weight_stats
+                .iter()
+                .map(|s| s.normalized_std_dev)
+                .collect::<Vec<_>>(),
         );
         eprintln!("    => Mean:    {weight_norm_std_dev_mean:.3}");
 
@@ -149,11 +149,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
 
     eprintln!("Best Individuals:");
     for (i, ind) in population.individuals().iter().take(5).enumerate() {
-        eprintln!(
-            "  {i:2}: {:?} => {}",
-            ind.weights().as_array(),
-            ind.fitness()
-        );
+        eprintln!("  {i:2}: {:?} => {}", ind.weights(), ind.fitness());
     }
 
     eprintln!("{ai:?} AI learning completed.");
@@ -167,12 +163,9 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         name: model_name.to_owned(),
         trained_at: Utc::now(),
         final_fitness: best_individual.fitness(),
-        placement_weights: iter::zip(
-            ALL_BOARD_FEATURES.as_array(),
-            best_individual.weights().as_array(),
-        )
-        .map(|(f, w)| (f.id().to_owned(), w))
-        .collect(),
+        placement_weights: iter::zip(ALL_BOARD_FEATURES, best_individual.weights())
+            .map(|(f, w)| (f.id().to_owned(), *w))
+            .collect(),
     };
     Output::save_json(&model, output.clone())?;
 

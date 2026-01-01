@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, BufWriter, StdoutLock},
+    io::{self, BufWriter, StdoutLock, Write as _},
     path::PathBuf,
 };
 
@@ -61,6 +61,12 @@ impl Output {
     {
         serde_json::to_writer_pretty(&mut *self, &value)
             .with_context(|| format!("Failed to write JSON to {}", self.display_path()))?;
+        writeln!(&mut *self).with_context(|| {
+            format!(
+                "Failed to write newline after JSON to {}",
+                self.display_path()
+            )
+        })?;
         Ok(())
     }
 }

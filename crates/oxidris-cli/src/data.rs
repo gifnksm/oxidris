@@ -1,11 +1,8 @@
-use std::{collections::BTreeMap, fs::File, io::BufReader, iter, ops::Range, path::Path};
+use std::{collections::BTreeMap, fs::File, io::BufReader, ops::Range, path::Path};
 
 use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
-use oxidris_ai::{
-    board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue},
-    weights::WeightSet,
-};
+use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue, DynBoardFeatureSource};
 use oxidris_engine::{BitBoard, Piece};
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +20,7 @@ pub struct BoardAndPlacement {
 #[derive(Debug, Clone)]
 pub struct BoardFeatures {
     pub board: BoardAndPlacement,
-    pub features: [BoardFeatureValue; ALL_BOARD_FEATURES.len()],
+    pub features: Vec<BoardFeatureValue>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,14 +73,19 @@ pub struct Model {
 }
 
 impl Model {
-    pub(crate) fn to_feature_weights(&self) -> WeightSet<{ ALL_BOARD_FEATURES.len() }> {
-        let mut weights = [0.0; ALL_BOARD_FEATURES.len()];
-        for (feature, slot) in iter::zip(ALL_BOARD_FEATURES.as_array(), &mut weights) {
-            if let Some(weight) = self.placement_weights.get(feature.id()) {
-                *slot = *weight;
-            }
-        }
-        WeightSet::from_array(weights)
+    pub(crate) fn to_feature_weights(
+        &self,
+    ) -> anyhow::Result<(Vec<&'static dyn DynBoardFeatureSource>, Vec<f32>)> {
+        self.placement_weights
+            .iter()
+            .map(|(feature_id, weight)| -> anyhow::Result<(&'static dyn DynBoardFeatureSource, f32)> {
+                let feature = ALL_BOARD_FEATURES
+                    .iter()
+                    .find(|f| f.id() == feature_id)
+                    .ok_or_else(|| anyhow::anyhow!("Feature ID {feature_id} in model not found in ALL_BOARD_FEATURES"))?;
+                Ok((*feature, *weight))
+            })
+            .collect()
     }
 }
 

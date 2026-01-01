@@ -70,7 +70,7 @@ fn dump_source(writer: &mut dyn io::Write, statistics: &[FeatureStatistics]) -> 
         writer,
         "// To regenerate, run: make regenerate-board-feature-stats"
     )?;
-    for (f, stats) in iter::zip(ALL_BOARD_FEATURES.as_array(), statistics) {
+    for (f, stats) in iter::zip(ALL_BOARD_FEATURES, statistics) {
         writeln!(writer)?;
         writeln!(
             writer,

@@ -1,6 +1,9 @@
 use std::array;
 
-use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue};
+use oxidris_ai::{
+    board_analysis::BoardAnalysis,
+    board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue},
+};
 
 use crate::data::{
     BoardAndPlacement, BoardFeatures, FeatureStatistics, Histogram, HistogramBin, ValueStats,
@@ -11,7 +14,11 @@ pub fn compute_all_features(boards: &[BoardAndPlacement]) -> Vec<BoardFeatures> 
 }
 
 fn compute_board_features(board: &BoardAndPlacement) -> BoardFeatures {
-    let features = ALL_BOARD_FEATURES.measure(&board.board, board.placement);
+    let analysis = BoardAnalysis::from_board(&board.board, board.placement);
+    let features = ALL_BOARD_FEATURES
+        .iter()
+        .map(|feature| feature.compute_feature_value(&analysis))
+        .collect();
     BoardFeatures {
         board: board.clone(),
         features,

@@ -159,8 +159,8 @@ pub(crate) fn auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
 
     let model = data::load_model(model_path)?;
 
-    let weights = model.to_feature_weights();
-    let placement_evaluator = FeatureBasedPlacementEvaluator::from_weights(weights);
+    let (features, weights) = model.to_feature_weights()?;
+    let placement_evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
     let mut best_turn = None;
     run_game_loop(PlayMode::Auto, |input, game| {

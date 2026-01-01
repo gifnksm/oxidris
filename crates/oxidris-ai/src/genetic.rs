@@ -1,28 +1,28 @@
-use std::{array, thread};
+use std::thread;
 
 use rand::{Rng, seq::IndexedRandom};
 
 use oxidris_engine::GameField;
 
 use crate::{
-    board_feature::BoardFeatureSet, placement_evaluator::FeatureBasedPlacementEvaluator,
+    board_feature::DynBoardFeatureSource, placement_evaluator::FeatureBasedPlacementEvaluator,
     session_evaluator::SessionEvaluator, statistics::Statistics, turn_evaluator::TurnEvaluator,
-    weights::WeightSet,
+    weights,
 };
 
 #[derive(Debug, Clone)]
-pub struct Individual<const FEATURE_COUNT: usize> {
-    weights: WeightSet<FEATURE_COUNT>,
+pub struct Individual {
+    weights: Vec<f32>,
     fitness: f32,
 }
 
-impl<const FEATURE_COUNT: usize> Individual<FEATURE_COUNT> {
-    pub fn random<R>(rng: &mut R, max_weight: f32) -> Self
+impl Individual {
+    pub fn random<R>(rng: &mut R, max_weight: f32, feature_count: usize) -> Self
     where
         R: Rng + ?Sized,
     {
-        let mut weights = WeightSet::random(rng, max_weight);
-        weights.normalize_l1();
+        let mut weights = weights::random(rng, max_weight, feature_count);
+        weights::normalize_l1(&mut weights);
         Self {
             weights,
             fitness: f32::MIN,
@@ -30,7 +30,7 @@ impl<const FEATURE_COUNT: usize> Individual<FEATURE_COUNT> {
     }
 
     #[must_use]
-    pub fn weights(&self) -> &WeightSet<FEATURE_COUNT> {
+    pub fn weights(&self) -> &[f32] {
         &self.weights
     }
 
@@ -40,25 +40,34 @@ impl<const FEATURE_COUNT: usize> Individual<FEATURE_COUNT> {
     }
 }
 
-#[derive(Debug)]
-pub struct Population<const FEATURE_COUNT: usize> {
-    individuals: Vec<Individual<FEATURE_COUNT>>,
+#[derive(Debug, Clone)]
+pub struct Population {
+    board_features: Vec<&'static dyn DynBoardFeatureSource>,
+    individuals: Vec<Individual>,
 }
 
-impl<const FEATURE_COUNT: usize> Population<FEATURE_COUNT> {
+impl Population {
     #[must_use]
-    pub fn random<R>(count: usize, rng: &mut R, max_weight: f32) -> Self
+    pub fn random<R>(
+        board_features: Vec<&'static dyn DynBoardFeatureSource>,
+        count: usize,
+        rng: &mut R,
+        max_weight: f32,
+    ) -> Self
     where
         R: Rng + ?Sized,
     {
         let individuals = (0..count)
-            .map(|_| Individual::random(rng, max_weight))
+            .map(|_| Individual::random(rng, max_weight, board_features.len()))
             .collect();
-        Population { individuals }
+        Population {
+            board_features,
+            individuals,
+        }
     }
 
     #[must_use]
-    pub fn individuals(&self) -> &[Individual<FEATURE_COUNT>] {
+    pub fn individuals(&self) -> &[Individual] {
         &self.individuals
     }
 
@@ -66,12 +75,11 @@ impl<const FEATURE_COUNT: usize> Population<FEATURE_COUNT> {
         &mut self,
         fields: &[GameField],
         session_evaluator: &dyn SessionEvaluator,
-        board_features: &BoardFeatureSet<'static, FEATURE_COUNT>,
     ) {
         thread::scope(|s| {
             for ind in &mut self.individuals {
                 let placement_evaluator = FeatureBasedPlacementEvaluator::new(
-                    board_features.clone(),
+                    self.board_features.clone(),
                     ind.weights.clone(),
                 );
                 let turn_evaluator = TurnEvaluator::new(placement_evaluator);
@@ -88,14 +96,13 @@ impl<const FEATURE_COUNT: usize> Population<FEATURE_COUNT> {
     }
 
     #[must_use]
-    pub fn compute_weight_stats(&self) -> [Statistics; FEATURE_COUNT] {
-        array::from_fn(|i| {
-            let weights = self
-                .individuals()
-                .iter()
-                .map(|ind| ind.weights.as_array()[i]);
-            Statistics::compute(weights).unwrap()
-        })
+    pub fn compute_weight_stats(&self) -> Vec<Statistics> {
+        (0..self.board_features.len())
+            .map(|i| {
+                let weights = self.individuals().iter().map(|ind| ind.weights[i]);
+                Statistics::compute(weights).unwrap()
+            })
+            .collect()
     }
 
     #[must_use]
@@ -116,10 +123,7 @@ pub struct PopulationEvolver {
 
 impl PopulationEvolver {
     #[must_use]
-    pub fn evolve<const FEATURE_COUNT: usize>(
-        &self,
-        population: &Population<FEATURE_COUNT>,
-    ) -> Population<FEATURE_COUNT> {
+    pub fn evolve(&self, population: &Population) -> Population {
         let mut rng = rand::rng();
         let mut next_individuals = vec![];
         assert!(
@@ -136,20 +140,21 @@ impl PopulationEvolver {
             let p1 = tournament_select(&population.individuals, self.tournament_size, &mut rng);
             let p2 = tournament_select(&population.individuals, self.tournament_size, &mut rng);
 
-            let mut child = WeightSet::blx_alpha(
+            let mut child = weights::blx_alpha(
                 &p1.weights,
                 &p2.weights,
                 self.blx_alpha,
                 self.max_weight,
                 &mut rng,
             );
-            child.mutate(
+            weights::mutate(
+                &mut child,
                 self.mutation_sigma,
                 self.max_weight,
                 self.mutation_rate,
                 &mut rng,
             );
-            child.normalize_l1();
+            weights::normalize_l1(&mut child);
 
             next_individuals.push(Individual {
                 weights: child,
@@ -158,16 +163,17 @@ impl PopulationEvolver {
         }
 
         Population {
+            board_features: population.board_features.clone(),
             individuals: next_individuals,
         }
     }
 }
 
-fn tournament_select<'a, R, const FEATURE_COUNT: usize>(
-    population: &'a [Individual<FEATURE_COUNT>],
+fn tournament_select<'a, R>(
+    population: &'a [Individual],
     tournament_size: usize,
     rng: &mut R,
-) -> &'a Individual<FEATURE_COUNT>
+) -> &'a Individual
 where
     R: Rng + ?Sized,
 {

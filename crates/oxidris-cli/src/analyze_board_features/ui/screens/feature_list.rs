@@ -148,7 +148,6 @@ impl Widget for FeatureSelector {
         Self: Sized,
     {
         let items = ALL_BOARD_FEATURES
-            .as_array()
             .iter()
             .enumerate()
             .map(|(i, f)| {
