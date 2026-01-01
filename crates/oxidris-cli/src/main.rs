@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use oxidris_ai::AiType;
 
 use self::{
     analyze_board_features::AnalyzeBoardFeaturesArg,
@@ -51,7 +50,7 @@ fn main() -> anyhow::Result<()> {
     {
         Mode::ManualPlay(arg) => play::manual(&arg)?,
         Mode::AutoPlay(arg) => play::auto(&arg)?,
-        Mode::TrainAi(arg) => train_ai::run(&arg),
+        Mode::TrainAi(arg) => train_ai::run(&arg)?,
         Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
         Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,
         Mode::GenerateBoardFeatureStats(arg) => generate_board_feature_stats::run(&arg)?,

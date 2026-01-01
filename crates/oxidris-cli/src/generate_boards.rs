@@ -1,14 +1,13 @@
-use std::{
-    fs::File,
-    io::{self, BufWriter, Write as _},
-    path::PathBuf,
-};
+use std::{io::Write as _, path::PathBuf};
 
 use anyhow::Context;
 use oxidris_ai::{placement_evaluator::DumpPlacementEvaluator, turn_evaluator::TurnEvaluator};
 use oxidris_engine::{GameField, GameStats};
 
-use crate::data::{BoardAndPlacement, BoardCollection};
+use crate::{
+    data::{BoardAndPlacement, BoardCollection},
+    util::Output,
+};
 
 const MAX_TURNS: usize = 500;
 const TURNS_HISTOGRAM_WIDTH: usize = 10;
@@ -101,29 +100,19 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         eprintln!("  {min:2}- : {count:5} {}", "#".repeat(count / 50));
     }
 
-    let writer = if let Some(output_path) = output {
-        let file = File::create(output_path)
-            .with_context(|| format!("Failed to create output file: {}", output_path.display()))?;
-        Box::new(file) as Box<dyn io::Write>
-    } else {
-        Box::new(io::stdout().lock()) as Box<dyn io::Write>
-    };
-    let mut writer = BufWriter::new(writer);
+    let mut writer = Output::from_output_path(output.clone())?;
     serde_json::to_writer(&mut writer, &captured_boards).with_context(|| {
         format!(
             "Failed to write captured boards to {}",
-            output
-                .as_ref()
-                .map_or_else(|| "stdout".to_string(), |p| p.display().to_string())
+            writer.display_path()
         )
     })?;
     writer.flush().with_context(|| {
         format!(
             "Failed to write captured boards to {}",
-            output
-                .as_ref()
-                .map_or_else(|| "stdout".to_string(), |p| p.display().to_string())
+            writer.display_path()
         )
     })?;
+
     Ok(())
 }

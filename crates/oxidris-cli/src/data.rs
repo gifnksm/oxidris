@@ -1,7 +1,11 @@
-use std::{fs::File, io::BufReader, ops::Range, path::Path};
+use std::{collections::BTreeMap, fs::File, io::BufReader, iter, ops::Range, path::Path};
 
 use anyhow::{Context, bail};
-use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue};
+use chrono::{DateTime, Utc};
+use oxidris_ai::{
+    board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue},
+    weights::WeightSet,
+};
 use oxidris_engine::{BitBoard, Piece};
 use serde::{Deserialize, Serialize};
 
@@ -63,6 +67,26 @@ impl ValueStats {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Model {
+    pub name: String,
+    pub trained_at: DateTime<Utc>,
+    pub final_fitness: f32,
+    pub placement_weights: BTreeMap<String, f32>,
+}
+
+impl Model {
+    pub(crate) fn to_feature_weights(&self) -> WeightSet<{ ALL_BOARD_FEATURES.len() }> {
+        let mut weights = [0.0; ALL_BOARD_FEATURES.len()];
+        for (feature, slot) in iter::zip(ALL_BOARD_FEATURES.as_array(), &mut weights) {
+            if let Some(weight) = self.placement_weights.get(feature.id()) {
+                *slot = *weight;
+            }
+        }
+        WeightSet::from_array(weights)
+    }
+}
+
 pub fn load_board<P>(path: P) -> anyhow::Result<Vec<BoardAndPlacement>>
 where
     P: AsRef<Path>,
@@ -79,4 +103,19 @@ where
     }
 
     Ok(boards.boards)
+}
+
+pub fn load_model<P>(path: P) -> anyhow::Result<Model>
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    let file = File::open(path)
+        .with_context(|| format!("Failed to open model file: {}", path.display()))?;
+
+    let reader = BufReader::new(file);
+    let model: Model = serde_json::from_reader(reader)
+        .with_context(|| format!("Failed to read model file: {}", path.display()))?;
+
+    Ok(model)
 }

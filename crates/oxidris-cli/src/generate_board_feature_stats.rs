@@ -1,6 +1,5 @@
 use std::{
-    fs::File,
-    io::{self, BufWriter, Write as _},
+    io::{self, Write as _},
     iter,
     path::PathBuf,
 };
@@ -11,7 +10,7 @@ use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
 use crate::{
     analysis,
     data::{self, FeatureStatistics},
-    util,
+    util::{self, Output},
 };
 
 #[derive(Default, Debug, Clone, clap::Args)]
@@ -41,14 +40,7 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
     let statistics = analysis::coimpute_statistics(&boards_features);
     eprintln!("Statistics computed");
 
-    let writer = if let Some(output_path) = output {
-        let file = File::create(output_path)
-            .with_context(|| format!("Failed to create output file: {}", output_path.display()))?;
-        Box::new(file) as Box<dyn io::Write>
-    } else {
-        Box::new(io::stdout().lock()) as Box<dyn io::Write>
-    };
-    let mut writer = BufWriter::new(writer);
+    let mut writer = Output::from_output_path(output.clone())?;
     dump_source(&mut writer, &statistics).with_context(|| {
         format!(
             "Failed to write source code to {}",

@@ -1,5 +1,6 @@
-use std::iter;
+use std::{iter, path::PathBuf};
 
+use chrono::Utc;
 use oxidris_ai::{
     AiType,
     board_feature::ALL_BOARD_FEATURES,
@@ -9,7 +10,7 @@ use oxidris_ai::{
 };
 use oxidris_engine::GameField;
 
-use crate::util;
+use crate::{data::Model, util::Output};
 
 const GAMES_PER_INDIVIDUAL: usize = 3;
 const TURN_LIMIT: usize = 3000;
@@ -72,11 +73,13 @@ const fn evolver_by_phase(phase: EvolutaionPhase) -> PopulationEvolver {
 pub(crate) struct TrainAiArg {
     #[arg(long, default_value = "aggro")]
     ai: AiType,
+    /// Output file path
+    #[arg(long)]
+    output: Option<PathBuf>,
 }
 
-#[expect(clippy::cast_precision_loss)]
-pub(crate) fn run(arg: &TrainAiArg) {
-    let TrainAiArg { ai } = arg;
+pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
+    let TrainAiArg { ai, output } = arg;
     let session_evaluator = match ai {
         AiType::Aggro => &AggroSessionEvaluator::new(TURN_LIMIT) as &dyn SessionEvaluator,
         AiType::Defensive => &DefensiveSessionEvaluator::new(TURN_LIMIT) as &dyn SessionEvaluator,
@@ -153,17 +156,35 @@ pub(crate) fn run(arg: &TrainAiArg) {
         );
     }
 
-    eprintln!("Best individual weights saved to file:");
-    let best_individual = population.individuals().first().unwrap();
-    eprintln!("[");
-    for (f, w) in iter::zip(
-        ALL_BOARD_FEATURES.as_array(),
-        best_individual.weights().as_array(),
-    ) {
-        let scale = w / (1.0 / ALL_BOARD_FEATURES.len() as f32);
-        eprintln!("    {}, // {} (x{scale:.3})", util::format_f32(w), f.name());
-    }
-    eprintln!("]");
-
     eprintln!("{ai:?} AI learning completed.");
+
+    let model_name = match ai {
+        AiType::Aggro => "aggro",
+        AiType::Defensive => "defensive",
+    };
+    let best_individual = population.individuals().first().unwrap();
+    let model = Model {
+        name: model_name.to_owned(),
+        trained_at: Utc::now(),
+        final_fitness: best_individual.fitness(),
+        placement_weights: iter::zip(
+            ALL_BOARD_FEATURES.as_array(),
+            best_individual.weights().as_array(),
+        )
+        .map(|(f, w)| (f.id().to_owned(), w))
+        .collect(),
+    };
+    Output::save_json(&model, output.clone())?;
+
+    eprintln!();
+    eprintln!("Model saved successfully");
+    if let Some(path) = &output {
+        eprintln!("  Path: {}", path.display());
+    }
+    eprintln!("  Name: {}", model.name);
+    eprintln!("  Trained at: {}", model.trained_at);
+    eprintln!("  Final fitness: {:.3}", model.final_fitness);
+    eprintln!("  Weights: {} features", model.placement_weights.len());
+
+    Ok(())
 }

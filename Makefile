@@ -37,6 +37,7 @@ help:
 FORCE:
 
 DATA_DIR := data
+MODELS_DIR := models
 
 ## Play the game (default target)
 .PHONY: play
@@ -51,12 +52,12 @@ build:
 ## Let the computer play the game automatically with aggressive AI
 .PHONY: auto-play-aggro
 auto-play-aggro:
-	cargo run --release -- auto-play --ai aggro
+	cargo run --release -- auto-play $(MODELS_DIR)/ai/aggro.json
 
 ## Let the computer play the game automatically with defensive AI
 .PHONY: auto-play-defensive
 auto-play-defensive:
-	cargo run --release -- auto-play --ai defensive
+	cargo run --release -- auto-play $(MODELS_DIR)/ai/defensive.json
 
 ## Generate board data JSON file (if missing)
 .PHONY: generate-board-data
@@ -76,12 +77,12 @@ regenerate-board-feature-stats: $(DATA_DIR)/boards.json
 ## Train an aggressive AI using genetic algorithms
 .PHONY: train-ai-aggro
 train-ai-aggro:
-	cargo run --release -- train-ai --ai aggro
+	cargo run --release -- train-ai --ai aggro --output $(MODELS_DIR)/ai/aggro.json
 
 ## Train a defensive AI using genetic algorithms
 .PHONY: train-ai-defensive
 train-ai-defensive:
-	cargo run --release -- train-ai --ai defensive
+	cargo run --release -- train-ai --ai defensive --output $(MODELS_DIR)/ai/defensive.json
 
 ## Start the TUI for analyzing board features
 .PHONY: analyze-board-features

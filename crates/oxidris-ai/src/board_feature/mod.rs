@@ -99,12 +99,11 @@ pub struct BoardFeatureValue {
 }
 
 pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
+    const ID: &str;
+    const NAME: &str;
     const NORMALIZATION_MIN: f32;
     const NORMALIZATION_MAX: f32;
     const SIGNAL: FeatureSignal;
-
-    #[must_use]
-    fn name() -> &'static str;
 
     #[must_use]
     fn extract_raw(analysis: &BoardAnalysis) -> u32;
@@ -140,6 +139,8 @@ pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
 
 pub trait DynBoardFeatureSource: fmt::Debug + Send + Sync {
     #[must_use]
+    fn id(&self) -> &'static str;
+    #[must_use]
     fn name(&self) -> &'static str;
     #[must_use]
     fn type_name(&self) -> &'static str;
@@ -163,8 +164,12 @@ impl<T> DynBoardFeatureSource for T
 where
     T: BoardFeatureSource,
 {
+    fn id(&self) -> &'static str {
+        T::ID
+    }
+
     fn name(&self) -> &'static str {
-        T::name()
+        T::NAME
     }
 
     fn type_name(&self) -> &'static str {
@@ -221,13 +226,12 @@ where
 pub struct HolesPenalty;
 
 impl BoardFeatureSource for HolesPenalty {
+    const ID: &str = "holes_penalty";
+    const NAME: &str = "Holes Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Holes Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
@@ -261,13 +265,12 @@ impl BoardFeatureSource for HolesPenalty {
 pub struct HoleDepthPenalty;
 
 impl BoardFeatureSource for HoleDepthPenalty {
+    const ID: &str = "hole_depth_penalty";
+    const NAME: &str = "Hole Depth Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Hole Depth Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let mut depth_sum = 0u32;
@@ -311,13 +314,12 @@ impl BoardFeatureSource for HoleDepthPenalty {
 pub struct RowTransitionsPenalty;
 
 impl BoardFeatureSource for RowTransitionsPenalty {
+    const ID: &str = "row_transitions_penalty";
+    const NAME: &str = "Row Transitions Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Row Transitions Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
@@ -356,13 +358,12 @@ impl BoardFeatureSource for RowTransitionsPenalty {
 pub struct ColumnTransitionsPenalty;
 
 impl BoardFeatureSource for ColumnTransitionsPenalty {
+    const ID: &str = "column_transitions_penalty";
+    const NAME: &str = "Column Transitions Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Column Transitions Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let mut transitions = 0;
@@ -405,13 +406,12 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
 pub struct SurfaceBumpinessPenalty;
 
 impl BoardFeatureSource for SurfaceBumpinessPenalty {
+    const ID: &str = "surface_bumpiness_penalty";
+    const NAME: &str = "Surface Bumpiness Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Surface Bumpiness Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         analysis
@@ -452,13 +452,12 @@ impl BoardFeatureSource for SurfaceBumpinessPenalty {
 pub struct SurfaceRoughnessPenalty;
 
 impl BoardFeatureSource for SurfaceRoughnessPenalty {
+    const ID: &str = "surface_roughness_penalty";
+    const NAME: &str = "Surface Roughness Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Surface Roughness Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         analysis
@@ -499,13 +498,12 @@ impl BoardFeatureSource for SurfaceRoughnessPenalty {
 pub struct WellDepthPenalty;
 
 impl BoardFeatureSource for WellDepthPenalty {
+    const ID: &str = "well_depth_penalty";
+    const NAME: &str = "Well Depth Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Well Depth Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         const DEPTH_THRESHOLD: u8 = 1;
@@ -543,13 +541,12 @@ impl BoardFeatureSource for WellDepthPenalty {
 pub struct DeepWellRisk;
 
 impl BoardFeatureSource for DeepWellRisk {
+    const ID: &str = "deep_well_risk";
+    const NAME: &str = "Deep Well Risk";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Deep Well Risk"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         const DEPTH_THRESHOLD: u8 = 1;
@@ -586,13 +583,12 @@ impl BoardFeatureSource for DeepWellRisk {
 pub struct MaxHeightPenalty;
 
 impl BoardFeatureSource for MaxHeightPenalty {
+    const ID: &str = "max_height_penalty";
+    const NAME: &str = "Max Height Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Max Height Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let max_height = *analysis.column_heights.iter().max().unwrap();
@@ -624,13 +620,12 @@ impl BoardFeatureSource for MaxHeightPenalty {
 pub struct CenterColumnsPenalty;
 
 impl BoardFeatureSource for CenterColumnsPenalty {
+    const ID: &str = "center_columns_penalty";
+    const NAME: &str = "Center Columns Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Center Columns Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         const CENTER_START: usize = 3;
@@ -664,13 +659,12 @@ impl BoardFeatureSource for CenterColumnsPenalty {
 pub struct TopOutRisk;
 
 impl BoardFeatureSource for TopOutRisk {
+    const ID: &str = "top_out_risk";
+    const NAME: &str = "Top-Out Risk";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Top-Out Risk"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let max_height = *analysis.column_heights.iter().max().unwrap();
@@ -702,13 +696,12 @@ impl BoardFeatureSource for TopOutRisk {
 pub struct TotalHeightPenalty;
 
 impl BoardFeatureSource for TotalHeightPenalty {
+    const ID: &str = "total_height_penalty";
+    const NAME: &str = "Total Height Penalty";
+
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
-    fn name() -> &'static str {
-        "Total Height Penalty"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         analysis.column_heights.iter().map(|&h| u32::from(h)).sum()
@@ -757,13 +750,12 @@ impl BoardFeatureSource for TotalHeightPenalty {
 pub struct LineClearBonus;
 
 impl BoardFeatureSource for LineClearBonus {
+    const ID: &str = "line_clear_bonus";
+    const NAME: &str = "Line Clear Bonus";
+
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 6.0;
     const SIGNAL: FeatureSignal = FeatureSignal::Positive;
-
-    fn name() -> &'static str {
-        "Lines Clear Bonus"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         u32::try_from(analysis.cleared_lines).unwrap()
@@ -810,13 +802,12 @@ impl BoardFeatureSource for LineClearBonus {
 pub struct IWellReward;
 
 impl BoardFeatureSource for IWellReward {
+    const ID: &str = "i_well_reward";
+    const NAME: &str = "I-Well Reward";
+
     const NORMALIZATION_MIN: f32 = 0.0;
     const NORMALIZATION_MAX: f32 = 1.0;
     const SIGNAL: FeatureSignal = FeatureSignal::Positive;
-
-    fn name() -> &'static str {
-        "I-Well Reward"
-    }
 
     fn extract_raw(analysis: &BoardAnalysis) -> u32 {
         let left_well_depth = analysis.column_well_depths[0];

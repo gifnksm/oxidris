@@ -3,7 +3,6 @@ use std::{fmt, iter};
 use oxidris_engine::{BitBoard, Piece};
 
 use crate::{
-    AiType,
     board_analysis::BoardAnalysis,
     board_feature::{
         ALL_BOARD_FEATURES, ALL_BOARD_FEATURES_COUNT, BoardFeatureSet, BoardFeatureSource as _,
@@ -36,24 +35,6 @@ impl FeatureBasedPlacementEvaluator<'static, ALL_BOARD_FEATURES_COUNT> {
     #[must_use]
     pub fn from_weights(weights: WeightSet<ALL_BOARD_FEATURES_COUNT>) -> Self {
         Self::new(ALL_BOARD_FEATURES, weights)
-    }
-
-    #[must_use]
-    pub fn aggro() -> Self {
-        Self::from_weights(WeightSet::AGGRO)
-    }
-
-    #[must_use]
-    pub fn defensive() -> Self {
-        Self::from_weights(WeightSet::DEFENSIVE)
-    }
-
-    #[must_use]
-    pub fn from_ai_type(ai: AiType) -> Self {
-        match ai {
-            AiType::Aggro => Self::aggro(),
-            AiType::Defensive => Self::defensive(),
-        }
     }
 }
 

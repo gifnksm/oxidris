@@ -1,6 +1,7 @@
 use std::{
     io,
     ops::ControlFlow,
+    path::PathBuf,
     thread,
     time::{Duration, Instant},
 };
@@ -13,7 +14,7 @@ use oxidris_ai::{
 use oxidris_engine::{GameSession, SessionState};
 
 use crate::{
-    AiType,
+    data,
     ui::{input::Input, renderer::Renderer},
 };
 
@@ -74,7 +75,7 @@ impl ManualPlayAction {
 
 const FPS: u64 = 60;
 
-fn run_game_loop<F>(play_mode: PlayMode, mut handler: F) -> io::Result<()>
+fn run_game_loop<F>(play_mode: PlayMode, mut handler: F) -> anyhow::Result<()>
 where
     F: FnMut(&mut Input, &mut GameSession) -> io::Result<ControlFlow<()>>,
 {
@@ -109,7 +110,7 @@ where
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct ManualPlayArg {}
 
-pub(crate) fn manual(arg: &ManualPlayArg) -> io::Result<()> {
+pub(crate) fn manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
     let ManualPlayArg {} = arg;
     run_game_loop(PlayMode::Manual, |input, game| {
         while let Some(key) = input.try_read()? {
@@ -149,13 +150,17 @@ pub(crate) fn manual(arg: &ManualPlayArg) -> io::Result<()> {
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct AutoPlayArg {
-    #[arg(long, default_value = "aggro")]
-    ai: AiType,
+    /// Path to the model file (JSON format)
+    model_path: PathBuf,
 }
 
-pub(crate) fn auto(arg: &AutoPlayArg) -> io::Result<()> {
-    let AutoPlayArg { ai } = arg;
-    let placement_evaluator = FeatureBasedPlacementEvaluator::from_ai_type(*ai);
+pub(crate) fn auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
+    let AutoPlayArg { model_path } = arg;
+
+    let model = data::load_model(model_path)?;
+
+    let weights = model.to_feature_weights();
+    let placement_evaluator = FeatureBasedPlacementEvaluator::from_weights(weights);
     let turn_evaluator = TurnEvaluator::new(placement_evaluator);
     let mut best_turn = None;
     run_game_loop(PlayMode::Auto, |input, game| {
