@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf};
+use std::{collections::HashMap, fmt, path::PathBuf};
 
 use oxidris_ai::{
     board_feature::{self, DynBoardFeatureSource},
@@ -7,7 +7,7 @@ use oxidris_ai::{
     turn_evaluator::TurnEvaluator,
 };
 use oxidris_engine::{GameField, GameStats};
-use rand::Rng as _;
+use rand::Rng;
 
 use crate::{
     data::{BoardAndPlacement, SessionCollection, SessionData},
@@ -16,7 +16,6 @@ use crate::{
 
 const MAX_TURNS: usize = 500;
 const TURNS_HISTOGRAM_WIDTH: usize = 10;
-const HEIGHT_HISTOGRAM_WIDTH: usize = 2;
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct GenerateBoardsArg {
@@ -44,6 +43,109 @@ impl PlacementEvaluatorFactory {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct DifficultyBin {
+    height_bin: u8,
+    holes_bin: u8,
+}
+
+impl DifficultyBin {
+    const NUM_BINS: usize = 20;
+    const HEIGHT_BIN_WIDTH: u8 = 4;
+    const HOLES_BIN_WIDTH: u8 = 3;
+
+    fn new(analysis: &PlacementAnalysis) -> Self {
+        let height = analysis.board_analysis().max_height();
+        let holes = analysis.board_analysis().num_holes();
+        Self {
+            height_bin: (height / Self::HEIGHT_BIN_WIDTH).clamp(0, 4),
+            holes_bin: (holes / Self::HOLES_BIN_WIDTH).clamp(0, 3),
+        }
+    }
+}
+
+struct AdaptiveSampler {
+    bin_counts: HashMap<DifficultyBin, usize>,
+    total_captured: usize,
+}
+
+impl AdaptiveSampler {
+    fn new() -> Self {
+        let bin_counts = (0..4)
+            .flat_map(|height| {
+                (0..4).map(move |holes| {
+                    (
+                        DifficultyBin {
+                            height_bin: height,
+                            holes_bin: holes,
+                        },
+                        0,
+                    )
+                })
+            })
+            .collect();
+        Self {
+            bin_counts,
+            total_captured: 0,
+        }
+    }
+
+    #[expect(clippy::cast_precision_loss)]
+    fn should_capture<R>(
+        &mut self,
+        analysis: &PlacementAnalysis,
+        stats: &GameStats,
+        rng: &mut R,
+    ) -> bool
+    where
+        R: Rng,
+    {
+        let bind = DifficultyBin::new(analysis);
+        let current_count = *self.bin_counts.get(&bind).unwrap_or(&0);
+        let desired_count = self.total_captured.div_ceil(DifficultyBin::NUM_BINS);
+        let fill_ratio = if desired_count == 0 {
+            1.0
+        } else {
+            current_count as f64 / desired_count as f64
+        };
+
+        let mut capture_prob = 1.0 / (1.0 + fill_ratio);
+        let turns = stats.completed_pieces();
+        if turns < 30 {
+            capture_prob *= 0.3;
+        } else if turns < 60 {
+            capture_prob *= 0.5;
+        } else if turns < 100 {
+            capture_prob *= 0.7;
+        }
+
+        // Downscale capture probability to avoid excessive captures
+        capture_prob *= 0.1;
+        capture_prob = capture_prob.clamp(0.0, 0.1);
+
+        let should_capture = rng.random_bool(capture_prob);
+        if should_capture {
+            *self.bin_counts.entry(bind).or_insert(0) += 1;
+            self.total_captured += 1;
+        }
+        should_capture
+    }
+
+    fn print_progress(&self) {
+        eprintln!("Captured {} boards", self.total_captured);
+        eprintln!("Height & Holes distribution:");
+
+        let mut bins: Vec<_> = self.bin_counts.iter().collect();
+        bins.sort_by_key(|(bin, _)| (bin.height_bin, bin.holes_bin));
+
+        print_histogram(bins.into_iter().map(|(bin, count)| {
+            let height = bin.height_bin * DifficultyBin::HEIGHT_BIN_WIDTH;
+            let holes = bin.holes_bin * DifficultyBin::HOLES_BIN_WIDTH;
+            (format!("{height:2},{holes:2}"), *count)
+        }));
+    }
+}
+
 pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let GenerateBoardsArg { num_boards, output } = arg;
     let placement_evaluators: &[PlacementEvaluatorFactory] = &[
@@ -56,15 +158,13 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
 
     let mut rng = rand::rng();
     let mut total_games = 0;
-    let mut captured_boards = 0;
     let mut captured_sessions = vec![];
     let mut evaluator_histogram = vec![0; placement_evaluators.len()];
     let mut turns_histogram = [0; MAX_TURNS / TURNS_HISTOGRAM_WIDTH + 1];
-    let mut height_histogram = [0; 10];
+    let mut adaptive_sampler = AdaptiveSampler::new();
 
-    while captured_boards < *num_boards {
+    while adaptive_sampler.total_captured < *num_boards {
         total_games += 1;
-        let mut captured_heights = [false; 6];
         let mut field = GameField::new();
         let mut stats = GameStats::new();
         let evaluator_index = rng.random_range(0..placement_evaluators.len());
@@ -75,55 +175,43 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             placement_evaluator: placement_evaluator.name.to_owned(),
             boards: vec![],
         };
-        while let Some((turn, analysis)) = turn_evaluator.select_best_turn(&field) {
-            let t = stats.completed_pieces();
+        while let Some((turn_plan, analysis)) = turn_evaluator.select_best_turn(&field) {
+            let turn = stats.completed_pieces();
             let capture_board = BoardAndPlacement {
-                turn: t,
+                turn,
                 board: field.board().clone(),
-                placement: turn.placement(),
+                placement: turn_plan.placement(),
             };
-            let (_cleared_lines, result) = turn.apply(&analysis, &mut field, &mut stats);
+            let (_cleared_lines, result) = turn_plan.apply(&analysis, &mut field, &mut stats);
             if result.is_err() {
-                session_data.gameover_turn = Some(t);
+                session_data.gameover_turn = Some(turn);
                 break;
             }
-
-            let mut do_capture = false;
-            let h = field.board().max_height();
-
-            // Fixed intervals to capture boards
-            if matches!(t, 5 | 15 | 30 | 60) || (t >= 100 && t.is_multiple_of(50)) {
-                do_capture = true;
-            }
-
-            for (i, th) in [5, 9, 12, 14, 16, 18].into_iter().enumerate() {
-                if h >= th && !captured_heights[i] {
-                    captured_heights[i] = true;
-                    do_capture = true;
-                }
-            }
-
-            if do_capture {
-                captured_boards += 1;
+            if adaptive_sampler.should_capture(&analysis, &stats, &mut rng) {
                 evaluator_histogram[evaluator_index] += 1;
-                turns_histogram[(t / TURNS_HISTOGRAM_WIDTH).min(turns_histogram.len() - 1)] += 1;
-                height_histogram[(h / HEIGHT_HISTOGRAM_WIDTH).min(height_histogram.len() - 1)] += 1;
+                turns_histogram[(turn / TURNS_HISTOGRAM_WIDTH).min(turns_histogram.len() - 1)] += 1;
                 session_data.boards.push(capture_board);
             }
-
             if stats.completed_pieces() > MAX_TURNS {
                 break;
             }
         }
         captured_sessions.push(session_data);
+        if total_games % 100 == 0 {
+            adaptive_sampler.print_progress();
+        }
     }
 
     let collection = SessionCollection {
-        total_boards: captured_boards,
+        total_boards: adaptive_sampler.total_captured,
         sessions: captured_sessions,
     };
 
-    eprintln!("Captured {captured_boards} boards from {total_games} games.");
+    eprintln!(
+        "Captured {} boards from {total_games} games.",
+        adaptive_sampler.total_captured,
+    );
+    adaptive_sampler.print_progress();
     eprintln!();
     eprintln!("Placement evaluator histogram:");
     print_histogram(
@@ -139,14 +227,6 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             .iter()
             .enumerate()
             .map(|(i, count)| (i * TURNS_HISTOGRAM_WIDTH, *count)),
-    );
-    eprintln!();
-    eprintln!("Height histogram:");
-    print_histogram(
-        height_histogram
-            .iter()
-            .enumerate()
-            .map(|(i, count)| (i * HEIGHT_HISTOGRAM_WIDTH, *count)),
     );
 
     Output::save_json(&collection, output.clone())?;
