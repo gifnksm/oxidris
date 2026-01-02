@@ -177,7 +177,18 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         total_games += 1;
         let mut field = GameField::new();
         let mut stats = GameStats::new();
-        let evaluator_index = rng.random_range(0..placement_evaluators.len());
+
+        // Weighted selection: dumb=60%, aggro=25%, balance=15%
+        let evaluator_index = {
+            let r = rng.random_range(0..100);
+            if r < 60 {
+                0 // dumb
+            } else if r < 85 {
+                1 // aggro
+            } else {
+                2 // balance
+            }
+        };
         let placement_evaluator = &placement_evaluators[evaluator_index];
         let turn_evaluator = TurnEvaluator::new((placement_evaluator.factory)());
         let mut session_data = SessionData {

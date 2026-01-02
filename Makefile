@@ -89,6 +89,11 @@ train-ai-defensive:
 analyze-board-features:
 	cargo run --release -- analyze-board-features $(DATA_DIR)/boards.json
 
+## Analyze analyzing censoring effects
+.PHONY: analyze-censoring
+analyze-censoring:
+	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json
+
 ## Clean build artifacts
 .PHONY: clean
 clean:

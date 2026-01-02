@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 use self::{
     analyze_board_features::AnalyzeBoardFeaturesArg,
+    analyze_censoring::AnalyzeCensoringArg,
     generate_board_feature_stats::GenerateBoardFeatureStatsArg,
     generate_boards::GenerateBoardsArg,
     play::{AutoPlayArg, ManualPlayArg},
@@ -10,6 +11,7 @@ use self::{
 
 mod analysis;
 mod analyze_board_features;
+mod analyze_censoring;
 mod data;
 mod generate_board_feature_stats;
 mod generate_boards;
@@ -41,6 +43,8 @@ enum Mode {
     AnalyzeBoardFeatures(#[clap(flatten)] AnalyzeBoardFeaturesArg),
     /// Generate statistics about board features
     GenerateBoardFeatureStats(#[clap(flatten)] GenerateBoardFeatureStatsArg),
+    /// Analyze censoring in board data
+    AnalyzeCensoring(#[clap(flatten)] AnalyzeCensoringArg),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -55,6 +59,7 @@ fn main() -> anyhow::Result<()> {
         Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
         Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,
         Mode::GenerateBoardFeatureStats(arg) => generate_board_feature_stats::run(&arg)?,
+        Mode::AnalyzeCensoring(arg) => analyze_censoring::run(&arg)?,
     }
     Ok(())
 }
