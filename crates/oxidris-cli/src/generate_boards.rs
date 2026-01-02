@@ -100,32 +100,40 @@ impl AdaptiveSampler {
     where
         R: Rng,
     {
-        let bind = DifficultyBin::new(analysis);
-        let current_count = *self.bin_counts.get(&bind).unwrap_or(&0);
+        let bin = DifficultyBin::new(analysis);
+        let current_count = *self.bin_counts.get(&bin).unwrap_or(&0);
         let desired_count = self.total_captured.div_ceil(DifficultyBin::NUM_BINS);
         let fill_ratio = if desired_count == 0 {
-            1.0
+            0.0
         } else {
             current_count as f64 / desired_count as f64
         };
 
         let mut capture_prob = 1.0 / (1.0 + fill_ratio);
+
+        let difficulty_score = f64::from(bin.height_bin + bin.holes_bin);
+        let difficulty_bonus = (difficulty_score / 7.0).powf(2.5) * 3.0;
+        // (0, 0) -> 0.0
+        // (4, 3) -> (7/7 )^2.5 * 3 = 3.0
+        capture_prob += difficulty_bonus;
+
         let turns = stats.completed_pieces();
-        if turns < 30 {
-            capture_prob *= 0.3;
-        } else if turns < 60 {
-            capture_prob *= 0.5;
+        let turn_multiplier = if turns < 30 {
+            0.5
         } else if turns < 100 {
-            capture_prob *= 0.7;
-        }
+            1.0
+        } else {
+            1.2
+        };
+        capture_prob *= turn_multiplier;
 
         // Downscale capture probability to avoid excessive captures
-        capture_prob *= 0.1;
-        capture_prob = capture_prob.clamp(0.0, 0.1);
+        capture_prob *= 0.3;
+        capture_prob = capture_prob.clamp(0.05, 1.0);
 
         let should_capture = rng.random_bool(capture_prob);
         if should_capture {
-            *self.bin_counts.entry(bind).or_insert(0) += 1;
+            *self.bin_counts.entry(bin).or_insert(0) += 1;
             self.total_captured += 1;
         }
         should_capture
@@ -145,6 +153,8 @@ impl AdaptiveSampler {
         }));
     }
 }
+
+const CAPTURE_INTERVAL: usize = 5;
 
 pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let GenerateBoardsArg { num_boards, output } = arg;
@@ -175,6 +185,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             placement_evaluator: placement_evaluator.name.to_owned(),
             boards: vec![],
         };
+        let mut capture_interval = CAPTURE_INTERVAL;
         while let Some((turn_plan, analysis)) = turn_evaluator.select_best_turn(&field) {
             let turn = stats.completed_pieces();
             let capture_board = BoardAndPlacement {
@@ -187,19 +198,27 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
                 session_data.gameover_turn = Some(turn);
                 break;
             }
-            if adaptive_sampler.should_capture(&analysis, &stats, &mut rng) {
-                evaluator_histogram[evaluator_index] += 1;
-                turns_histogram[(turn / TURNS_HISTOGRAM_WIDTH).min(turns_histogram.len() - 1)] += 1;
-                session_data.boards.push(capture_board);
+            if capture_interval == 0 {
+                if adaptive_sampler.should_capture(&analysis, &stats, &mut rng) {
+                    evaluator_histogram[evaluator_index] += 1;
+                    turns_histogram
+                        [(turn / TURNS_HISTOGRAM_WIDTH).min(turns_histogram.len() - 1)] += 1;
+                    session_data.boards.push(capture_board);
+                    capture_interval = CAPTURE_INTERVAL;
+                }
+                if adaptive_sampler.total_captured % 1000 == 0
+                    && adaptive_sampler.total_captured > 0
+                {
+                    adaptive_sampler.print_progress();
+                }
+            } else {
+                capture_interval -= 1;
             }
             if stats.completed_pieces() > MAX_TURNS {
                 break;
             }
         }
         captured_sessions.push(session_data);
-        if total_games % 100 == 0 {
-            adaptive_sampler.print_progress();
-        }
     }
 
     let collection = SessionCollection {
@@ -277,16 +296,23 @@ pub struct AggroPlacementEvaluator {
 
 impl AggroPlacementEvaluator {
     pub fn new() -> Self {
+        // copy from aggro.json
         let pairs: &[(&'static dyn DynBoardFeatureSource, f32)] = &[
-            (&board_feature::RowTransitionsPenalty, 0.1f32),
-            (&board_feature::ColumnTransitionsPenalty, 0.1),
-            (&board_feature::SurfaceBumpinessPenalty, 0.1),
-            (&board_feature::SurfaceRoughnessPenalty, 0.1),
-            (&board_feature::WellDepthPenalty, 0.1),
-            (&board_feature::MaxHeightPenalty, 0.1),
-            (&board_feature::TopOutRisk, 0.1),
-            (&board_feature::LineClearBonus, 0.5),
-            (&board_feature::IWellReward, 0.5),
+            (&board_feature::HolesPenalty, 0.228_862_03),
+            (&board_feature::HoleDepthPenalty, 0.157_612_1),
+            (&board_feature::RowTransitionsPenalty, 0.032_375_332),
+            (&board_feature::ColumnTransitionsPenalty, 0.073_017_87),
+            (&board_feature::SurfaceBumpinessPenalty, 0.021_512_082),
+            (&board_feature::SurfaceRoughnessPenalty, 0.0),
+            (&board_feature::WellDepthPenalty, 0.003_433_691_3),
+            (&board_feature::DeepWellRisk, 0.112_219_19),
+            (&board_feature::MaxHeightPenalty, 0.041_565_202),
+            (&board_feature::CenterColumnsPenalty, 0.017_524_77),
+            (&board_feature::CenterTopOutRisk, 0.006_517_862),
+            (&board_feature::TopOutRisk, 0.238_829_42),
+            (&board_feature::TotalHeightPenalty, 0.021_264_264),
+            (&board_feature::LineClearBonus, 0.010_285_562),
+            (&board_feature::IWellReward, 0.034_980_606),
         ];
         let features = pairs.iter().map(|(f, _)| *f).collect();
         let weights = pairs.iter().map(|(_, w)| *w).collect();
