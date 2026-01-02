@@ -9,5 +9,8 @@ derive_more = { workspace = true, features = ["display", "error", "is_variant"] 
 rand.workspace = true
 serde.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

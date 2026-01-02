@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{fmt::Write, ops::Range};
 
 use serde::{Deserialize, Serialize};
 
@@ -26,8 +26,7 @@ const PLAYABLE_MASK: u16 = FULL_ROW_MASK & !SENTINEL_MASK;
 
 /// Single row in the bit board representation.
 /// Stores one row of the board as a u16 bitmask.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BitRow {
     bits: u16,
 }
@@ -129,10 +128,53 @@ impl BitRow {
 /// ```
 ///
 /// This allows full movement range while maintaining 4x4 grid collision detection.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BitBoard {
     rows: [BitRow; TOTAL_HEIGHT],
+}
+
+impl Serialize for BitBoard {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut hex_string = String::with_capacity(TOTAL_HEIGHT * 4);
+        for row in &self.rows {
+            write!(&mut hex_string, "{:04x}", row.bits).unwrap();
+        }
+        serializer.serialize_str(&hex_string)
+    }
+}
+
+impl<'de> Deserialize<'de> for BitBoard {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        // Expected length: TOTAL_HEIGHT * 4 characters
+        let expected_len = TOTAL_HEIGHT * 4;
+        if s.len() != expected_len {
+            return Err(serde::de::Error::custom(format!(
+                "expected {} characters (4 per row * {} rows), got {}",
+                expected_len,
+                TOTAL_HEIGHT,
+                s.len()
+            )));
+        }
+
+        let mut rows = [BitRow::EMPTY; TOTAL_HEIGHT];
+        for (i, row) in rows.iter_mut().enumerate() {
+            let start = i * 4;
+            let end = start + 4;
+            let hex_str = &s[start..end];
+            let bits = u16::from_str_radix(hex_str, 16).map_err(serde::de::Error::custom)?;
+            *row = BitRow { bits };
+        }
+
+        Ok(BitBoard { rows })
+    }
 }
 
 impl BitBoard {
@@ -441,6 +483,113 @@ mod tests {
             }
         }
         assert_eq!(occupied_count, PLAYABLE_WIDTH - 1);
+    }
+
+    #[test]
+    fn test_bit_board_serialization() {
+        let board = BitBoard::INITIAL;
+        let serialized = serde_json::to_string(&board).unwrap();
+
+        // Print the serialized format for verification
+        println!("BitBoard serialized format:");
+        println!("{}", serde_json::to_string_pretty(&board).unwrap());
+
+        // The serialized format should be a single hex string
+        assert!(serialized.starts_with('"'));
+        assert!(serialized.ends_with('"'));
+        assert!(serialized.contains("3003")); // EMPTY rows
+        assert!(serialized.contains("3fff")); // FULL_SENTINEL rows
+
+        // Should be 24 rows * 4 chars = 96 chars, plus 2 for quotes
+        assert_eq!(serialized.len(), TOTAL_HEIGHT * 4 + 2);
+
+        let deserialized: BitBoard = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, board);
+    }
+
+    #[test]
+    fn test_bit_board_serialization_with_data() {
+        let board = BitBoard::from_ascii(
+            r"
+            ..........
+            .#........
+            ..#.......
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ",
+        );
+
+        let serialized = serde_json::to_string(&board).unwrap();
+
+        // Print the serialized format for verification
+        println!("BitBoard with data serialized format:");
+        println!("{}", serde_json::to_string_pretty(&board).unwrap());
+
+        let deserialized: BitBoard = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, board);
+    }
+
+    #[test]
+    fn test_hex_string_format_example() {
+        // This test demonstrates the hex string serialization format
+        // BitBoard is serialized as a single concatenated hex string (4 chars per row)
+
+        // Example: Create a board with a specific pattern
+        let board = BitBoard::from_ascii(
+            r"
+            ##........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ..........
+            ",
+        );
+
+        let serialized = serde_json::to_string_pretty(&board).unwrap();
+        println!("\nExample of BitBoard hex string serialization:");
+        println!("{serialized}");
+        println!("Length: {} characters (including quotes)", serialized.len());
+
+        // Verify the format - should be a single string
+        assert!(serialized.starts_with('"'));
+        assert!(serialized.ends_with('"'));
+        assert!(serialized.contains("300f")); // First row with ## pattern
+        assert!(serialized.contains("3003")); // Empty rows
+        assert!(serialized.contains("3fff")); // Bottom sentinel rows
+
+        // Verify round-trip
+        let deserialized: BitBoard = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, board);
     }
 
     #[test]
