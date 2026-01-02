@@ -1,9 +1,7 @@
 use std::{collections::HashMap, fmt, path::PathBuf};
 
 use oxidris_ai::{
-    board_feature::{self, DynBoardFeatureSource},
-    placement_analysis::PlacementAnalysis,
-    placement_evaluator::{FeatureBasedPlacementEvaluator, PlacementEvaluator},
+    placement_analysis::PlacementAnalysis, placement_evaluator::PlacementEvaluator,
     turn_evaluator::TurnEvaluator,
 };
 use oxidris_engine::{GameField, GameStats};
@@ -114,7 +112,7 @@ impl AdaptiveSampler {
         let difficulty_score = f64::from(bin.height_bin + bin.holes_bin);
         let difficulty_bonus = (difficulty_score / 7.0).powf(2.5) * 3.0;
         // (0, 0) -> 0.0
-        // (4, 3) -> (7/7 )^2.5 * 3 = 3.0
+        // (4, 3) -> (7/7)^2.5 * 3 = 3.0
         capture_prob += difficulty_bonus;
 
         let turns = stats.completed_pieces();
@@ -159,9 +157,10 @@ const CAPTURE_INTERVAL: usize = 5;
 pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let GenerateBoardsArg { num_boards, output } = arg;
     let placement_evaluators: &[PlacementEvaluatorFactory] = &[
-        PlacementEvaluatorFactory::new("dumb", DumbPlacementEvaluator::boxed),
-        PlacementEvaluatorFactory::new("aggro", AggroPlacementEvaluator::boxed),
-        PlacementEvaluatorFactory::new("balance", BalancePlacementEvaluator::boxed),
+        PlacementEvaluatorFactory::new("random", RandomPlacementEvaluator::boxed),
+        PlacementEvaluatorFactory::new("height_only", HeightOnlyEvaluator::boxed),
+        PlacementEvaluatorFactory::new("heuristic", HeuristicEvaluator::boxed),
+        PlacementEvaluatorFactory::new("noisy_heuristic", NoisyHeuristicEvaluator::boxed),
     ];
 
     eprintln!("Generating boards for training data...");
@@ -178,17 +177,9 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         let mut field = GameField::new();
         let mut stats = GameStats::new();
 
-        // Weighted selection: dumb=60%, aggro=25%, balance=15%
-        let evaluator_index = {
-            let r = rng.random_range(0..100);
-            if r < 60 {
-                0 // dumb
-            } else if r < 85 {
-                1 // aggro
-            } else {
-                2 // balance
-            }
-        };
+        // Uniform selection of independent evaluators to avoid circular dependency
+        // Each evaluator has 25% probability
+        let evaluator_index = rng.random_range(0..placement_evaluators.len());
         let placement_evaluator = &placement_evaluators[evaluator_index];
         let turn_evaluator = TurnEvaluator::new((placement_evaluator.factory)());
         let mut session_data = SessionData {
@@ -277,14 +268,20 @@ where
     let max_bar_width = 50;
     for (label, count) in &data {
         let bar_width = (count * max_bar_width) / max_count;
-        println!("{:>10} | {:<5} {}", label, count, "#".repeat(bar_width));
+        println!("{:>15} | {:<5} {}", label, count, "#".repeat(bar_width));
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DumbPlacementEvaluator {}
+// Independent evaluators that don't use normalized features
+// to avoid circular dependency when optimizing feature normalization
 
-impl DumbPlacementEvaluator {
+/// Completely random placement evaluator (baseline/worst case)
+#[derive(Debug, Clone)]
+pub struct RandomPlacementEvaluator {
+    // No state needed - will use thread_rng in evaluate
+}
+
+impl RandomPlacementEvaluator {
     pub fn new() -> Self {
         Self {}
     }
@@ -294,7 +291,51 @@ impl DumbPlacementEvaluator {
     }
 }
 
-impl PlacementEvaluator for DumbPlacementEvaluator {
+impl PlacementEvaluator for RandomPlacementEvaluator {
+    #[inline]
+    fn evaluate_placement(&self, _analysis: &PlacementAnalysis) -> f32 {
+        // Random score between -1.0 and 1.0
+        rand::rng().random_range(-1.0..1.0)
+    }
+}
+
+/// Height-only evaluator (minimize max height only)
+#[derive(Debug, Clone)]
+pub struct HeightOnlyEvaluator {}
+
+impl HeightOnlyEvaluator {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn boxed() -> BoxedPlacementEvaluator {
+        Box::new(Self::new())
+    }
+}
+
+impl PlacementEvaluator for HeightOnlyEvaluator {
+    #[inline]
+    fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
+        let max_height = analysis.board_analysis().max_height();
+        -f32::from(max_height)
+    }
+}
+
+/// Heuristic evaluator using raw `max_height` and `num_holes` (no normalization)
+#[derive(Debug, Clone)]
+pub struct HeuristicEvaluator {}
+
+impl HeuristicEvaluator {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn boxed() -> BoxedPlacementEvaluator {
+        Box::new(Self::new())
+    }
+}
+
+impl PlacementEvaluator for HeuristicEvaluator {
     #[inline]
     fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
         let max_height = analysis.board_analysis().max_height();
@@ -303,35 +344,17 @@ impl PlacementEvaluator for DumbPlacementEvaluator {
     }
 }
 
+/// Noisy heuristic evaluator - adds random noise to height+holes heuristic
+/// to make it play worse and generate more diverse/dangerous boards
 #[derive(Debug, Clone)]
-pub struct AggroPlacementEvaluator {
-    evaluator: FeatureBasedPlacementEvaluator,
+pub struct NoisyHeuristicEvaluator {
+    noise_scale: f32,
 }
 
-impl AggroPlacementEvaluator {
+impl NoisyHeuristicEvaluator {
     pub fn new() -> Self {
-        // copy from aggro.json
-        let pairs: &[(&'static dyn DynBoardFeatureSource, f32)] = &[
-            (&board_feature::HolesPenalty, 0.228_862_03),
-            (&board_feature::HoleDepthPenalty, 0.157_612_1),
-            (&board_feature::RowTransitionsPenalty, 0.032_375_332),
-            (&board_feature::ColumnTransitionsPenalty, 0.073_017_87),
-            (&board_feature::SurfaceBumpinessPenalty, 0.021_512_082),
-            (&board_feature::SurfaceRoughnessPenalty, 0.0),
-            (&board_feature::WellDepthPenalty, 0.003_433_691_3),
-            (&board_feature::DeepWellRisk, 0.112_219_19),
-            (&board_feature::MaxHeightPenalty, 0.041_565_202),
-            (&board_feature::CenterColumnsPenalty, 0.017_524_77),
-            (&board_feature::CenterTopOutRisk, 0.006_517_862),
-            (&board_feature::TopOutRisk, 0.238_829_42),
-            (&board_feature::TotalHeightPenalty, 0.021_264_264),
-            (&board_feature::LineClearBonus, 0.010_285_562),
-            (&board_feature::IWellReward, 0.034_980_606),
-        ];
-        let features = pairs.iter().map(|(f, _)| *f).collect();
-        let weights = pairs.iter().map(|(_, w)| *w).collect();
         Self {
-            evaluator: FeatureBasedPlacementEvaluator::new(features, weights),
+            noise_scale: 5.0, // Noise amplitude
         }
     }
 
@@ -340,53 +363,15 @@ impl AggroPlacementEvaluator {
     }
 }
 
-impl PlacementEvaluator for AggroPlacementEvaluator {
+impl PlacementEvaluator for NoisyHeuristicEvaluator {
     #[inline]
     fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
-        self.evaluator.evaluate_placement(analysis)
-    }
-}
+        let max_height = analysis.board_analysis().max_height();
+        let covered_holes = analysis.board_analysis().num_holes();
+        let base_score = -f32::from(max_height) - f32::from(covered_holes);
 
-#[derive(Debug, Clone)]
-pub struct BalancePlacementEvaluator {
-    evaluator: FeatureBasedPlacementEvaluator,
-}
-
-impl BalancePlacementEvaluator {
-    pub fn new() -> Self {
-        // copy from defensive.json
-        let pairs: &[(&'static dyn DynBoardFeatureSource, f32)] = &[
-            (&board_feature::HolesPenalty, 0.213_184_65),
-            (&board_feature::HoleDepthPenalty, 0.110_842_15),
-            (&board_feature::RowTransitionsPenalty, 0.092_231_855),
-            (&board_feature::ColumnTransitionsPenalty, 0.008_030_57),
-            (&board_feature::SurfaceBumpinessPenalty, 0.036_550_764),
-            (&board_feature::SurfaceRoughnessPenalty, 0.019_671_245),
-            (&board_feature::WellDepthPenalty, 0.205_994_08),
-            (&board_feature::DeepWellRisk, 0.023_119_722),
-            (&board_feature::MaxHeightPenalty, 0.139_035_12),
-            (&board_feature::CenterColumnsPenalty, 0.029_494_1),
-            (&board_feature::CenterTopOutRisk, 0.021_646_535),
-            (&board_feature::TopOutRisk, 0.062_471_554),
-            (&board_feature::TotalHeightPenalty, 0.033_591_066),
-            (&board_feature::LineClearBonus, 0.003_266_561_8),
-            (&board_feature::IWellReward, 0.000_870_029_5),
-        ];
-        let features = pairs.iter().map(|(f, _)| *f).collect();
-        let weights = pairs.iter().map(|(_, w)| *w).collect();
-        Self {
-            evaluator: FeatureBasedPlacementEvaluator::new(features, weights),
-        }
-    }
-
-    pub fn boxed() -> BoxedPlacementEvaluator {
-        Box::new(Self::new())
-    }
-}
-
-impl PlacementEvaluator for BalancePlacementEvaluator {
-    #[inline]
-    fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
-        self.evaluator.evaluate_placement(analysis)
+        // Add random noise to make suboptimal choices
+        let noise = rand::rng().random_range(-self.noise_scale..self.noise_scale);
+        base_score + noise
     }
 }
