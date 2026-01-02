@@ -151,7 +151,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let placement_evaluators: &[PlacementEvaluatorFactory] = &[
         PlacementEvaluatorFactory::new("dumb", DumbPlacementEvaluator::boxed),
         PlacementEvaluatorFactory::new("aggro", AggroPlacementEvaluator::boxed),
-        PlacementEvaluatorFactory::new("balance", BalancePlacenemtnEvaluator::boxed),
+        PlacementEvaluatorFactory::new("balance", BalancePlacementEvaluator::boxed),
     ];
 
     eprintln!("Generating boards for training data...");
@@ -308,11 +308,11 @@ impl PlacementEvaluator for AggroPlacementEvaluator {
 }
 
 #[derive(Debug, Clone)]
-pub struct BalancePlacenemtnEvaluator {
+pub struct BalancePlacementEvaluator {
     evaluator: FeatureBasedPlacementEvaluator,
 }
 
-impl BalancePlacenemtnEvaluator {
+impl BalancePlacementEvaluator {
     pub fn new() -> Self {
         // copy from defensive.json
         let pairs: &[(&'static dyn DynBoardFeatureSource, f32)] = &[
@@ -344,7 +344,7 @@ impl BalancePlacenemtnEvaluator {
     }
 }
 
-impl PlacementEvaluator for BalancePlacenemtnEvaluator {
+impl PlacementEvaluator for BalancePlacementEvaluator {
     #[inline]
     fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
         self.evaluator.evaluate_placement(analysis)
