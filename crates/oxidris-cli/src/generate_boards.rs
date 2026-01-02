@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use oxidris_ai::{
     board_feature::{self, DynBoardFeatureSource},
@@ -126,30 +126,46 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     eprintln!("Captured {captured_boards} boards from {total_games} games.");
     eprintln!();
     eprintln!("Placement evaluator histogram:");
-    for (i, evaluator) in placement_evaluators.iter().enumerate() {
-        let count = evaluator_histogram[i];
-        eprintln!(
-            "  {:10} : {count:5} {}",
-            evaluator.name,
-            "#".repeat(count / 200)
-        );
-    }
+    print_histogram(
+        placement_evaluators
+            .iter()
+            .enumerate()
+            .map(|(i, evaluator)| (evaluator.name, evaluator_histogram[i])),
+    );
     eprintln!();
     eprintln!("Turns histogram:");
-    for (i, count) in turns_histogram.iter().enumerate() {
-        let min = i * TURNS_HISTOGRAM_WIDTH;
-        eprintln!("  {min:3}- : {count:5} {}", "#".repeat(count / 100));
-    }
+    print_histogram(
+        turns_histogram
+            .iter()
+            .enumerate()
+            .map(|(i, count)| (i * TURNS_HISTOGRAM_WIDTH, *count)),
+    );
     eprintln!();
     eprintln!("Height histogram:");
-    for (i, count) in height_histogram.iter().enumerate() {
-        let min = i * HEIGHT_HISTOGRAM_WIDTH;
-        eprintln!("  {min:2}- : {count:5} {}", "#".repeat(count / 200));
-    }
+    print_histogram(
+        height_histogram
+            .iter()
+            .enumerate()
+            .map(|(i, count)| (i * HEIGHT_HISTOGRAM_WIDTH, *count)),
+    );
 
     Output::save_json(&collection, output.clone())?;
 
     Ok(())
+}
+
+fn print_histogram<I, S>(data: I)
+where
+    I: Iterator<Item = (S, usize)>,
+    S: fmt::Display,
+{
+    let data = data.collect::<Vec<_>>();
+    let max_count = data.iter().map(|(_, c)| *c).max().unwrap_or(1);
+    let max_bar_width = 50;
+    for (label, count) in &data {
+        let bar_width = (count * max_bar_width) / max_count;
+        println!("{:>10} | {:<5} {}", label, count, "#".repeat(bar_width));
+    }
 }
 
 #[derive(Debug, Clone)]
