@@ -42,8 +42,8 @@ impl crate::board_feature::HoleDepthPenalty {
     pub const TRANSFORMED_P99: f32 = 63.0;
     pub const NORMALIZED_P01: f32 = 0.0;
     pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P25: f32 = 0.718_75;
-    pub const NORMALIZED_P50: f32 = 0.937_5;
+    pub const NORMALIZED_P25: f32 = 0.727_272_75;
+    pub const NORMALIZED_P50: f32 = 0.939_393_94;
     pub const NORMALIZED_P75: f32 = 1.0;
     pub const NORMALIZED_P95: f32 = 1.0;
     pub const NORMALIZED_P99: f32 = 1.0;
@@ -232,10 +232,34 @@ impl crate::board_feature::CenterColumnsPenalty {
     pub const TRANSFORMED_P75: f32 = 7.0;
     pub const TRANSFORMED_P95: f32 = 12.0;
     pub const TRANSFORMED_P99: f32 = 16.0;
-    pub const NORMALIZED_P01: f32 = 0.682_926_83;
-    pub const NORMALIZED_P05: f32 = 0.780_487_8;
-    pub const NORMALIZED_P25: f32 = 0.902_439;
-    pub const NORMALIZED_P50: f32 = 0.975_609_8;
+    pub const NORMALIZED_P01: f32 = 0.0;
+    pub const NORMALIZED_P05: f32 = 0.0;
+    pub const NORMALIZED_P25: f32 = 0.454_545_44;
+    pub const NORMALIZED_P50: f32 = 0.727_272_75;
+    pub const NORMALIZED_P75: f32 = 0.909_090_9;
+    pub const NORMALIZED_P95: f32 = 1.0;
+    pub const NORMALIZED_P99: f32 = 1.0;
+}
+
+impl crate::board_feature::CenterTopOutRisk {
+    pub const RAW_P01: f32 = 1.0;
+    pub const RAW_P05: f32 = 1.0;
+    pub const RAW_P25: f32 = 2.0;
+    pub const RAW_P50: f32 = 4.0;
+    pub const RAW_P75: f32 = 7.0;
+    pub const RAW_P95: f32 = 12.0;
+    pub const RAW_P99: f32 = 16.0;
+    pub const TRANSFORMED_P01: f32 = 1.0;
+    pub const TRANSFORMED_P05: f32 = 1.0;
+    pub const TRANSFORMED_P25: f32 = 2.0;
+    pub const TRANSFORMED_P50: f32 = 4.0;
+    pub const TRANSFORMED_P75: f32 = 7.0;
+    pub const TRANSFORMED_P95: f32 = 12.0;
+    pub const TRANSFORMED_P99: f32 = 16.0;
+    pub const NORMALIZED_P01: f32 = 0.0;
+    pub const NORMALIZED_P05: f32 = 0.0;
+    pub const NORMALIZED_P25: f32 = 0.625;
+    pub const NORMALIZED_P50: f32 = 1.0;
     pub const NORMALIZED_P75: f32 = 1.0;
     pub const NORMALIZED_P95: f32 = 1.0;
     pub const NORMALIZED_P99: f32 = 1.0;

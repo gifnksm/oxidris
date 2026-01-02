@@ -43,6 +43,7 @@ pub const ALL_BOARD_FEATURES: &[&dyn DynBoardFeatureSource] = &[
     &DeepWellRisk,
     &MaxHeightPenalty,
     &CenterColumnsPenalty,
+    &CenterTopOutRisk,
     &TopOutRisk,
     &TotalHeightPenalty,
     &LineClearBonus,
@@ -525,6 +526,47 @@ impl BoardFeatureSource for CenterColumnsPenalty {
     const NAME: &str = "Center Columns Penalty";
 
     const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
+    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
+    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
+
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().center_column_max_height().into()
+    }
+}
+
+/// Thresholded risk for top-out in the center 4 columns (columns 3-6).
+///
+/// This feature penalizes:
+///
+/// - High stacking in the critical center columns
+/// - Early-stage top-out risk in the most important area
+/// - Center column height before it reaches critical levels
+///
+/// The center 4 columns are strategically crucial because:
+/// - They are the most difficult to clear when filled
+/// - Most pieces naturally gravitate toward the center
+/// - High center columns severely restrict piece placement options
+///
+/// This feature uses the same thresholded approach as [`TopOutRisk`] (P75-P95), but focuses
+/// specifically on the center 4 columns rather than all columns, allowing the AI to distinguish
+/// between edge height and critical center height issues.
+///
+/// # Raw measurement
+///
+/// - `raw = max(column_heights[3..=6])`: the tallest column among the center 4 columns.
+///
+/// # Normalization
+///
+/// - Clipped to `[P75, P95]`.
+/// - `SIGNAL` = Negative (lower height is better).
+#[derive(Debug)]
+pub struct CenterTopOutRisk;
+
+impl BoardFeatureSource for CenterTopOutRisk {
+    const ID: &str = "center_top_out_risk";
+    const NAME: &str = "Center Top-Out Risk";
+
+    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
