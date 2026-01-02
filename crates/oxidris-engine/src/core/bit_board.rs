@@ -247,7 +247,7 @@ impl BitBoard {
         0
     }
 
-    /// Creates a BitBoard from ASCII art representation for testing.
+    /// Creates a `BitBoard` from ASCII art representation for testing.
     /// '#' represents an occupied cell, '.' represents an empty cell.
     /// The board should be 10 columns wide and up to 20 rows tall.
     /// Rows are specified from top to bottom (row 0 at top).

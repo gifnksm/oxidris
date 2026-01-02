@@ -19,7 +19,6 @@ pub trait EvaluateSessionStats {
 
 pub trait SessionEvaluator: fmt::Debug + Send + Sync {
     fn play_and_evaluate_session(&self, field: &GameField, turn_evaluator: &TurnEvaluator) -> f32;
-    #[expect(clippy::cast_precision_loss)]
     fn play_and_evaluate_sessions(
         &self,
         fields: &[GameField],
@@ -87,7 +86,7 @@ impl SessionStats for DefaultSessionStats {
         let max_height = *analysis
             .board_analysis()
             .column_heights()
-            .into_iter()
+            .iter()
             .max()
             .unwrap();
         if max_height > self.worst_max_height {
@@ -127,7 +126,7 @@ impl EvaluateSessionStats for AggroSessionEvaluator {
                 .map(|(w, c)| f32::from(w) * (*c as f32))
                 .sum::<f32>();
         let efficiency = weighted_line_count / survived.max(1.0);
-        let height_penalty = ((u8::max(stats.worst_max_height, 10) - 10) as f32) / 5.0;
+        let height_penalty = f32::from(u8::max(stats.worst_max_height, 10) - 10) / 5.0;
         survival_bonus + efficiency * survived_ratio - height_penalty
     }
 }
@@ -158,7 +157,7 @@ impl EvaluateSessionStats for DefensiveSessionEvaluator {
         let survival_bonus = 2.0 * survived_ratio * survived_ratio;
         let line_count = stats.game_stats.total_cleared_lines() as f32;
         let efficiency = line_count / survived.max(1.0);
-        let height_penalty = (stats.worst_max_height as f32) / 20.0;
+        let height_penalty = f32::from(stats.worst_max_height) / 20.0;
         survival_bonus + efficiency * survived_ratio - height_penalty
     }
 }

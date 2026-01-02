@@ -81,7 +81,7 @@ impl Population {
                     self.board_features.clone(),
                     ind.weights.clone(),
                 );
-                let turn_evaluator = TurnEvaluator::new(placement_evaluator);
+                let turn_evaluator = TurnEvaluator::new(Box::new(placement_evaluator));
                 s.spawn(move || {
                     ind.fitness =
                         session_evaluator.play_and_evaluate_sessions(fields, &turn_evaluator);

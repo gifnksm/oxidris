@@ -63,12 +63,10 @@ pub struct TurnEvaluator {
 }
 
 impl TurnEvaluator {
-    pub fn new<E>(placement_evaluator: E) -> Self
-    where
-        E: PlacementEvaluator + 'static,
-    {
+    #[must_use]
+    pub fn new(placement_evaluator: Box<dyn PlacementEvaluator>) -> Self {
         Self {
-            placement_evaluator: Box::new(placement_evaluator),
+            placement_evaluator,
         }
     }
 

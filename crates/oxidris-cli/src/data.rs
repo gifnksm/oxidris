@@ -7,12 +7,21 @@ use oxidris_engine::{BitBoard, Piece};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct BoardCollection {
+pub struct SessionCollection {
+    pub total_boards: usize,
+    pub sessions: Vec<SessionData>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SessionData {
+    pub placement_evaluator: String,
     pub boards: Vec<BoardAndPlacement>,
+    pub gameover_turn: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BoardAndPlacement {
+    pub turn: usize,
     pub board: BitBoard,
     pub placement: Piece,
 }
@@ -89,7 +98,7 @@ impl Model {
     }
 }
 
-pub fn load_board<P>(path: P) -> anyhow::Result<Vec<BoardAndPlacement>>
+pub fn load_sessions<P>(path: P) -> anyhow::Result<Vec<SessionData>>
 where
     P: AsRef<Path>,
 {
@@ -97,14 +106,14 @@ where
     let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
 
     let reader = BufReader::new(file);
-    let boards: BoardCollection = serde_json::from_reader(reader)
+    let boards: SessionCollection = serde_json::from_reader(reader)
         .with_context(|| format!("failed to parse {}", path.display()))?;
 
-    if boards.boards.is_empty() {
+    if boards.sessions.is_empty() {
         bail!("{} is empty", path.display());
     }
 
-    Ok(boards.boards)
+    Ok(boards.sessions)
 }
 
 pub fn load_model<P>(path: P) -> anyhow::Result<Model>

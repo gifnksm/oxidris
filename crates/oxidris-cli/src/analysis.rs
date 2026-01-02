@@ -6,11 +6,16 @@ use oxidris_ai::{
 };
 
 use crate::data::{
-    BoardAndPlacement, BoardFeatureStatistics, BoardSample, Histogram, HistogramBin, ValueStats,
+    BoardAndPlacement, BoardFeatureStatistics, BoardSample, Histogram, HistogramBin, SessionData,
+    ValueStats,
 };
 
-pub fn extract_all_board_features(boards: &[BoardAndPlacement]) -> Vec<BoardSample> {
-    boards.iter().map(extract_board_features).collect()
+pub fn extract_all_board_features(sessions: &[SessionData]) -> Vec<BoardSample> {
+    sessions
+        .iter()
+        .flat_map(|session| &session.boards)
+        .map(extract_board_features)
+        .collect()
 }
 
 fn extract_board_features(board: &BoardAndPlacement) -> BoardSample {

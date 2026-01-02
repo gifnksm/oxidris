@@ -230,7 +230,7 @@ impl BoardAnalysis {
         *self.sum_of_deep_well_depth.get_or_init(|| {
             const DEPTH_THRESHOLD: u8 = 1;
             self.column_well_depths()
-                .into_iter()
+                .iter()
                 .filter(|depth| **depth > DEPTH_THRESHOLD)
                 .map(|depth| u32::from(depth - DEPTH_THRESHOLD))
                 .sum()
