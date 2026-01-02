@@ -181,8 +181,9 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         let placement_evaluator = &placement_evaluators[evaluator_index];
         let turn_evaluator = TurnEvaluator::new((placement_evaluator.factory)());
         let mut session_data = SessionData {
-            gameover_turn: None,
             placement_evaluator: placement_evaluator.name.to_owned(),
+            survived_turns: 0,
+            is_game_over: false,
             boards: vec![],
         };
         let mut capture_interval = CAPTURE_INTERVAL;
@@ -195,9 +196,11 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             };
             let (_cleared_lines, result) = turn_plan.apply(&analysis, &mut field, &mut stats);
             if result.is_err() {
-                session_data.gameover_turn = Some(turn);
+                session_data.is_game_over = true;
                 break;
             }
+            session_data.survived_turns = turn;
+
             if capture_interval == 0 {
                 if adaptive_sampler.should_capture(&analysis, &stats, &mut rng) {
                     evaluator_histogram[evaluator_index] += 1;
@@ -206,7 +209,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
                     session_data.boards.push(capture_board);
                     capture_interval = CAPTURE_INTERVAL;
                 }
-                if adaptive_sampler.total_captured % 1000 == 0
+                if adaptive_sampler.total_captured.is_multiple_of(1000)
                     && adaptive_sampler.total_captured > 0
                 {
                     adaptive_sampler.print_progress();

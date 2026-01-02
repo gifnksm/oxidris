@@ -15,8 +15,9 @@ pub struct SessionCollection {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SessionData {
     pub placement_evaluator: String,
+    pub survived_turns: usize,
+    pub is_game_over: bool,
     pub boards: Vec<BoardAndPlacement>,
-    pub gameover_turn: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
