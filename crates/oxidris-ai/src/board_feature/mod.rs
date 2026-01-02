@@ -26,10 +26,9 @@
 //! - `ALL_BOARD_FEATURES.measure(board, placement)` returns raw/transformed/normalized per feature.
 //! - `ALL_BOARD_FEATURES.measure_normalized(board, placement)` returns normalized scores for weighting.
 
-use oxidris_engine::{BitBoard, PieceKind};
 use std::fmt;
 
-use crate::board_analysis::BoardAnalysis;
+use crate::placement_analysis::PlacementAnalysis;
 
 mod stats;
 
@@ -71,7 +70,7 @@ pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
     const SIGNAL: FeatureSignal;
 
     #[must_use]
-    fn extract_raw(analysis: &BoardAnalysis) -> u32;
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32;
 
     #[must_use]
     #[expect(clippy::cast_precision_loss)]
@@ -90,7 +89,7 @@ pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
     }
 
     #[must_use]
-    fn compute_feature_value(analysis: &BoardAnalysis) -> BoardFeatureValue {
+    fn compute_feature_value(analysis: &PlacementAnalysis) -> BoardFeatureValue {
         let raw = Self::extract_raw(analysis);
         let transformed = Self::transform(raw);
         let normalized = Self::normalize(transformed);
@@ -116,13 +115,13 @@ pub trait DynBoardFeatureSource: fmt::Debug + Send + Sync {
     #[must_use]
     fn signal(&self) -> FeatureSignal;
     #[must_use]
-    fn extract_raw(&self, analysis: &BoardAnalysis) -> u32;
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
     #[must_use]
     fn transform(&self, raw: u32) -> f32;
     #[must_use]
     fn normalize(&self, transformed: f32) -> f32;
     #[must_use]
-    fn compute_feature_value(&self, analysis: &BoardAnalysis) -> BoardFeatureValue;
+    fn compute_feature_value(&self, analysis: &PlacementAnalysis) -> BoardFeatureValue;
 }
 
 impl<T> DynBoardFeatureSource for T
@@ -153,7 +152,7 @@ where
         T::SIGNAL
     }
 
-    fn extract_raw(&self, analysis: &BoardAnalysis) -> u32 {
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         T::extract_raw(analysis)
     }
 
@@ -165,7 +164,7 @@ where
         T::normalize(transformed)
     }
 
-    fn compute_feature_value(&self, analysis: &BoardAnalysis) -> BoardFeatureValue {
+    fn compute_feature_value(&self, analysis: &PlacementAnalysis) -> BoardFeatureValue {
         T::compute_feature_value(analysis)
     }
 }
@@ -198,10 +197,8 @@ impl BoardFeatureSource for HolesPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        core::iter::zip(analysis.column_heights, analysis.column_occupied_cells)
-            .map(|(h, occ)| u32::from(h - occ))
-            .sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().num_holes().into()
     }
 }
 
@@ -213,14 +210,17 @@ impl BoardFeatureSource for HolesPenalty {
 /// - Stacking that traps holes under tall columns
 /// - Mid/late-game instability from unrecoverable cavities
 ///
-/// Complements [`HolesPenalty`], which counts holes uniformly. Here, holes deeper under the stack contribute more
-/// via the number of occupied cells above them.
+/// Complements [`HolesPenalty`], which counts holes uniformly. Here, holes deeper in the stack contribute more
+/// based on their depth (number of cells above them, including both occupied and empty cells).
 ///
 /// # Raw measurement
 ///
-/// - For each column, scan top-down. After the first filled cell, every empty cell is a hole; add `blocks_above` to
-///   the cumulative sum where `blocks_above` is the count of occupied cells seen above the hole in that column.
-/// - `raw = Σ (blocks_above for each hole)` across all columns.
+/// - For each column, scan top-down, tracking a `depth` counter:
+///   - When an occupied cell is encountered, increment `depth`.
+///   - When an empty cell is encountered after at least one occupied cell (i.e., `depth > 0`):
+///     - Add the current `depth` value to the cumulative sum.
+///     - Increment `depth` (the hole itself adds to the depth for cells below).
+/// - `raw = Σ (depth at each hole)` across all columns.
 ///
 /// # Normalization
 ///
@@ -237,20 +237,8 @@ impl BoardFeatureSource for HoleDepthPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        let mut depth_sum = 0u32;
-        for x in BitBoard::PLAYABLE_X_RANGE {
-            let mut blocks_above = 0u32;
-            for y in 0..BitBoard::PLAYABLE_HEIGHT {
-                let occupied = analysis.board.playable_row(y).is_cell_occupied(x);
-                if occupied {
-                    blocks_above += 1;
-                } else if blocks_above > 0 {
-                    depth_sum += blocks_above;
-                }
-            }
-        }
-        depth_sum
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().sum_of_hole_depth()
     }
 }
 
@@ -286,19 +274,8 @@ impl BoardFeatureSource for RowTransitionsPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        let mut transitions = 0;
-        for row in analysis.board.playable_rows() {
-            let mut cells = row.iter_playable_cells();
-            let mut prev_occupied = cells.next().unwrap();
-            for occupied in cells {
-                if occupied != prev_occupied {
-                    transitions += 1;
-                }
-                prev_occupied = occupied;
-            }
-        }
-        transitions
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().row_transitions()
     }
 }
 
@@ -330,19 +307,8 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        let mut transitions = 0;
-        for x in BitBoard::PLAYABLE_X_RANGE {
-            let mut prev_occupied = analysis.board.playable_row(0).is_cell_occupied(x);
-            for y in 1..BitBoard::PLAYABLE_HEIGHT {
-                let occupied = analysis.board.playable_row(y).is_cell_occupied(x);
-                if occupied != prev_occupied {
-                    transitions += 1;
-                }
-                prev_occupied = occupied;
-            }
-        }
-        transitions
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().column_transitions()
     }
 }
 
@@ -378,16 +344,8 @@ impl BoardFeatureSource for SurfaceBumpinessPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        analysis
-            .column_heights
-            .windows(2)
-            .map(|w| {
-                let left = i32::from(w[0]);
-                let right = i32::from(w[1]);
-                (right - left).unsigned_abs()
-            })
-            .sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().surface_bumpiness()
     }
 }
 
@@ -424,17 +382,8 @@ impl BoardFeatureSource for SurfaceRoughnessPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        analysis
-            .column_heights
-            .windows(3)
-            .map(|w| {
-                let left = i32::from(w[0]);
-                let mid = i32::from(w[1]);
-                let right = i32::from(w[2]);
-                ((right - mid) - (mid - left)).unsigned_abs()
-            })
-            .sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().surface_roughness()
     }
 }
 
@@ -470,14 +419,8 @@ impl BoardFeatureSource for WellDepthPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        const DEPTH_THRESHOLD: u8 = 1;
-        analysis
-            .column_well_depths
-            .into_iter()
-            .filter(|depth| *depth > DEPTH_THRESHOLD)
-            .map(|depth| u32::from(depth - DEPTH_THRESHOLD))
-            .sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().sum_of_deep_well_depth()
     }
 }
 
@@ -513,14 +456,8 @@ impl BoardFeatureSource for DeepWellRisk {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        const DEPTH_THRESHOLD: u8 = 1;
-        analysis
-            .column_well_depths
-            .into_iter()
-            .filter(|depth| *depth > DEPTH_THRESHOLD)
-            .map(|depth| u32::from(depth - DEPTH_THRESHOLD))
-            .sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().sum_of_deep_well_depth()
     }
 }
 
@@ -555,13 +492,12 @@ impl BoardFeatureSource for MaxHeightPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        let max_height = *analysis.column_heights.iter().max().unwrap();
-        u32::from(max_height)
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().max_height().into()
     }
 }
 
-/// Smooth penalty for cumulative height in the center four columns.
+/// Smooth penalty for maximum height in the center four columns.
 ///
 /// This feature penalizes:
 ///
@@ -575,7 +511,7 @@ impl BoardFeatureSource for MaxHeightPenalty {
 ///
 /// # Raw measurement
 ///
-/// - `raw = Σ (column_heights[3..=6])`: sum of heights in columns 3, 4, 5, and 6.
+/// - `raw = max(column_heights[3..=6])`: maximum height among columns 3, 4, 5, and 6.
 ///
 /// # Normalization
 ///
@@ -592,13 +528,8 @@ impl BoardFeatureSource for CenterColumnsPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        const CENTER_START: usize = 3;
-        const CENTER_END: usize = 6;
-        analysis.column_heights[CENTER_START..=CENTER_END]
-            .iter()
-            .map(|&h| u32::from(h))
-            .sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().center_column_max_height().into()
     }
 }
 
@@ -631,9 +562,8 @@ impl BoardFeatureSource for TopOutRisk {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        let max_height = *analysis.column_heights.iter().max().unwrap();
-        u32::from(max_height)
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().max_height().into()
     }
 }
 
@@ -668,8 +598,8 @@ impl BoardFeatureSource for TotalHeightPenalty {
     const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
     const SIGNAL: FeatureSignal = FeatureSignal::Negative;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        analysis.column_heights.iter().map(|&h| u32::from(h)).sum()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().total_height().into()
     }
 }
 
@@ -722,8 +652,8 @@ impl BoardFeatureSource for LineClearBonus {
     const NORMALIZATION_MAX: f32 = 6.0;
     const SIGNAL: FeatureSignal = FeatureSignal::Positive;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        u32::try_from(analysis.cleared_lines).unwrap()
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        u32::try_from(analysis.cleared_lines()).unwrap()
     }
 
     fn transform(raw: u32) -> f32 {
@@ -744,9 +674,7 @@ impl BoardFeatureSource for LineClearBonus {
 ///
 /// # Raw measurement
 ///
-/// - `raw = max(left_well_depth, right_well_depth)`.
-/// - If a ready I-well (`depth >= 4`) coincides with placing an `I` piece,
-///   set `raw = 0` to avoid double rewarding and to encourage an immediate tetris.
+/// - `raw = max(left_well_depth, right_well_depth)`: the deeper of the two edge wells.
 ///
 /// # Transform
 ///
@@ -760,9 +688,9 @@ impl BoardFeatureSource for LineClearBonus {
 ///
 /// # Rationale and interplay
 ///
-/// - Complements [`DeepWellRisk`] by penalizing excessive vertical wells.
+/// - Complements [`DeepWellRisk`] by focusing on edge wells suitable for tetrises, while [`DeepWellRisk`] penalizes excessive depths.
 /// - Synergizes with [`LineClearBonus`] to favor consistent tetrises.
-/// - The consumption guard discourages hoarding when an `I` piece is available.
+/// - The triangular transform naturally discourages both shallow wells (not ready) and overly deep wells (risky).
 #[derive(Debug)]
 pub struct IWellReward;
 
@@ -774,16 +702,8 @@ impl BoardFeatureSource for IWellReward {
     const NORMALIZATION_MAX: f32 = 1.0;
     const SIGNAL: FeatureSignal = FeatureSignal::Positive;
 
-    fn extract_raw(analysis: &BoardAnalysis) -> u32 {
-        let left_well_depth = analysis.column_well_depths[0];
-        let right_well_depth = analysis.column_well_depths[BitBoard::PLAYABLE_WIDTH - 1];
-        let max_depth = u8::max(left_well_depth, right_well_depth);
-
-        if max_depth >= 4 && analysis.placement.kind() == PieceKind::I {
-            return 0;
-        }
-
-        u32::from(max_depth)
+    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().edge_iwell_depth().into()
     }
 
     #[expect(clippy::cast_precision_loss)]

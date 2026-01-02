@@ -3,7 +3,7 @@ use std::{fmt, iter};
 use oxidris_engine::{GameField, GameStats};
 
 use crate::{
-    board_analysis::BoardAnalysis,
+    placement_analysis::PlacementAnalysis,
     turn_evaluator::{SessionStats, TurnEvaluator},
 };
 
@@ -81,9 +81,15 @@ impl SessionStats for DefaultSessionStats {
         }
     }
 
-    fn complete_piece_drop(&mut self, analysis: &BoardAnalysis) {
-        self.game_stats.complete_piece_drop(analysis.cleared_lines);
-        let max_height = analysis.column_heights.into_iter().max().unwrap();
+    fn complete_piece_drop(&mut self, analysis: &PlacementAnalysis) {
+        self.game_stats
+            .complete_piece_drop(analysis.cleared_lines());
+        let max_height = *analysis
+            .board_analysis()
+            .column_heights()
+            .into_iter()
+            .max()
+            .unwrap();
         if max_height > self.worst_max_height {
             self.worst_max_height = max_height;
         }

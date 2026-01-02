@@ -31,15 +31,15 @@ impl crate::board_feature::HoleDepthPenalty {
     pub const RAW_P25: f32 = 0.0;
     pub const RAW_P50: f32 = 2.0;
     pub const RAW_P75: f32 = 9.0;
-    pub const RAW_P95: f32 = 32.0;
-    pub const RAW_P99: f32 = 60.0;
+    pub const RAW_P95: f32 = 33.0;
+    pub const RAW_P99: f32 = 63.0;
     pub const TRANSFORMED_P01: f32 = 0.0;
     pub const TRANSFORMED_P05: f32 = 0.0;
     pub const TRANSFORMED_P25: f32 = 0.0;
     pub const TRANSFORMED_P50: f32 = 2.0;
     pub const TRANSFORMED_P75: f32 = 9.0;
-    pub const TRANSFORMED_P95: f32 = 32.0;
-    pub const TRANSFORMED_P99: f32 = 60.0;
+    pub const TRANSFORMED_P95: f32 = 33.0;
+    pub const TRANSFORMED_P99: f32 = 63.0;
     pub const NORMALIZED_P01: f32 = 0.0;
     pub const NORMALIZED_P05: f32 = 0.0;
     pub const NORMALIZED_P25: f32 = 0.718_75;
@@ -113,10 +113,10 @@ impl crate::board_feature::SurfaceBumpinessPenalty {
     pub const TRANSFORMED_P95: f32 = 27.0;
     pub const TRANSFORMED_P99: f32 = 38.0;
     pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.041_666_687;
-    pub const NORMALIZED_P25: f32 = 0.583_333_4;
-    pub const NORMALIZED_P50: f32 = 0.791_666_7;
-    pub const NORMALIZED_P75: f32 = 0.916_666_7;
+    pub const NORMALIZED_P05: f32 = 0.0;
+    pub const NORMALIZED_P25: f32 = 0.565_217_4;
+    pub const NORMALIZED_P50: f32 = 0.782_608_7;
+    pub const NORMALIZED_P75: f32 = 0.913_043_5;
     pub const NORMALIZED_P95: f32 = 1.0;
     pub const NORMALIZED_P99: f32 = 1.0;
 }
@@ -219,24 +219,24 @@ impl crate::board_feature::MaxHeightPenalty {
 
 impl crate::board_feature::CenterColumnsPenalty {
     pub const RAW_P01: f32 = 1.0;
-    pub const RAW_P05: f32 = 3.0;
-    pub const RAW_P25: f32 = 7.0;
-    pub const RAW_P50: f32 = 13.0;
-    pub const RAW_P75: f32 = 26.0;
-    pub const RAW_P95: f32 = 44.0;
-    pub const RAW_P99: f32 = 57.0;
+    pub const RAW_P05: f32 = 1.0;
+    pub const RAW_P25: f32 = 2.0;
+    pub const RAW_P50: f32 = 4.0;
+    pub const RAW_P75: f32 = 7.0;
+    pub const RAW_P95: f32 = 12.0;
+    pub const RAW_P99: f32 = 16.0;
     pub const TRANSFORMED_P01: f32 = 1.0;
-    pub const TRANSFORMED_P05: f32 = 3.0;
-    pub const TRANSFORMED_P25: f32 = 7.0;
-    pub const TRANSFORMED_P50: f32 = 13.0;
-    pub const TRANSFORMED_P75: f32 = 26.0;
-    pub const TRANSFORMED_P95: f32 = 44.0;
-    pub const TRANSFORMED_P99: f32 = 57.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P25: f32 = 0.439_024_4;
-    pub const NORMALIZED_P50: f32 = 0.756_097_56;
-    pub const NORMALIZED_P75: f32 = 0.902_439;
+    pub const TRANSFORMED_P05: f32 = 1.0;
+    pub const TRANSFORMED_P25: f32 = 2.0;
+    pub const TRANSFORMED_P50: f32 = 4.0;
+    pub const TRANSFORMED_P75: f32 = 7.0;
+    pub const TRANSFORMED_P95: f32 = 12.0;
+    pub const TRANSFORMED_P99: f32 = 16.0;
+    pub const NORMALIZED_P01: f32 = 0.682_926_83;
+    pub const NORMALIZED_P05: f32 = 0.780_487_8;
+    pub const NORMALIZED_P25: f32 = 0.902_439;
+    pub const NORMALIZED_P50: f32 = 0.975_609_8;
+    pub const NORMALIZED_P75: f32 = 1.0;
     pub const NORMALIZED_P95: f32 = 1.0;
     pub const NORMALIZED_P99: f32 = 1.0;
 }
@@ -281,10 +281,10 @@ impl crate::board_feature::TotalHeightPenalty {
     pub const TRANSFORMED_P95: f32 = 94.0;
     pub const TRANSFORMED_P99: f32 = 125.0;
     pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.011_764_705;
-    pub const NORMALIZED_P25: f32 = 0.435_294_1;
-    pub const NORMALIZED_P50: f32 = 0.8;
-    pub const NORMALIZED_P75: f32 = 0.952_941_2;
+    pub const NORMALIZED_P05: f32 = 0.0;
+    pub const NORMALIZED_P25: f32 = 0.428_571_4;
+    pub const NORMALIZED_P50: f32 = 0.797_619_04;
+    pub const NORMALIZED_P75: f32 = 0.952_380_96;
     pub const NORMALIZED_P95: f32 = 1.0;
     pub const NORMALIZED_P99: f32 = 1.0;
 }

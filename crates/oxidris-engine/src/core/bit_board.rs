@@ -246,6 +246,37 @@ impl BitBoard {
         }
         0
     }
+
+    /// Creates a BitBoard from ASCII art representation for testing.
+    /// '#' represents an occupied cell, '.' represents an empty cell.
+    /// The board should be 10 columns wide and up to 20 rows tall.
+    /// Rows are specified from top to bottom (row 0 at top).
+    #[must_use]
+    pub fn from_ascii(art: &str) -> Self {
+        let mut board = Self::INITIAL;
+        let lines: Vec<&str> = art.lines().filter(|line| !line.trim().is_empty()).collect();
+
+        for (y, line) in lines.iter().enumerate() {
+            let chars: Vec<char> = line.chars().filter(|c| *c == '#' || *c == '.').collect();
+            assert_eq!(
+                chars.len(),
+                Self::PLAYABLE_WIDTH,
+                "Each row must have exactly {} cells, got {} at row {}",
+                Self::PLAYABLE_WIDTH,
+                chars.len(),
+                y
+            );
+
+            for (x, &ch) in chars.iter().enumerate() {
+                if ch == '#' {
+                    let row_index = y + SENTINEL_MARGIN_TOP;
+                    let col_index = x + SENTINEL_MARGIN_LEFT;
+                    board.rows[row_index].occupy_cells(col_index, 0b1);
+                }
+            }
+        }
+        board
+    }
 }
 
 #[cfg(test)]

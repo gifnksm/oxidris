@@ -3,11 +3,11 @@ use std::iter;
 use arrayvec::ArrayVec;
 use oxidris_engine::{BitBoard, CompletePieceDropError, GameField, GameStats, Piece};
 
-use crate::{board_analysis::BoardAnalysis, placement_evaluator::PlacementEvaluator};
+use crate::{placement_analysis::PlacementAnalysis, placement_evaluator::PlacementEvaluator};
 
 pub trait SessionStats: Sized {
     fn new() -> Self;
-    fn complete_piece_drop(&mut self, analysis: &BoardAnalysis);
+    fn complete_piece_drop(&mut self, analysis: &PlacementAnalysis);
 }
 
 impl SessionStats for GameStats {
@@ -15,8 +15,8 @@ impl SessionStats for GameStats {
         GameStats::new()
     }
 
-    fn complete_piece_drop(&mut self, analysis: &BoardAnalysis) {
-        self.complete_piece_drop(analysis.cleared_lines);
+    fn complete_piece_drop(&mut self, analysis: &PlacementAnalysis) {
+        self.complete_piece_drop(analysis.cleared_lines());
     }
 }
 
@@ -39,7 +39,7 @@ impl TurnPlan {
 
     pub fn apply<S>(
         &self,
-        analysis: &BoardAnalysis,
+        analysis: &PlacementAnalysis,
         field: &mut GameField,
         stats: &mut S,
     ) -> (usize, Result<(), CompletePieceDropError>)
@@ -73,12 +73,12 @@ impl TurnEvaluator {
     }
 
     #[must_use]
-    pub fn select_best_turn(&self, field: &GameField) -> Option<(TurnPlan, BoardAnalysis)> {
+    pub fn select_best_turn(&self, field: &GameField) -> Option<(TurnPlan, PlacementAnalysis)> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
 
         for turn in available_turns(field).into_iter().flatten() {
-            let analysis = BoardAnalysis::from_board(field.board(), turn.placement());
+            let analysis = PlacementAnalysis::from_board(field.board(), turn.placement());
             let score = self.placement_evaluator.evaluate_placement(&analysis);
             if score > best_score {
                 best_score = score;

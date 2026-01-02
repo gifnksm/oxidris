@@ -1,12 +1,12 @@
 use std::{fmt, iter};
 
 use crate::{
-    board_analysis::BoardAnalysis,
     board_feature::{BoardFeatureSource, DynBoardFeatureSource, HolesPenalty, TopOutRisk},
+    placement_analysis::PlacementAnalysis,
 };
 
 pub trait PlacementEvaluator: fmt::Debug + Send + Sync {
-    fn evaluate_placement(&self, analysis: &BoardAnalysis) -> f32;
+    fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32;
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ impl FeatureBasedPlacementEvaluator {
 
 impl PlacementEvaluator for FeatureBasedPlacementEvaluator {
     #[inline]
-    fn evaluate_placement(&self, analysis: &BoardAnalysis) -> f32 {
+    fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
         iter::zip(&self.features, &self.weights)
             .map(|(f, w)| f.compute_feature_value(&analysis).normalized * w)
             .sum()
@@ -38,7 +38,7 @@ pub struct DumpPlacementEvaluator;
 impl PlacementEvaluator for DumpPlacementEvaluator {
     #[inline]
     #[expect(clippy::cast_precision_loss)]
-    fn evaluate_placement(&self, analysis: &BoardAnalysis) -> f32 {
+    fn evaluate_placement(&self, analysis: &PlacementAnalysis) -> f32 {
         let max_height = <TopOutRisk as BoardFeatureSource>::extract_raw(&analysis);
         let covered_holes = <HolesPenalty as BoardFeatureSource>::extract_raw(&analysis);
         -(max_height as f32) - (covered_holes as f32)

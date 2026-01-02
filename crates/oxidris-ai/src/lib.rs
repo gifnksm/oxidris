@@ -1,6 +1,7 @@
 pub mod board_analysis;
 pub mod board_feature;
 pub mod genetic;
+pub mod placement_analysis;
 pub mod placement_evaluator;
 pub mod session_evaluator;
 pub mod statistics;

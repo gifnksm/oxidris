@@ -1,8 +1,8 @@
 use std::array;
 
 use oxidris_ai::{
-    board_analysis::BoardAnalysis,
     board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue},
+    placement_analysis::PlacementAnalysis,
 };
 
 use crate::data::{
@@ -14,7 +14,7 @@ pub fn extract_all_board_features(boards: &[BoardAndPlacement]) -> Vec<BoardSamp
 }
 
 fn extract_board_features(board: &BoardAndPlacement) -> BoardSample {
-    let analysis = BoardAnalysis::from_board(&board.board, board.placement);
+    let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
     let feature_vector = ALL_BOARD_FEATURES
         .iter()
         .map(|feature| feature.compute_feature_value(&analysis))
