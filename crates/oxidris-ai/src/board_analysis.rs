@@ -476,32 +476,27 @@ mod tests {
             assert_eq!(
                 analysis.total_height(),
                 expected_total_height,
-                "{}: total_height",
-                name
+                "{name}: total_height"
             );
             assert_eq!(
                 analysis.max_height(),
                 expected_max_height,
-                "{}: max_height",
-                name
+                "{name}: max_height"
             );
             assert_eq!(
                 analysis.num_holes(),
                 expected_num_holes,
-                "{}: num_holes",
-                name
+                "{name}: num_holes"
             );
             assert_eq!(
                 analysis.surface_bumpiness(),
                 expected_surface_bumpiness,
-                "{}: surface_bumpiness",
-                name
+                "{name}: surface_bumpiness"
             );
             assert_eq!(
                 analysis.surface_roughness(),
                 expected_surface_roughness,
-                "{}: surface_roughness",
-                name
+                "{name}: surface_roughness"
             );
         }
     }
@@ -510,15 +505,15 @@ mod tests {
     fn test_column_heights() {
         let board = test_boards::staircase();
         let analysis = BoardAnalysis::from_board(&board);
-        let heights = analysis.column_heights();
+        let heights: &[u8] = analysis.column_heights();
 
         assert_eq!(heights[0], 5);
         assert_eq!(heights[1], 4);
         assert_eq!(heights[2], 3);
         assert_eq!(heights[3], 2);
         assert_eq!(heights[4], 1);
-        for i in 5..10 {
-            assert_eq!(heights[i], 0);
+        for &h in &heights[5..10] {
+            assert_eq!(h, 0);
         }
     }
 
@@ -526,12 +521,12 @@ mod tests {
     fn test_column_occupied_cells() {
         let board = test_boards::single_hole();
         let analysis = BoardAnalysis::from_board(&board);
-        let occupied = analysis.column_occupied_cells();
+        let occupied: &[u8] = analysis.column_occupied_cells();
 
         // Column 0 has 2 occupied cells (with 1 hole in between)
         assert_eq!(occupied[0], 2);
-        for i in 1..10 {
-            assert_eq!(occupied[i], 0);
+        for &o in &occupied[1..10] {
+            assert_eq!(o, 0);
         }
     }
 
@@ -546,7 +541,7 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.sum_of_hole_depth(), expected, "{}", name);
+            assert_eq!(analysis.sum_of_hole_depth(), expected, "{name}");
         }
     }
 
@@ -593,7 +588,7 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.row_transitions(), expected, "{}", name);
+            assert_eq!(analysis.row_transitions(), expected, "{name}");
         }
     }
 
@@ -608,7 +603,7 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.column_transitions(), expected, "{}", name);
+            assert_eq!(analysis.column_transitions(), expected, "{name}");
         }
     }
 
@@ -616,7 +611,7 @@ mod tests {
     fn test_column_well_depths() {
         let board = test_boards::well();
         let analysis = BoardAnalysis::from_board(&board);
-        let wells = analysis.column_well_depths();
+        let wells: &[u8] = analysis.column_well_depths();
 
         assert_eq!(wells[0], 0);
         assert_eq!(wells[1], 1); // Well between columns 0 and 2
@@ -627,7 +622,7 @@ mod tests {
     fn test_column_well_depths_edges() {
         let board = test_boards::edge_well_left();
         let analysis = BoardAnalysis::from_board(&board);
-        let wells = analysis.column_well_depths();
+        let wells: &[u8] = analysis.column_well_depths();
 
         assert_eq!(wells[0], 1); // Left edge well
     }
@@ -642,7 +637,7 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.sum_of_deep_well_depth(), expected, "{}", name);
+            assert_eq!(analysis.sum_of_deep_well_depth(), expected, "{name}");
         }
     }
 
@@ -688,7 +683,7 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.center_column_max_height(), expected, "{}", name);
+            assert_eq!(analysis.center_column_max_height(), expected, "{name}");
         }
     }
 
@@ -735,7 +730,7 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.edge_iwell_depth(), expected, "{}", name);
+            assert_eq!(analysis.edge_iwell_depth(), expected, "{name}");
         }
     }
 
