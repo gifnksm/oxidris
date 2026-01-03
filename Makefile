@@ -89,10 +89,20 @@ train-ai-defensive:
 analyze-board-features:
 	cargo run --release -- analyze-board-features $(DATA_DIR)/boards.json
 
-## Analyze analyzing censoring effects
+## Analyze censoring effects
 .PHONY: analyze-censoring
 analyze-censoring:
 	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json
+
+## Analyze censoring effects with Kaplan-Meier survival analysis
+.PHONY: analyze-censoring-km
+analyze-censoring-km:
+	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier
+
+## Analyze censoring with Kaplan-Meier and export CSV curves
+.PHONY: analyze-censoring-km-csv
+analyze-censoring-km-csv:
+	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier --km-output-dir $(DATA_DIR)/km_curves
 
 ## Clean build artifacts
 .PHONY: clean
