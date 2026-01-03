@@ -15,10 +15,6 @@ pub(crate) struct AnalyzeCensoringArg {
     /// Path to the boards JSON file
     pub boards: PathBuf,
 
-    /// Show detailed feature value breakdown
-    #[arg(long)]
-    pub detailed: bool,
-
     /// Feature IDs to analyze
     #[arg(long, default_values = ["holes_penalty", "max_height_penalty", "hole_depth_penalty"])]
     pub features: Vec<String>,
@@ -50,7 +46,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
     println!();
 
     for feature_id in &arg.features {
-        analyze_by_feature(sessions, feature_id, arg.detailed)?;
+        analyze_by_feature(sessions, feature_id)?;
         println!();
     }
 
@@ -202,22 +198,43 @@ fn analyze_feature_survival(
     println!("  {}", "-".repeat(74));
 
     let total_values = feature_data.len();
-    let quartile_indices = if total_values <= 5 {
-        (0..total_values).collect::<Vec<_>>()
-    } else {
-        vec![
-            0,
-            total_values / 4,
-            total_values / 2,
-            3 * total_values / 4,
-            total_values - 1,
-        ]
-    };
 
+    // Calculate cumulative board counts for percentile-based selection
     let all_values: Vec<_> = feature_data.iter().collect();
-    let mut km_curves = vec![];
+    let total_boards: usize = all_values.iter().map(|(_, data)| data.len()).sum();
 
-    for &idx in &quartile_indices {
+    let mut cumulative_boards = 0;
+    let mut percentile_indices = Vec::new();
+    let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
+    let mut percentile_idx = 0;
+
+    for (idx, (_, data)) in all_values.iter().enumerate() {
+        cumulative_boards += data.len();
+        let current_percentile = cumulative_boards as f64 / total_boards as f64;
+
+        while percentile_idx < percentiles.len()
+            && current_percentile >= percentiles[percentile_idx]
+        {
+            percentile_indices.push(idx);
+            percentile_idx += 1;
+        }
+    }
+
+    // Ensure we always have the last value
+    if (percentile_indices.is_empty()
+        || *percentile_indices.last().unwrap() != all_values.len() - 1)
+        && !percentile_indices.contains(&(all_values.len() - 1))
+    {
+        percentile_indices.push(all_values.len() - 1);
+    }
+
+    // Deduplicate indices
+    percentile_indices.sort_unstable();
+    percentile_indices.dedup();
+
+    let mut km_curves = Vec::new();
+
+    for &idx in &percentile_indices {
         if let Some((value, data)) = all_values.get(idx) {
             let total = data.len();
             let censored = data.iter().filter(|(_, c)| *c).count();
@@ -244,9 +261,7 @@ fn analyze_feature_survival(
         }
     }
 
-    if total_values > 5 {
-        println!("  (Showing min, Q1, median, Q3, max of {total_values} values)");
-    }
+    println!("  (Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
 
     // Save CSV files if output directory specified
     if let Some(dir) = output_dir {
@@ -309,10 +324,10 @@ fn analyze_by_evaluator(sessions: &[crate::data::SessionData]) {
     }
 }
 
+#[expect(clippy::cast_precision_loss)]
 fn analyze_by_feature(
     sessions: &[crate::data::SessionData],
     feature_id: &str,
-    detailed: bool,
 ) -> anyhow::Result<()> {
     // Find the feature
     let feature = ALL_BOARD_FEATURES
@@ -342,56 +357,55 @@ fn analyze_by_feature(
         }
     }
 
-    if detailed {
-        // Detailed output: show all values
-        println!(
-            "  {:<8} {:>8} {:>10} {:>12} {:>12} {:>8}",
-            "Value", "Boards", "Censored%", "Mean(Comp)", "Mean(All)", "Bias"
-        );
-        println!("  {}", "-".repeat(68));
+    // Show percentiles based on board count
+    println!(
+        "  {:<8} {:>8} {:>10} {:>12} {:>12} {:>8}",
+        "Value", "Boards", "Censored%", "Mean(Comp)", "Mean(All)", "Bias"
+    );
+    println!("  {}", "-".repeat(68));
 
-        for (value, data) in feature_data.iter().take(15) {
-            print_feature_value_row(*value, data);
-        }
+    let total_values = feature_data.len();
 
-        let total_values = feature_data.len();
-        if total_values > 15 {
-            println!("  ... and {} more values", total_values - 15);
-        }
-    } else {
-        // Summary output: show quartiles
-        println!(
-            "  {:<8} {:>8} {:>10} {:>12} {:>12} {:>8}",
-            "Value", "Boards", "Censored%", "Mean(Comp)", "Mean(All)", "Bias"
-        );
-        println!("  {}", "-".repeat(68));
+    // Calculate cumulative board counts for percentile-based selection
+    let all_values: Vec<_> = feature_data.iter().collect();
+    let total_boards: usize = all_values.iter().map(|(_, data)| data.len()).sum();
 
-        let total_values = feature_data.len();
-        let quartile_indices = if total_values <= 5 {
-            // Show all if few values
-            (0..total_values).collect::<Vec<_>>()
-        } else {
-            // Show min, Q1, median, Q3, max
-            vec![
-                0,
-                total_values / 4,
-                total_values / 2,
-                3 * total_values / 4,
-                total_values - 1,
-            ]
-        };
+    let mut cumulative_boards = 0;
+    let mut percentile_indices = Vec::new();
+    let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
+    let mut percentile_idx = 0;
 
-        let all_values: Vec<_> = feature_data.iter().collect();
-        for &idx in &quartile_indices {
-            if let Some((value, data)) = all_values.get(idx) {
-                print_feature_value_row(**value, data);
-            }
-        }
+    for (idx, (_, data)) in all_values.iter().enumerate() {
+        cumulative_boards += data.len();
+        let current_percentile = cumulative_boards as f64 / total_boards as f64;
 
-        if total_values > 5 {
-            println!("  (Showing min, Q1, median, Q3, max of {total_values} values)");
+        while percentile_idx < percentiles.len()
+            && current_percentile >= percentiles[percentile_idx]
+        {
+            percentile_indices.push(idx);
+            percentile_idx += 1;
         }
     }
+
+    // Ensure we always have the last value
+    if (percentile_indices.is_empty()
+        || *percentile_indices.last().unwrap() != all_values.len() - 1)
+        && !percentile_indices.contains(&(all_values.len() - 1))
+    {
+        percentile_indices.push(all_values.len() - 1);
+    }
+
+    // Deduplicate indices
+    percentile_indices.sort_unstable();
+    percentile_indices.dedup();
+
+    for &idx in &percentile_indices {
+        if let Some((value, data)) = all_values.get(idx) {
+            print_feature_value_row(**value, data);
+        }
+    }
+
+    println!("  (Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
 
     Ok(())
 }
