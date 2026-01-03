@@ -10,7 +10,6 @@ use oxidris_ai::{
     },
 };
 use oxidris_engine::GameField;
-use oxidris_stats::descriptive;
 
 use crate::{data::Model, util::Output};
 
@@ -109,10 +108,12 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         population.evaluate_fitness(&fields, session_evaluator);
 
         let weight_stats = population.compute_weight_stats();
-        let weight_norm_std_dev_mean = {
-            let norm_std_devs = weight_stats.iter().map(|s| s.normalized_std_dev);
-            descriptive::compute_mean(norm_std_devs).unwrap()
-        };
+        #[expect(clippy::cast_precision_loss)]
+        let weight_norm_std_dev_mean = weight_stats
+            .iter()
+            .map(|s| s.normalized_std_dev)
+            .sum::<f32>()
+            / weight_stats.len() as f32;
 
         let fitness_stats = population.compute_fitness_stats();
 

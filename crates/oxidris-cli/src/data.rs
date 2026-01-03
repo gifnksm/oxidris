@@ -1,9 +1,10 @@
-use std::{collections::BTreeMap, fs::File, io::BufReader, ops::Range, path::Path};
+use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
 
 use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
 use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue, DynBoardFeatureSource};
 use oxidris_engine::{BitBoard, Piece};
+use oxidris_stats::comprehensive::ComprehensiveStats;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -36,43 +37,9 @@ pub struct BoardSample {
 
 #[derive(Debug, Clone)]
 pub struct BoardFeatureStatistics {
-    pub raw: ValueStats,
-    pub transformed: ValueStats,
-    pub normalized: ValueStats,
-}
-
-#[derive(Debug, Clone)]
-pub struct ValueStats {
-    pub min: f32,
-    pub max: f32,
-    pub mean: f32,
-    pub median: f32,
-    pub std_dev: f32,
-    pub percentiles: Vec<(f32, f32)>,
-    pub histogram: Histogram,
-}
-
-#[derive(Debug, Clone)]
-pub struct Histogram {
-    pub bins: Vec<HistogramBin>,
-}
-
-#[derive(Debug, Clone)]
-pub struct HistogramBin {
-    pub range: Range<f32>,
-    pub count: u64,
-}
-
-impl ValueStats {
-    pub fn get_percentile(&self, percentile: f32) -> Option<f32> {
-        self.percentiles.iter().find_map(|(p, value)| {
-            if (*p - percentile).abs() < f32::EPSILON {
-                Some(*value)
-            } else {
-                None
-            }
-        })
-    }
+    pub raw: ComprehensiveStats,
+    pub transformed: ComprehensiveStats,
+    pub normalized: ComprehensiveStats,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

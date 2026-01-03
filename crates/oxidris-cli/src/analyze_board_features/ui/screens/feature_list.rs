@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
+use oxidris_stats::comprehensive::ComprehensiveStats;
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -14,10 +15,7 @@ use ratatui::{
     },
 };
 
-use crate::analyze_board_features::{
-    data::ValueStats,
-    ui::app::{AppData, Screen},
-};
+use crate::analyze_board_features::ui::app::{AppData, Screen};
 
 #[derive(Default, Debug)]
 pub struct FeatureListScreen {
@@ -81,9 +79,9 @@ impl FeatureListScreen {
             label: "Raw vs Transformed",
             data: &raw_trans_data,
             x_title: "Raw",
-            x_bounds: [0.0, f64::from(feature_stats.raw.max)],
+            x_bounds: [0.0, f64::from(feature_stats.raw.stats.max)],
             y_title: "Transformed",
-            y_bounds: [0.0, f64::from(feature_stats.transformed.max)],
+            y_bounds: [0.0, f64::from(feature_stats.transformed.stats.max)],
         };
 
         let raw_norm_data = data
@@ -100,7 +98,7 @@ impl FeatureListScreen {
             label: "Raw vs Normalized",
             data: &raw_norm_data,
             x_title: "Raw",
-            x_bounds: [0.0, f64::from(feature_stats.raw.max)],
+            x_bounds: [0.0, f64::from(feature_stats.raw.stats.max)],
             y_title: "Normalized",
             y_bounds: [0.0, 1.0],
         };
@@ -178,7 +176,7 @@ impl Widget for FeatureSelector {
 
 struct FeatureStatistics<'a> {
     label: &'a str,
-    stats: &'a ValueStats,
+    stats: &'a ComprehensiveStats,
 }
 
 impl Widget for FeatureStatistics<'_> {
@@ -194,20 +192,21 @@ impl Widget for FeatureStatistics<'_> {
         let panes = Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)])
             .split(block.inner(area));
 
+        let stats = &self.stats.stats;
         let mut text = vec![
-            Line::raw(format!("  Mean:   {:10.2}", self.stats.mean)),
-            Line::raw(format!("  Median: {:10.2}", self.stats.median)),
-            Line::raw(format!("  Min:    {:10.2}", self.stats.min,)),
+            Line::raw(format!("  Mean:   {:10.2}", stats.mean)),
+            Line::raw(format!("  Median: {:10.2}", stats.median)),
+            Line::raw(format!("  Min:    {:10.2}", stats.min,)),
         ];
         for p in [1, 5, 10, 25, 50, 75, 90, 95, 99] {
             text.push(Line::raw(format!(
                 "  P{p:02}:    {:10.2}",
-                self.stats.get_percentile(p as f32).unwrap_or(f32::NAN)
+                self.stats.percentiles.get(p as f32).unwrap_or(f32::NAN)
             )));
         }
         text.extend([
-            Line::raw(format!("  Max:    {:10.2}", self.stats.max,)),
-            Line::raw(format!("  StdDev: {:10.2}", self.stats.std_dev,)),
+            Line::raw(format!("  Max:    {:10.2}", stats.max,)),
+            Line::raw(format!("  StdDev: {:10.2}", stats.std_dev,)),
         ]);
 
         let paragraph = Paragraph::new(text);

@@ -1,19 +1,56 @@
-/// Kaplan-Meier survival curve
+/// Kaplan-Meier survival curve for survival analysis.
+///
+/// The Kaplan-Meier estimator is a non-parametric statistic used to estimate the survival
+/// function from lifetime data. It accounts for censored data (observations where the event
+/// of interest has not occurred by the end of the study period).
+///
+/// # Fields
+///
+/// The curve stores parallel vectors representing the survival function at discrete time points:
+/// - Time points where events occurred
+/// - Survival probability at each time point
+/// - Number of subjects at risk at each time point
+/// - Number of events (non-censored observations) at each time point
 #[derive(Debug, Clone)]
 pub struct KaplanMeierCurve {
-    /// Time points
+    /// Time points where events (non-censored observations) occurred.
     pub times: Vec<usize>,
-    /// Survival probability at each time point
+    /// Survival probability at each corresponding time point.
+    /// Values range from 0.0 (no survival) to 1.0 (complete survival).
     pub survival_prob: Vec<f64>,
-    /// Number at risk at each time point
+    /// Number of subjects at risk (not yet experienced the event or censored) at each time point.
     pub at_risk: Vec<usize>,
-    /// Number of events at each time point
+    /// Number of events (non-censored observations) that occurred at each time point.
     pub events: Vec<usize>,
 }
 
 impl KaplanMeierCurve {
-    /// Calculate Kaplan-Meier estimate from survival data
-    /// data: `Vec<(time, is_censored)>`
+    /// Computes the Kaplan-Meier survival curve from survival data.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - A vector of tuples where each tuple contains:
+    ///   - `time`: The time at which the observation occurred
+    ///   - `is_censored`: `true` if the observation was censored (event did not occur),
+    ///     `false` if the event occurred
+    ///
+    /// # Returns
+    ///
+    /// A `KaplanMeierCurve` with survival probabilities calculated at each event time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use oxidris_stats::survival::KaplanMeierCurve;
+    /// // Data: (time, is_censored)
+    /// let data = vec![
+    ///     (10, false), // Event at time 10
+    ///     (20, true),  // Censored at time 20
+    ///     (30, false), // Event at time 30
+    /// ];
+    /// let curve = KaplanMeierCurve::from_data(data);
+    /// assert!(!curve.times.is_empty());
+    /// ```
     #[expect(clippy::cast_precision_loss)]
     #[must_use]
     pub fn from_data(mut data: Vec<(usize, bool)>) -> Self {
@@ -75,7 +112,29 @@ impl KaplanMeierCurve {
         }
     }
 
-    /// Get median survival time (time when survival probability drops to 50%)
+    /// Returns the median survival time.
+    ///
+    /// The median survival time is the time at which the survival probability
+    /// drops to or below 50%. If the survival probability never reaches 50%,
+    /// this method returns `None`.
+    ///
+    /// Linear interpolation is used between time points for more accurate estimates.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(time)` - The median survival time if the survival probability reaches 50%
+    /// * `None` - If the survival probability never drops to 50% or if the curve is empty
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use oxidris_stats::survival::KaplanMeierCurve;
+    /// let data = vec![(10, false), (20, false), (30, false)];
+    /// let curve = KaplanMeierCurve::from_data(data);
+    /// if let Some(median) = curve.median_survival() {
+    ///     println!("Median survival time: {}", median);
+    /// }
+    /// ```
     #[expect(clippy::cast_precision_loss)]
     #[must_use]
     pub fn median_survival(&self) -> Option<f64> {
@@ -103,7 +162,31 @@ impl KaplanMeierCurve {
         None
     }
 
-    /// Get survival probability at a specific time
+    /// Returns the survival probability at a specific time.
+    ///
+    /// This method uses a step function: the survival probability remains constant
+    /// between event times and decreases only when an event occurs.
+    ///
+    /// # Arguments
+    ///
+    /// * `time` - The time point at which to evaluate the survival probability
+    ///
+    /// # Returns
+    ///
+    /// The survival probability at the specified time. Returns `1.0` if the time
+    /// is before the first event, or the last known survival probability if the
+    /// time is after the last event.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use oxidris_stats::survival::KaplanMeierCurve;
+    /// let data = vec![(10, false), (20, false)];
+    /// let curve = KaplanMeierCurve::from_data(data);
+    ///
+    /// assert_eq!(curve.survival_at(5), 1.0);  // Before first event
+    /// assert!(curve.survival_at(15) < 1.0);   // After first event
+    /// ```
     #[must_use]
     pub fn survival_at(&self, time: usize) -> f64 {
         if self.times.is_empty() {

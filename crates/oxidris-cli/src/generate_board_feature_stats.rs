@@ -86,7 +86,7 @@ fn dump_source(
             ("NORMALIZED", &stats.normalized),
         ] {
             for percentile in [1u8, 5, 10, 25, 50, 75, 90, 95, 99] {
-                let value = stats.get_percentile(f32::from(percentile)).unwrap();
+                let value = stats.percentiles.get(f32::from(percentile)).unwrap();
                 let s = util::format_f32(value);
                 writeln!(writer, "    pub const {kind}_P{percentile:02}: f32 = {s};",)?;
             }

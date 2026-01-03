@@ -1,6 +1,6 @@
 use std::thread;
 
-use oxidris_stats::descriptive::Statistics;
+use oxidris_stats::descriptive::DescriptiveStats;
 use rand::{Rng, seq::IndexedRandom};
 
 use oxidris_engine::GameField;
@@ -95,18 +95,18 @@ impl Population {
     }
 
     #[must_use]
-    pub fn compute_weight_stats(&self) -> Vec<Statistics> {
+    pub fn compute_weight_stats(&self) -> Vec<DescriptiveStats> {
         (0..self.board_features.len())
             .map(|i| {
                 let weights = self.individuals().iter().map(|ind| ind.weights[i]);
-                Statistics::compute(weights).unwrap()
+                DescriptiveStats::new(weights).unwrap()
             })
             .collect()
     }
 
     #[must_use]
-    pub fn compute_fitness_stats(&self) -> Statistics {
-        Statistics::compute(self.individuals.iter().map(|ind| ind.fitness)).unwrap()
+    pub fn compute_fitness_stats(&self) -> DescriptiveStats {
+        DescriptiveStats::new(self.individuals.iter().map(|ind| ind.fitness)).unwrap()
     }
 }
 
