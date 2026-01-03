@@ -1,8 +1,10 @@
-# Normalization Parameter Generation
+# Feature Normalization
+
+> **Note:** This document is part of the [Evaluator Design](./evaluator_design.md) documentation.
 
 ## Overview
 
-This document describes the survival-based normalization parameter generation system for board features in the Tetris AI project.
+This document describes the survival-based normalization parameter generation system for board features. Normalization is a core component of the evaluator design, providing non-linear, data-driven transformations for feature values.
 
 ## Background
 
@@ -16,20 +18,32 @@ Traditional normalization approaches (min-max, z-score) fail to account for **ri
 
 ## Normalization Method: P05-P95 Robust KM
 
-The implemented method is **P05-P95 robust normalization** based on Kaplan-Meier median survival times:
+The implemented method is **P05-P95 robust normalization** with **2-stage transform and normalize**:
 
 ### Algorithm
 
 1. **Calculate KM median** for each unique feature value
 2. **Find P05 and P95 feature values** based on board count distribution
-3. **Use their KM medians as normalization bounds**:
+3. **Generate transform mapping**: raw value → KM median (survival time in turns)
+4. **Store normalization range**:
    - `km_max = KM median of P05 feature value` (good state)
    - `km_min = KM median of P95 feature value` (bad state)
-4. **Normalize all feature values**:
-   ```
-   normalized = (km_median - km_min) / (km_max - km_min)
-   normalized = clamp(normalized, 0.0, 1.0)
-   ```
+
+### Two-Stage Evaluation
+
+When evaluating a board:
+
+**Stage 1: Transform** (raw value → KM median)
+```rust
+let raw = feature.extract_raw(analysis);  // e.g., holes=3
+let km_median = transform_mapping[raw];    // → 177.5 turns
+```
+
+**Stage 2: Normalize** (KM median → 0-1)
+```rust
+let normalized = (km_median - km_min) / (km_max - km_min);  // → 0.54
+let normalized = normalized.clamp(0.0, 1.0);
+```
 
 ### Why This Method?
 
@@ -91,17 +105,23 @@ Step 1: Find P05/P95 by board count
   P05 (5,000th board)  → value=0
   P95 (95,000th board) → value=33
 
-Step 2: Get their KM medians
-  km_max = km(0)  = 322.8
-  km_min = km(33) = 7.1
-  km_range = 315.7
+Step 2: Build transform mapping (raw → KM median)
+  transform_mapping[0]   = 322.8 turns
+  transform_mapping[1]   = 276.1 turns
+  transform_mapping[3]   = 177.5 turns
+  transform_mapping[33]  = 7.1 turns
+  transform_mapping[50]  = 0.5 turns
+  transform_mapping[115] = 0.0 turns
 
-Step 3: Normalize all values
-  norm(0)  = (322.8 - 7.1) / 315.7 = 1.00
-  norm(1)  = (276.1 - 7.1) / 315.7 = 0.85
-  norm(33) = (7.1 - 7.1) / 315.7   = 0.00
-  norm(50) = (0.5 - 7.1) / 315.7   = -0.02 → 0.00 (clamped)
-  norm(115)= (0.0 - 7.1) / 315.7   = -0.02 → 0.00 (clamped)
+Step 3: Store normalization range
+  km_max = 322.8  (P05's KM median)
+  km_min = 7.1    (P95's KM median)
+
+Step 4: At evaluation time (2-stage)
+  holes=0:  transform → 322.8, normalize → (322.8-7.1)/315.7 = 1.00
+  holes=3:  transform → 177.5, normalize → (177.5-7.1)/315.7 = 0.54
+  holes=33: transform → 7.1,   normalize → (7.1-7.1)/315.7   = 0.00
+  holes=50: transform → 0.5,   normalize → (0.5-7.1)/315.7   = -0.02 → 0.00 (clamp)
 ```
 
 ## Usage
@@ -148,13 +168,18 @@ Any feature in `ALL_BOARD_FEATURES` can be used. Common ones include:
   "normalization_method": "robust_km",
   "features": {
     "holes_penalty": {
-      "mapping": {
-        "0": 1.0,
-        "1": 0.85,
-        "2": 0.72,
+      "transform_mapping": {
+        "0": 322.8,
+        "1": 276.1,
+        "2": 235.0,
+        "3": 177.5,
         ...
-        "33": 0.0,
-        "50": 0.0
+        "33": 7.1,
+        "50": 0.5
+      },
+      "normalization": {
+        "km_min": 7.1,
+        "km_max": 322.8
       },
       "stats": {
         "p05_feature_value": 0,
@@ -178,7 +203,10 @@ Any feature in `ALL_BOARD_FEATURES` can be used. Common ones include:
 
 #### Per-Feature
 
-- **`mapping`**: Direct lookup table: feature_value → normalized_value (0.0-1.0).
+- **`transform_mapping`**: Transform lookup: feature_value → KM_median (survival time in turns).
+- **`normalization`**: Normalization range for stage 2.
+  - `km_min`: Minimum KM median (P95's value, worst case)
+  - `km_max`: Maximum KM median (P05's value, best case)
 - **`stats`**: Metadata about the normalization.
 
 #### Stats Object
@@ -199,9 +227,11 @@ let km_range = stats.p05_km_median - stats.p95_km_median;
 
 This is useful for initializing feature weights to equalize their impact.
 
-## Integration
+## Integration with Evaluators
 
-### Loading in Evaluators
+For complete evaluator implementation details, see [Evaluator Design](./evaluator_design.md).
+
+### Loading Normalization Parameters
 
 ```rust
 use std::collections::BTreeMap;
@@ -216,8 +246,15 @@ struct NormalizationParams {
 
 #[derive(Deserialize)]
 struct FeatureNormalization {
-    mapping: BTreeMap<u32, f64>,
+    transform_mapping: BTreeMap<u32, f64>,
+    normalization: NormalizationRange,
     stats: NormalizationStats,
+}
+
+#[derive(Deserialize)]
+struct NormalizationRange {
+    km_min: f64,
+    km_max: f64,
 }
 
 #[derive(Deserialize)]
@@ -229,9 +266,32 @@ struct NormalizationStats {
     total_unique_values: usize,
 }
 
-impl NormalizationStats {
+impl NormalizationRange {
+    fn normalize(&self, km_median: f64) -> f64 {
+        if self.km_max == self.km_min {
+            0.5
+        } else {
+            ((km_median - self.km_min) / (self.km_max - self.km_min)).clamp(0.0, 1.0)
+        }
+    }
+}
+
+impl FeatureNormalization {
+    /// Two-stage: transform then normalize
+    fn transform_and_normalize(&self, raw_value: u32) -> f64 {
+        // Stage 1: Transform (raw → KM median)
+        let km_median = self
+            .transform_mapping
+            .get(&raw_value)
+            .copied()
+            .unwrap_or(self.normalization.km_min); // Default to worst case
+        
+        // Stage 2: Normalize (KM median → 0-1)
+        self.normalization.normalize(km_median)
+    }
+    
     fn km_range(&self) -> f64 {
-        self.p05_km_median - self.p95_km_median
+        self.stats.p05_km_median - self.stats.p95_km_median
     }
 }
 
@@ -239,10 +299,7 @@ impl NormalizationStats {
 let params: NormalizationParams = serde_json::from_reader(file)?;
 let holes = board.count_holes();
 let normalized = params.features["holes_penalty"]
-    .mapping
-    .get(&holes)
-    .copied()
-    .unwrap_or(0.0); // Unseen values default to worst (0.0)
+    .transform_and_normalize(holes);
 ```
 
 ### Initializing Feature Weights
@@ -291,7 +348,7 @@ bumpiness: range = 51 turns  → 0.1 norm change = 5.1 turns
 With equal weights (w=1.0), holes has 6x more impact!
 ```
 
-**Solution:** Save `km_range` in stats, use it to initialize weights.
+**Solution:** The transform_mapping preserves KM median values (in turns), allowing proper weight initialization based on `km_range`.
 
 ### Why Not Global Normalization (All Features Same Scale)?
 
@@ -326,16 +383,49 @@ Normalization parameters are only valid for data generated with the same MAX_TUR
 - Different MAX_TURNS → different KM estimates
 - Storing MAX_TURNS enables validation at load time
 
+## Key Design Decisions
+
+### Why Two Stages (Transform + Normalize)?
+
+**Separation of concerns:**
+- **Transform**: Converts raw values to meaningful units (survival time in turns)
+  - Makes the intermediate value interpretable
+  - KM median = "expected remaining survival time"
+- **Normalize**: Scales to 0-1 for evaluation function
+  - Simple linear scaling
+  - Easy to understand and debug
+
+**Benefits:**
+- ✅ Intermediate values (KM medians) have clear meaning
+- ✅ Can analyze transform independently of normalization
+- ✅ Easy to try different normalization strategies later
+- ✅ Aligns with the original `transform()` and `normalize()` separation in BoardFeatureSource
+
+### Original Design Intent
+
+The original `BoardFeatureSource` had:
+```rust
+fn transform(raw: u32) -> f32;   // Was: linear (just cast)
+fn normalize(transformed: f32) -> f32;  // Was: P05-P95 linear scaling
+```
+
+The KM-based approach replaces the linear transform with a **non-linear, survival-based transform**:
+```rust
+transform(raw) = km_median(raw)  // Non-linear, data-driven
+normalize(km_median) = (km_median - km_min) / (km_max - km_min)
+```
+
+This eliminates duplicate features (e.g., `*_penalty` vs `*_risk`) because different normalization ranges are no longer needed—the KM transform captures the non-linear relationship.
+
 ## Validation Checklist
 
 Before using normalization parameters:
 
 1. ✅ Check `max_turns` matches current generation settings
 2. ✅ Verify all required features are present in the JSON
-3. ✅ Handle missing feature values:
-   - Option A: Default to 0.0 (worst case)
-   - Option B: Interpolate from nearby values
-   - Option C: Use P95 value as fallback
+3. ✅ Handle missing feature values in `transform_mapping`:
+   - Default to `km_min` (worst case, normalized to 0.0)
+   - Or interpolate from nearby values
 4. ✅ Check `normalization_method == "robust_km"`
 
 ## Future Enhancements
@@ -355,8 +445,9 @@ Before using normalization parameters:
 - [ ] Conditional normalization (context-dependent)
 - [ ] Online/adaptive normalization
 
-## References
+## See Also
 
+- [Evaluator Design](./evaluator_design.md) - Overall evaluator architecture
 - [Kaplan-Meier Survival Analysis](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator)
 - Feature definitions: `crates/oxidris-ai/src/board_feature/mod.rs`
 - Implementation: `crates/oxidris-cli/src/analyze_censoring.rs`
