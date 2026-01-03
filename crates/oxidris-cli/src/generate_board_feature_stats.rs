@@ -29,7 +29,7 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
     } = arg;
 
     eprintln!("Loading boards from {}...", boards_file.display());
-    let boards = data::load_sessions(boards_file)?;
+    let boards = data::load_session_collection(boards_file)?.sessions;
     eprintln!("Loaded {} boards", boards.len());
 
     eprintln!("Computing featuress for all boards...");

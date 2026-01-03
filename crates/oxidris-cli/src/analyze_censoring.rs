@@ -7,9 +7,7 @@ use std::{
 use clap::Args;
 use oxidris_ai::{board_feature::ALL_BOARD_FEATURES, placement_analysis::PlacementAnalysis};
 
-use crate::data::load_sessions;
-
-const MAX_TURNS: usize = 500;
+use crate::data;
 
 /// Kaplan-Meier survival curve
 #[derive(Debug, Clone)]
@@ -155,22 +153,24 @@ pub(crate) struct AnalyzeCensoringArg {
 }
 
 pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
-    let sessions = load_sessions(&arg.boards)?;
+    let collection = data::load_session_collection(&arg.boards)?;
+    let max_turns = collection.max_turns;
+    let sessions = &collection.sessions;
 
-    println!("Censoring Analysis Report (MAX_TURNS={MAX_TURNS})");
+    println!("Censoring Analysis Report (MAX_TURNS={max_turns})");
     println!("==========================================\n");
 
-    analyze_overall_censoring(&sessions);
+    analyze_overall_censoring(sessions);
     println!();
 
-    analyze_by_capture_phase(&sessions);
+    analyze_by_capture_phase(sessions, max_turns);
     println!();
 
-    analyze_by_evaluator(&sessions);
+    analyze_by_evaluator(sessions);
     println!();
 
     for feature_id in &arg.features {
-        analyze_by_feature(&sessions, feature_id, arg.detailed)?;
+        analyze_by_feature(sessions, feature_id, arg.detailed)?;
         println!();
     }
 
@@ -180,7 +180,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
         println!("========================================\n");
 
         for feature_id in &arg.features {
-            analyze_feature_survival(&sessions, feature_id, arg.km_output_dir.as_ref())?;
+            analyze_feature_survival(sessions, feature_id, arg.km_output_dir.as_ref())?;
             println!();
         }
     }
@@ -208,7 +208,7 @@ fn analyze_overall_censoring(sessions: &[crate::data::SessionData]) {
 }
 
 #[expect(clippy::cast_precision_loss)]
-fn analyze_by_capture_phase(sessions: &[crate::data::SessionData]) {
+fn analyze_by_capture_phase(sessions: &[crate::data::SessionData], max_turns: usize) {
     println!("Censoring by Capture Phase:");
     println!(
         "  {:<20} {:>8} {:>10} {:>12} {:>12} {:>8}",
@@ -216,13 +216,13 @@ fn analyze_by_capture_phase(sessions: &[crate::data::SessionData]) {
     );
     println!("  {}", "-".repeat(78));
 
-    // Define phases dynamically based on MAX_TURNS
-    let phase_size = MAX_TURNS / 4;
+    // Define phases dynamically based on max_turns
+    let phase_size = max_turns / 4;
     let phases = [
         ("Early", 0, phase_size),
         ("Mid", phase_size, phase_size * 2),
         ("Late", phase_size * 2, phase_size * 3),
-        ("Very Late", phase_size * 3, MAX_TURNS),
+        ("Very Late", phase_size * 3, max_turns),
     ];
 
     for (phase_name, start, end) in phases {

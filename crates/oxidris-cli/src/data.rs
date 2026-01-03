@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SessionCollection {
     pub total_boards: usize,
+    pub max_turns: usize,
     pub sessions: Vec<SessionData>,
 }
 
@@ -99,7 +100,7 @@ impl Model {
     }
 }
 
-pub fn load_sessions<P>(path: P) -> anyhow::Result<Vec<SessionData>>
+pub fn load_session_collection<P>(path: P) -> anyhow::Result<SessionCollection>
 where
     P: AsRef<Path>,
 {
@@ -114,7 +115,7 @@ where
         bail!("{} is empty", path.display());
     }
 
-    Ok(boards.sessions)
+    Ok(boards)
 }
 
 pub fn load_model<P>(path: P) -> anyhow::Result<Model>

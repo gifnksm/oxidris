@@ -15,7 +15,7 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     let AnalyzeBoardFeaturesArg { boards_file } = arg;
 
     eprintln!("Loading boards from {}...", boards_file.display());
-    let sessions = data::load_sessions(boards_file)?;
+    let sessions = data::load_session_collection(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
 
     eprintln!("Computing featuress for all boards...");

@@ -228,6 +228,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
 
     let collection = SessionCollection {
         total_boards: adaptive_sampler.total_captured,
+        max_turns: MAX_TURNS,
         sessions: captured_sessions,
     };
 
