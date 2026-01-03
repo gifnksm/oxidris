@@ -11,7 +11,9 @@ use clap::Args;
 use oxidris_ai::{board_feature::ALL_BOARD_FEATURES, placement_analysis::PlacementAnalysis};
 use oxidris_stats::survival::KaplanMeierCurve;
 
-use crate::data::{self, FeatureNormalization, NormalizationParams, NormalizationStats};
+use crate::data::{
+    self, FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
+};
 
 #[derive(Debug, Clone, Args)]
 pub(crate) struct AnalyzeCensoringArg {
@@ -172,18 +174,17 @@ fn generate_normalization_params(
             cumulative += count;
         }
 
-        // Generate normalization mapping using robust scaling (P05-P95 range)
-        let km_range = p05_km - p95_km;
-        let mut mapping = BTreeMap::new();
+        // Generate transform mapping (raw value -> KM median)
+        let mut transform_mapping = BTreeMap::new();
 
         for (value, km_median, _) in &value_km_data {
-            let normalized = if km_range > 0.0 {
-                ((km_median - p95_km) / km_range).clamp(0.0, 1.0)
-            } else {
-                0.5 // If no range, use neutral value
-            };
-            mapping.insert(*value, normalized);
+            transform_mapping.insert(*value, *km_median);
         }
+
+        let normalization = NormalizationRange {
+            km_min: p95_km,
+            km_max: p05_km,
+        };
 
         let stats = NormalizationStats {
             p05_feature_value: p05_value,
@@ -193,7 +194,11 @@ fn generate_normalization_params(
             total_unique_values,
         };
 
-        let feature_norm = FeatureNormalization { mapping, stats };
+        let feature_norm = FeatureNormalization {
+            transform_mapping,
+            normalization,
+            stats,
+        };
 
         feature_normalizations.insert(feature_id.clone(), feature_norm);
     }
