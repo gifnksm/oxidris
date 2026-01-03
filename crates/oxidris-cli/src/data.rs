@@ -50,6 +50,35 @@ pub struct Model {
     pub placement_weights: BTreeMap<String, f32>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NormalizationParams {
+    pub max_turns: usize,
+    pub normalization_method: String,
+    pub features: BTreeMap<String, FeatureNormalization>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FeatureNormalization {
+    pub mapping: BTreeMap<u32, f64>,
+    pub stats: NormalizationStats,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NormalizationStats {
+    pub p05_feature_value: u32,
+    pub p95_feature_value: u32,
+    pub p05_km_median: f64,
+    pub p95_km_median: f64,
+    pub total_unique_values: usize,
+}
+
+impl NormalizationStats {
+    /// Calculate the KM median range (difference in survival time)
+    pub fn km_range(&self) -> f64 {
+        self.p05_km_median - self.p95_km_median
+    }
+}
+
 impl Model {
     pub(crate) fn to_feature_weights(
         &self,

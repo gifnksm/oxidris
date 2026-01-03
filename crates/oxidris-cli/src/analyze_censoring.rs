@@ -1,22 +1,25 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write as _,
+    fs::File,
+    io::Write,
     path::PathBuf,
 };
 
+use anyhow::Context;
 use clap::Args;
 use oxidris_ai::{board_feature::ALL_BOARD_FEATURES, placement_analysis::PlacementAnalysis};
 use oxidris_stats::survival::KaplanMeierCurve;
 
-use crate::data;
+use crate::data::{self, FeatureNormalization, NormalizationParams, NormalizationStats};
 
 #[derive(Debug, Clone, Args)]
 pub(crate) struct AnalyzeCensoringArg {
     /// Path to the boards JSON file
     pub boards: PathBuf,
 
-    /// Feature IDs to analyze
-    #[arg(long, default_values = ["holes_penalty", "max_height_penalty", "hole_depth_penalty"])]
+    /// Feature IDs to analyze (comma-separated)
+    #[arg(long, value_delimiter = ',', default_values = ["holes_penalty", "max_height_penalty", "hole_depth_penalty"])]
     pub features: Vec<String>,
 
     /// Perform Kaplan-Meier survival analysis
@@ -26,6 +29,11 @@ pub(crate) struct AnalyzeCensoringArg {
     /// Output directory for KM curve CSV files
     #[arg(long)]
     pub km_output_dir: Option<PathBuf>,
+
+    /// Generate normalization parameters and save to this path
+    /// Uses P05-P95 robust KM-based normalization
+    #[arg(long)]
+    pub normalization_output: Option<PathBuf>,
 }
 
 pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
@@ -60,6 +68,152 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
             println!();
         }
     }
+
+    if let Some(output_path) = &arg.normalization_output {
+        println!("========================================");
+        println!("Generating Normalization Parameters");
+        println!("========================================\n");
+
+        println!("Features: {}", arg.features.join(", "));
+
+        let normalization_params =
+            generate_normalization_params(sessions, max_turns, &arg.features)?;
+
+        save_normalization_params(&normalization_params, output_path)?;
+
+        println!(
+            "\nNormalization parameters saved to: {}",
+            output_path.display()
+        );
+    }
+
+    Ok(())
+}
+
+#[expect(clippy::cast_precision_loss)]
+fn generate_normalization_params(
+    sessions: &[data::SessionData],
+    max_turns: usize,
+    features: &[String],
+) -> anyhow::Result<NormalizationParams> {
+    let mut feature_normalizations = BTreeMap::new();
+
+    for feature_id in features {
+        let feature = ALL_BOARD_FEATURES
+            .iter()
+            .find(|f| f.id() == feature_id)
+            .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))?;
+
+        println!("  Processing: {} ({})", feature.name(), feature_id);
+
+        // Collect survival data for each feature value
+        let mut feature_data: BTreeMap<u32, Vec<(usize, bool)>> = BTreeMap::new();
+
+        for session in sessions {
+            let is_censored = !session.is_game_over;
+            let game_end = session.survived_turns;
+
+            for board in &session.boards {
+                let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
+                let raw_value = feature.extract_raw(&analysis);
+                let remaining = game_end - board.turn;
+                feature_data
+                    .entry(raw_value)
+                    .or_default()
+                    .push((remaining, is_censored));
+            }
+        }
+
+        if feature_data.is_empty() {
+            anyhow::bail!("No data for feature {feature_id}");
+        }
+
+        // Calculate KM median for each feature value
+        let mut value_km_data: Vec<(u32, f64, usize)> = Vec::new();
+
+        for (value, data) in &feature_data {
+            let km = KaplanMeierCurve::from_data(data.clone());
+            if let Some(median) = km.median_survival() {
+                value_km_data.push((*value, median, data.len()));
+            }
+        }
+
+        if value_km_data.is_empty() {
+            anyhow::bail!("No valid KM medians for feature {feature_id}");
+        }
+
+        let total_unique_values = value_km_data.len();
+
+        // Sort by feature value to calculate cumulative board counts
+        value_km_data.sort_by_key(|(value, _, _)| *value);
+
+        // Find P05 and P95 feature values based on board count
+        let total_boards: usize = value_km_data.iter().map(|(_, _, count)| count).sum();
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let p05_count = (total_boards as f64 * 0.05) as usize;
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let p95_count = (total_boards as f64 * 0.95) as usize;
+
+        let mut cumulative = 0;
+        let mut p05_value = value_km_data[0].0;
+        let mut p05_km = value_km_data[0].1;
+        let mut p95_value = value_km_data[0].0;
+        let mut p95_km = value_km_data[0].1;
+
+        for (value, km_median, count) in &value_km_data {
+            if cumulative <= p05_count {
+                p05_value = *value;
+                p05_km = *km_median;
+            }
+            if cumulative <= p95_count {
+                p95_value = *value;
+                p95_km = *km_median;
+            }
+            cumulative += count;
+        }
+
+        // Generate normalization mapping using robust scaling (P05-P95 range)
+        let km_range = p05_km - p95_km;
+        let mut mapping = BTreeMap::new();
+
+        for (value, km_median, _) in &value_km_data {
+            let normalized = if km_range > 0.0 {
+                ((km_median - p95_km) / km_range).clamp(0.0, 1.0)
+            } else {
+                0.5 // If no range, use neutral value
+            };
+            mapping.insert(*value, normalized);
+        }
+
+        let stats = NormalizationStats {
+            p05_feature_value: p05_value,
+            p95_feature_value: p95_value,
+            p05_km_median: p05_km,
+            p95_km_median: p95_km,
+            total_unique_values,
+        };
+
+        let feature_norm = FeatureNormalization { mapping, stats };
+
+        feature_normalizations.insert(feature_id.clone(), feature_norm);
+    }
+
+    Ok(NormalizationParams {
+        max_turns,
+        normalization_method: "robust_km".to_string(),
+        features: feature_normalizations,
+    })
+}
+
+fn save_normalization_params(params: &NormalizationParams, path: &PathBuf) -> anyhow::Result<()> {
+    let json = serde_json::to_string_pretty(params)
+        .context("Failed to serialize normalization parameters")?;
+
+    let mut file =
+        File::create(path).with_context(|| format!("Failed to create file: {}", path.display()))?;
+
+    file.write_all(json.as_bytes())
+        .with_context(|| format!("Failed to write to file: {}", path.display()))?;
 
     Ok(())
 }

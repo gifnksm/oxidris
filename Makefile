@@ -104,6 +104,11 @@ analyze-censoring-km:
 analyze-censoring-km-csv:
 	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier --km-output-dir $(DATA_DIR)/km_curves
 
+## Generate normalization parameters from KM analysis
+.PHONY: generate-normalization
+generate-normalization:
+	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier --normalization-output $(DATA_DIR)/normalization_params.json
+
 ## Clean build artifacts
 .PHONY: clean
 clean:
