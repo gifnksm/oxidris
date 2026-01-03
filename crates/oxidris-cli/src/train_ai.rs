@@ -8,9 +8,9 @@ use oxidris_ai::{
     session_evaluator::{
         AggroSessionEvaluator, DefaultSessionEvaluator, DefensiveSessionEvaluator, SessionEvaluator,
     },
-    statistics,
 };
 use oxidris_engine::GameField;
+use oxidris_stats::descriptive;
 
 use crate::{data::Model, util::Output};
 
@@ -111,7 +111,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         let weight_stats = population.compute_weight_stats();
         let weight_norm_std_dev_mean = {
             let norm_std_devs = weight_stats.iter().map(|s| s.normalized_std_dev);
-            statistics::compute_mean(norm_std_devs).unwrap()
+            descriptive::compute_mean(norm_std_devs).unwrap()
         };
 
         let fitness_stats = population.compute_fitness_stats();

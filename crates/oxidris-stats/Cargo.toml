@@ -1,0 +1,9 @@
+[package]
+name = "oxidris-stats"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -4,7 +4,6 @@ pub mod genetic;
 pub mod placement_analysis;
 pub mod placement_evaluator;
 pub mod session_evaluator;
-pub mod statistics;
 pub mod turn_evaluator;
 pub mod weights;
 

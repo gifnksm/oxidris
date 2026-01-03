@@ -20,6 +20,7 @@ serde_json = "1.0.148"
 
 oxidris-ai = { path = "crates/oxidris-ai" }
 oxidris-engine = { path = "crates/oxidris-engine" }
+oxidris-stats = { path = "crates/oxidris-stats" }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }

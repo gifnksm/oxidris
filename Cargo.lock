@@ -860,6 +860,7 @@ dependencies = [
  "arrayvec",
  "derive_more",
  "oxidris-engine",
+ "oxidris-stats",
  "rand 0.9.2",
  "rand_distr",
 ]
@@ -874,6 +875,7 @@ dependencies = [
  "crossterm",
  "oxidris-ai",
  "oxidris-engine",
+ "oxidris-stats",
  "rand 0.9.2",
  "ratatui",
  "serde",
@@ -890,6 +892,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "oxidris-stats"
+version = "0.1.0"
 
 [[package]]
 name = "parking_lot"

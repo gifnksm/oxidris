@@ -1,13 +1,13 @@
 use std::thread;
 
+use oxidris_stats::descriptive::Statistics;
 use rand::{Rng, seq::IndexedRandom};
 
 use oxidris_engine::GameField;
 
 use crate::{
     board_feature::DynBoardFeatureSource, placement_evaluator::FeatureBasedPlacementEvaluator,
-    session_evaluator::SessionEvaluator, statistics::Statistics, turn_evaluator::TurnEvaluator,
-    weights,
+    session_evaluator::SessionEvaluator, turn_evaluator::TurnEvaluator, weights,
 };
 
 #[derive(Debug, Clone)]

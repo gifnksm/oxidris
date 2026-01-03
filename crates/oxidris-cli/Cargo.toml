@@ -10,6 +10,7 @@ clap.workspace = true
 crossterm.workspace = true
 oxidris-ai.workspace = true
 oxidris-engine.workspace = true
+oxidris-stats.workspace = true
 rand.workspace = true
 ratatui.workspace = true
 serde.workspace = true
