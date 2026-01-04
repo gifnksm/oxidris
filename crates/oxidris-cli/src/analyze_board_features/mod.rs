@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use oxidris_evaluator::board_feature;
+
 use crate::{analysis, data};
 
 mod index;
@@ -14,23 +16,25 @@ pub(crate) struct AnalyzeBoardFeaturesArg {
 pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     let AnalyzeBoardFeaturesArg { boards_file } = arg;
 
+    let features = board_feature::all_board_features();
+
     eprintln!("Loading boards from {}...", boards_file.display());
     let sessions = data::load_session_collection(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
 
     eprintln!("Computing featuress for all boards...");
-    let board_samples = analysis::extract_all_board_features(&sessions);
+    let board_samples = analysis::extract_all_board_features(&features, &sessions);
     eprintln!("Features computed");
 
     eprintln!("Computing statistics");
-    let statistics = analysis::coimpute_statistics(&board_samples);
+    let statistics = analysis::coimpute_statistics(&features, &board_samples);
     eprintln!("Statistics computed");
 
     eprintln!("Building board index...");
-    let board_index = index::BoardIndex::new(&board_samples);
+    let board_index = index::BoardIndex::new(&features, &board_samples);
     eprintln!("Board index built");
 
-    ui::run_tui(board_samples, statistics, board_index)?;
+    ui::run_tui(features, board_samples, statistics, board_index)?;
 
     Ok(())
 }

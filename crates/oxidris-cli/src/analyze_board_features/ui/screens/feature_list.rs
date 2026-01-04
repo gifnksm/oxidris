@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
 use oxidris_stats::comprehensive::ComprehensiveStats;
 use ratatui::{
     Frame,
@@ -17,12 +17,21 @@ use ratatui::{
 
 use crate::analyze_board_features::ui::app::{AppData, Screen};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct FeatureListScreen {
+    features: Vec<BoxedBoardFeatureSource>,
     selected_feature: usize,
 }
 
 impl FeatureListScreen {
+    #[must_use]
+    pub fn new(features: Vec<BoxedBoardFeatureSource>) -> Self {
+        Self {
+            features,
+            selected_feature: 0,
+        }
+    }
+
     #[expect(clippy::cast_precision_loss)]
     pub fn draw(&self, frame: &mut Frame, data: &AppData) {
         let feature_stats = &data.statistics[self.selected_feature];
@@ -48,6 +57,7 @@ impl FeatureListScreen {
         .split(panes[1]);
 
         let feature_list_pane = FeatureSelector {
+            features: &self.features,
             selected_feature: self.selected_feature,
         };
 
@@ -119,13 +129,13 @@ impl FeatureListScreen {
             }
             KeyCode::Up => {
                 if self.selected_feature == 0 {
-                    self.selected_feature = ALL_BOARD_FEATURES.len() - 1;
+                    self.selected_feature = self.features.len() - 1;
                 } else {
                     self.selected_feature -= 1;
                 }
             }
             KeyCode::Down => {
-                if self.selected_feature + 1 >= ALL_BOARD_FEATURES.len() {
+                if self.selected_feature + 1 >= self.features.len() {
                     self.selected_feature = 0;
                 } else {
                     self.selected_feature += 1;
@@ -136,16 +146,18 @@ impl FeatureListScreen {
     }
 }
 
-struct FeatureSelector {
+struct FeatureSelector<'a> {
+    features: &'a [BoxedBoardFeatureSource],
     selected_feature: usize,
 }
 
-impl Widget for FeatureSelector {
+impl Widget for FeatureSelector<'_> {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized,
     {
-        let items = ALL_BOARD_FEATURES
+        let items = self
+            .features
             .iter()
             .enumerate()
             .map(|(i, f)| {

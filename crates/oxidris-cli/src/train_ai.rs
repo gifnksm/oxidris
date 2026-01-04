@@ -3,7 +3,7 @@ use std::{iter, path::PathBuf};
 use chrono::Utc;
 use oxidris_engine::GameField;
 use oxidris_evaluator::{
-    board_feature::ALL_BOARD_FEATURES,
+    board_feature,
     session_evaluator::{
         AggroSessionEvaluator, DefaultSessionEvaluator, DefensiveSessionEvaluator, SessionEvaluator,
     },
@@ -95,11 +95,11 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
                 as &dyn SessionEvaluator
         }
     };
-    let board_features = ALL_BOARD_FEATURES;
+    let features = board_feature::all_board_features();
 
     let mut rng = rand::rng();
     let mut population = Population::random(
-        board_features.to_owned(),
+        features.clone(),
         POPULATION_COUNT,
         &mut rng,
         max_weight_by_phase(EvolutaionPhase::default()),
@@ -176,7 +176,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         name: model_name.to_owned(),
         trained_at: Utc::now(),
         final_fitness: best_individual.fitness(),
-        placement_weights: iter::zip(ALL_BOARD_FEATURES, best_individual.weights())
+        placement_weights: iter::zip(&features, best_individual.weights())
             .map(|(f, w)| (f.id().to_owned(), *w))
             .collect(),
     };

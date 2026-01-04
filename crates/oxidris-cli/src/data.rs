@@ -3,9 +3,7 @@ use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
 use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
 use oxidris_engine::{BitBoard, Piece};
-use oxidris_evaluator::board_feature::{
-    ALL_BOARD_FEATURES, BoardFeatureValue, DynBoardFeatureSource,
-};
+use oxidris_evaluator::board_feature::{self, BoardFeatureValue, BoxedBoardFeatureSource};
 use oxidris_stats::comprehensive::ComprehensiveStats;
 use serde::{Deserialize, Serialize};
 
@@ -102,16 +100,23 @@ impl NormalizationStats {
 impl Model {
     pub(crate) fn to_feature_weights(
         &self,
-    ) -> anyhow::Result<(Vec<&'static dyn DynBoardFeatureSource>, Vec<f32>)> {
+    ) -> anyhow::Result<(Vec<BoxedBoardFeatureSource>, Vec<f32>)> {
+        let all_features = board_feature::all_board_features();
         self.placement_weights
             .iter()
-            .map(|(feature_id, weight)| -> anyhow::Result<(&'static dyn DynBoardFeatureSource, f32)> {
-                let feature = ALL_BOARD_FEATURES
-                    .iter()
-                    .find(|f| f.id() == feature_id)
-                    .ok_or_else(|| anyhow::anyhow!("Feature ID {feature_id} in model not found in ALL_BOARD_FEATURES"))?;
-                Ok((*feature, *weight))
-            })
+            .map(
+                |(feature_id, weight)| -> anyhow::Result<(BoxedBoardFeatureSource, f32)> {
+                    let feature = all_features
+                        .iter()
+                        .find(|f| f.id() == feature_id)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Feature ID {feature_id} in model not found in ALL_BOARD_FEATURES"
+                            )
+                        })?;
+                    Ok((feature.clone_boxed(), *weight))
+                },
+            )
             .collect()
     }
 }

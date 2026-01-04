@@ -173,23 +173,29 @@ use crate::placement_analysis::PlacementAnalysis;
 
 mod stats;
 
-pub const ALL_BOARD_FEATURES: &[&dyn DynBoardFeatureSource] = &[
-    &HolesPenalty,
-    &HoleDepthPenalty,
-    &RowTransitionsPenalty,
-    &ColumnTransitionsPenalty,
-    &SurfaceBumpinessPenalty,
-    &SurfaceRoughnessPenalty,
-    &WellDepthPenalty,
-    &DeepWellRisk,
-    &MaxHeightPenalty,
-    &CenterColumnsPenalty,
-    &CenterTopOutRisk,
-    &TopOutRisk,
-    &TotalHeightPenalty,
-    &LineClearBonus,
-    &IWellReward,
-];
+#[must_use]
+pub fn all_board_features() -> Vec<BoxedBoardFeatureSource> {
+    vec![
+        // survival features
+        Box::new(HolesPenalty),
+        Box::new(HoleDepthPenalty),
+        Box::new(MaxHeightPenalty),
+        Box::new(TotalHeightPenalty),
+        Box::new(CenterColumnsPenalty),
+        Box::new(TopOutRisk),
+        Box::new(CenterTopOutRisk),
+        // structure features
+        Box::new(SurfaceBumpinessPenalty),
+        Box::new(SurfaceRoughnessPenalty),
+        Box::new(RowTransitionsPenalty),
+        Box::new(ColumnTransitionsPenalty),
+        Box::new(WellDepthPenalty),
+        Box::new(DeepWellRisk),
+        // score features
+        Box::new(LineClearBonus),
+        Box::new(IWellReward),
+    ]
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FeatureSignal {
@@ -204,7 +210,7 @@ pub struct BoardFeatureValue {
     pub normalized: f32,
 }
 
-pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
+pub trait BoardFeatureSource: Clone + fmt::Debug + Send + Sync {
     const ID: &str;
     const NAME: &str;
     const NORMALIZATION_MIN: f32;
@@ -257,6 +263,8 @@ pub trait DynBoardFeatureSource: fmt::Debug + Send + Sync {
     #[must_use]
     fn signal(&self) -> FeatureSignal;
     #[must_use]
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource;
+    #[must_use]
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
     #[must_use]
     fn transform(&self, raw: u32) -> f32;
@@ -266,9 +274,17 @@ pub trait DynBoardFeatureSource: fmt::Debug + Send + Sync {
     fn compute_feature_value(&self, analysis: &PlacementAnalysis) -> BoardFeatureValue;
 }
 
+pub type BoxedBoardFeatureSource = Box<dyn DynBoardFeatureSource>;
+
+impl Clone for BoxedBoardFeatureSource {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
+}
+
 impl<T> DynBoardFeatureSource for T
 where
-    T: BoardFeatureSource,
+    T: BoardFeatureSource + 'static,
 {
     fn id(&self) -> &'static str {
         T::ID
@@ -292,6 +308,10 @@ where
 
     fn signal(&self) -> FeatureSignal {
         T::SIGNAL
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
+        Box::new(self.clone())
     }
 
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -328,7 +348,7 @@ where
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer holes is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HolesPenalty;
 
 impl BoardFeatureSource for HolesPenalty {
@@ -368,7 +388,7 @@ impl BoardFeatureSource for HolesPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower holes is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HoleDepthPenalty;
 
 impl BoardFeatureSource for HoleDepthPenalty {
@@ -405,7 +425,7 @@ impl BoardFeatureSource for HoleDepthPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RowTransitionsPenalty;
 
 impl BoardFeatureSource for RowTransitionsPenalty {
@@ -438,7 +458,7 @@ impl BoardFeatureSource for RowTransitionsPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ColumnTransitionsPenalty;
 
 impl BoardFeatureSource for ColumnTransitionsPenalty {
@@ -475,7 +495,7 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (flatter surface is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SurfaceBumpinessPenalty;
 
 impl BoardFeatureSource for SurfaceBumpinessPenalty {
@@ -513,7 +533,7 @@ impl BoardFeatureSource for SurfaceBumpinessPenalty {
 ///
 /// - Clipped to `[P05, P95]`
 /// - `SIGNAL` = Negative (flatter surface is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SurfaceRoughnessPenalty;
 
 impl BoardFeatureSource for SurfaceRoughnessPenalty {
@@ -550,7 +570,7 @@ impl BoardFeatureSource for SurfaceRoughnessPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WellDepthPenalty;
 
 impl BoardFeatureSource for WellDepthPenalty {
@@ -587,7 +607,7 @@ impl BoardFeatureSource for WellDepthPenalty {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeepWellRisk;
 
 impl BoardFeatureSource for DeepWellRisk {
@@ -623,7 +643,7 @@ impl BoardFeatureSource for DeepWellRisk {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower maximum height is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MaxHeightPenalty;
 
 impl BoardFeatureSource for MaxHeightPenalty {
@@ -659,7 +679,7 @@ impl BoardFeatureSource for MaxHeightPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower center height is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CenterColumnsPenalty;
 
 impl BoardFeatureSource for CenterColumnsPenalty {
@@ -700,7 +720,7 @@ impl BoardFeatureSource for CenterColumnsPenalty {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (lower height is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CenterTopOutRisk;
 
 impl BoardFeatureSource for CenterTopOutRisk {
@@ -734,7 +754,7 @@ impl BoardFeatureSource for CenterTopOutRisk {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (lower height is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TopOutRisk;
 
 impl BoardFeatureSource for TopOutRisk {
@@ -770,7 +790,7 @@ impl BoardFeatureSource for TopOutRisk {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower total height is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TotalHeightPenalty;
 
 impl BoardFeatureSource for TotalHeightPenalty {
@@ -824,7 +844,7 @@ impl BoardFeatureSource for TotalHeightPenalty {
 ///
 /// - Clipped to `[0.0, 6.0]` (transformed range).
 /// - `SIGNAL` = Positive (more lines cleared is better).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LineClearBonus;
 
 impl BoardFeatureSource for LineClearBonus {
@@ -874,7 +894,7 @@ impl BoardFeatureSource for LineClearBonus {
 /// - Complements [`DeepWellRisk`] by focusing on edge wells suitable for tetrises, while [`DeepWellRisk`] penalizes excessive depths.
 /// - Synergizes with [`LineClearBonus`] to favor consistent tetrises.
 /// - The triangular transform naturally discourages both shallow wells (not ready) and overly deep wells (risky).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IWellReward;
 
 impl BoardFeatureSource for IWellReward {

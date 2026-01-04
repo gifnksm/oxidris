@@ -1,5 +1,5 @@
 use crossterm::event::{self, Event, KeyEventKind};
-use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::analyze_board_features::{
@@ -19,7 +19,7 @@ pub struct App {
 #[derive(Debug)]
 pub struct AppData {
     pub board_samples: Vec<BoardSample>,
-    pub statistics: [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()],
+    pub statistics: Vec<BoardFeatureStatistics>,
     pub board_index: BoardIndex,
 }
 
@@ -32,8 +32,9 @@ pub enum Screen {
 
 impl App {
     pub fn new(
+        features: Vec<BoxedBoardFeatureSource>,
         board_samples: Vec<BoardSample>,
-        statistics: [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()],
+        statistics: Vec<BoardFeatureStatistics>,
         board_index: BoardIndex,
     ) -> Self {
         let data = AppData {
@@ -44,7 +45,7 @@ impl App {
         Self {
             data,
             screen: Screen::default(),
-            features_list_screen: FeatureListScreen::default(),
+            features_list_screen: FeatureListScreen::new(features),
         }
     }
 

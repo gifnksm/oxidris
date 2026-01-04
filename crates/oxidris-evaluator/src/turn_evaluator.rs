@@ -150,14 +150,14 @@ impl TurnPlan {
 /// Uses a placement evaluator to score all possible placements and selects
 /// the one with the highest score.
 #[derive(Debug)]
-pub struct TurnEvaluator {
-    placement_evaluator: Box<dyn PlacementEvaluator>,
+pub struct TurnEvaluator<'a> {
+    placement_evaluator: Box<dyn PlacementEvaluator + 'a>,
 }
 
-impl TurnEvaluator {
+impl<'a> TurnEvaluator<'a> {
     /// Creates a new turn evaluator with the given placement evaluator.
     #[must_use]
-    pub fn new(placement_evaluator: Box<dyn PlacementEvaluator>) -> Self {
+    pub fn new(placement_evaluator: Box<dyn PlacementEvaluator + 'a>) -> Self {
         Self {
             placement_evaluator,
         }

@@ -1,26 +1,26 @@
-use std::array;
-
-use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
 
 use super::data::BoardSample;
 
 #[derive(Debug, Clone)]
 pub struct BoardIndex {
-    sorted_indices: [Vec<usize>; ALL_BOARD_FEATURES.len()],
+    sorted_indices: Vec<Vec<usize>>,
 }
 
 impl BoardIndex {
-    pub fn new(board_samples: &[BoardSample]) -> Self {
+    pub fn new(features: &[BoxedBoardFeatureSource], board_samples: &[BoardSample]) -> Self {
         Self {
-            sorted_indices: array::from_fn(|feature_idx| {
-                let mut indices = (0..board_samples.len()).collect::<Vec<_>>();
-                indices.sort_by(|&a, &b| {
-                    let val_a = board_samples[a].feature_vector[feature_idx].normalized;
-                    let val_b = board_samples[b].feature_vector[feature_idx].normalized;
-                    val_b.total_cmp(&val_a)
-                });
-                indices
-            }),
+            sorted_indices: (0..features.len())
+                .map(|feature_idx| {
+                    let mut indices = (0..board_samples.len()).collect::<Vec<_>>();
+                    indices.sort_by(|&a, &b| {
+                        let val_a = board_samples[a].feature_vector[feature_idx].normalized;
+                        let val_b = board_samples[b].feature_vector[feature_idx].normalized;
+                        val_b.total_cmp(&val_a)
+                    });
+                    indices
+                })
+                .collect(),
         }
     }
 

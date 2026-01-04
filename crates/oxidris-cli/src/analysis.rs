@@ -1,24 +1,28 @@
-use std::array;
-
 use oxidris_evaluator::{
-    board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue},
+    board_feature::{BoardFeatureValue, BoxedBoardFeatureSource},
     placement_analysis::PlacementAnalysis,
 };
 use oxidris_stats::comprehensive::ComprehensiveStats;
 
 use crate::data::{BoardAndPlacement, BoardFeatureStatistics, BoardSample, SessionData};
 
-pub fn extract_all_board_features(sessions: &[SessionData]) -> Vec<BoardSample> {
+pub fn extract_all_board_features(
+    features: &[BoxedBoardFeatureSource],
+    sessions: &[SessionData],
+) -> Vec<BoardSample> {
     sessions
         .iter()
         .flat_map(|session| &session.boards)
-        .map(extract_board_features)
+        .map(|board| extract_board_features(features, board))
         .collect()
 }
 
-fn extract_board_features(board: &BoardAndPlacement) -> BoardSample {
+fn extract_board_features(
+    features: &[BoxedBoardFeatureSource],
+    board: &BoardAndPlacement,
+) -> BoardSample {
     let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
-    let feature_vector = ALL_BOARD_FEATURES
+    let feature_vector = features
         .iter()
         .map(|feature| feature.compute_feature_value(&analysis))
         .collect();
@@ -29,11 +33,12 @@ fn extract_board_features(board: &BoardAndPlacement) -> BoardSample {
 }
 
 pub fn coimpute_statistics(
+    features: &[BoxedBoardFeatureSource],
     board_samples: &[BoardSample],
-) -> [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()] {
-    array::from_fn(|i| {
-        compute_feature_statistics(&board_samples.iter().map(|bf| bf.feature_vector[i]))
-    })
+) -> Vec<BoardFeatureStatistics> {
+    (0..features.len())
+        .map(|i| compute_feature_statistics(&board_samples.iter().map(|bf| bf.feature_vector[i])))
+        .collect()
 }
 
 #[expect(clippy::cast_precision_loss)]

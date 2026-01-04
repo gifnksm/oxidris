@@ -1,4 +1,4 @@
-use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
 
 use self::app::App;
 
@@ -11,12 +11,13 @@ mod app;
 mod screens;
 
 pub(crate) fn run_tui(
+    features: Vec<BoxedBoardFeatureSource>,
     board_samples: Vec<BoardSample>,
-    statistics: [BoardFeatureStatistics; ALL_BOARD_FEATURES.len()],
+    statistics: Vec<BoardFeatureStatistics>,
     board_index: BoardIndex,
 ) -> anyhow::Result<()> {
     let mut terminal = ratatui::init();
-    let app_result = App::new(board_samples, statistics, board_index).run(&mut terminal);
+    let app_result = App::new(features, board_samples, statistics, board_index).run(&mut terminal);
     ratatui::restore();
     app_result
 }

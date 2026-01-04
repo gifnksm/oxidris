@@ -8,7 +8,10 @@ use std::{
 
 use anyhow::Context;
 use clap::Args;
-use oxidris_evaluator::{board_feature::ALL_BOARD_FEATURES, placement_analysis::PlacementAnalysis};
+use oxidris_evaluator::{
+    board_feature::{self, BoxedBoardFeatureSource},
+    placement_analysis::PlacementAnalysis,
+};
 use oxidris_stats::survival::KaplanMeierCurve;
 
 use crate::data::{
@@ -39,6 +42,18 @@ pub(crate) struct AnalyzeCensoringArg {
 }
 
 pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
+    let all_features = board_feature::all_board_features();
+    let target_features = arg
+        .features
+        .iter()
+        .map(|feature_id| {
+            all_features
+                .iter()
+                .find(|f| f.id() == feature_id)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
     let collection = data::load_session_collection(&arg.boards)?;
     let max_turns = collection.max_turns;
     let sessions = &collection.sessions;
@@ -56,7 +71,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
     println!();
 
     for feature_id in &arg.features {
-        analyze_by_feature(sessions, feature_id)?;
+        analyze_by_feature(&all_features, feature_id, sessions)?;
         println!();
     }
 
@@ -65,8 +80,8 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
         println!("Kaplan-Meier Survival Analysis");
         println!("========================================\n");
 
-        for feature_id in &arg.features {
-            analyze_feature_survival(sessions, feature_id, arg.km_output_dir.as_ref())?;
+        for feature in &target_features {
+            analyze_feature_survival(feature, sessions, arg.km_output_dir.as_ref())?;
             println!();
         }
     }
@@ -79,7 +94,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
         println!("Features: {}", arg.features.join(", "));
 
         let normalization_params =
-            generate_normalization_params(sessions, max_turns, &arg.features)?;
+            generate_normalization_params(&target_features, sessions, max_turns)?;
 
         save_normalization_params(&normalization_params, output_path)?;
 
@@ -94,19 +109,14 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 
 #[expect(clippy::cast_precision_loss)]
 fn generate_normalization_params(
+    normalize_features: &[BoxedBoardFeatureSource],
     sessions: &[data::SessionData],
     max_turns: usize,
-    features: &[String],
 ) -> anyhow::Result<NormalizationParams> {
-    let mut feature_normalizations = BTreeMap::new();
+    let mut feature_normalizations = BTreeMap::<String, FeatureNormalization>::new();
 
-    for feature_id in features {
-        let feature = ALL_BOARD_FEATURES
-            .iter()
-            .find(|f| f.id() == feature_id)
-            .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))?;
-
-        println!("  Processing: {} ({})", feature.name(), feature_id);
+    for feature in normalize_features {
+        println!("  Processing: {} ({})", feature.name(), feature.id());
 
         // Collect survival data for each feature value
         let mut feature_data: BTreeMap<u32, Vec<(usize, bool)>> = BTreeMap::new();
@@ -127,11 +137,11 @@ fn generate_normalization_params(
         }
 
         if feature_data.is_empty() {
-            anyhow::bail!("No data for feature {feature_id}");
+            anyhow::bail!("No data for feature {}", feature.id());
         }
 
         // Calculate KM median for each feature value
-        let mut value_km_data: Vec<(u32, f64, usize)> = Vec::new();
+        let mut value_km_data: Vec<(u32, f64, usize)> = vec![];
 
         for (value, data) in &feature_data {
             let km = KaplanMeierCurve::from_data(data.clone());
@@ -141,7 +151,7 @@ fn generate_normalization_params(
         }
 
         if value_km_data.is_empty() {
-            anyhow::bail!("No valid KM medians for feature {feature_id}");
+            anyhow::bail!("No valid KM medians for feature {}", feature.id());
         }
 
         let total_unique_values = value_km_data.len();
@@ -200,7 +210,7 @@ fn generate_normalization_params(
             stats,
         };
 
-        feature_normalizations.insert(feature_id.clone(), feature_norm);
+        feature_normalizations.insert(feature.id().to_owned(), feature_norm);
     }
 
     Ok(NormalizationParams {
@@ -319,17 +329,15 @@ fn analyze_by_capture_phase(sessions: &[crate::data::SessionData], max_turns: us
 
 #[expect(clippy::cast_precision_loss)]
 fn analyze_feature_survival(
+    feature: &BoxedBoardFeatureSource,
     sessions: &[crate::data::SessionData],
-    feature_id: &str,
     output_dir: Option<&PathBuf>,
 ) -> anyhow::Result<()> {
-    // Find the feature
-    let feature = ALL_BOARD_FEATURES
-        .iter()
-        .find(|f| f.id() == feature_id)
-        .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))?;
-
-    println!("Kaplan-Meier Analysis: {} ({})", feature.name(), feature_id);
+    println!(
+        "Kaplan-Meier Analysis: {} ({})",
+        feature.name(),
+        feature.id()
+    );
 
     // Collect data: feature_value -> [(remaining_turns, is_censored)]
     let mut feature_data: BTreeMap<u32, Vec<(usize, bool)>> = BTreeMap::new();
@@ -425,7 +433,7 @@ fn analyze_feature_survival(
     // Save CSV files if output directory specified
     if let Some(dir) = output_dir {
         std::fs::create_dir_all(dir)?;
-        let csv_path = dir.join(format!("{feature_id}_km.csv"));
+        let csv_path = dir.join(format!("{}_km.csv", feature.id()));
         let mut csv_content = String::from("value,time,survival_prob,at_risk,events\n");
 
         for (value, km) in &km_curves {
@@ -485,11 +493,12 @@ fn analyze_by_evaluator(sessions: &[crate::data::SessionData]) {
 
 #[expect(clippy::cast_precision_loss)]
 fn analyze_by_feature(
-    sessions: &[crate::data::SessionData],
+    all_features: &[BoxedBoardFeatureSource],
     feature_id: &str,
+    sessions: &[crate::data::SessionData],
 ) -> anyhow::Result<()> {
     // Find the feature
-    let feature = ALL_BOARD_FEATURES
+    let feature = all_features
         .iter()
         .find(|f| f.id() == feature_id)
         .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))?;

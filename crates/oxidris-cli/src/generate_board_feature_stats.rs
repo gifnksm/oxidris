@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Context as _;
-use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
 
 use crate::{
     analysis,
@@ -28,20 +28,22 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
         output,
     } = arg;
 
+    let features = board_feature::all_board_features();
+
     eprintln!("Loading boards from {}...", boards_file.display());
     let boards = data::load_session_collection(boards_file)?.sessions;
     eprintln!("Loaded {} boards", boards.len());
 
     eprintln!("Computing featuress for all boards...");
-    let board_samples = analysis::extract_all_board_features(&boards);
+    let board_samples = analysis::extract_all_board_features(&features, &boards);
     eprintln!("Features computed");
 
     eprintln!("Computing statistics");
-    let statistics = analysis::coimpute_statistics(&board_samples);
+    let statistics = analysis::coimpute_statistics(&features, &board_samples);
     eprintln!("Statistics computed");
 
     let mut writer = Output::from_output_path(output.clone())?;
-    dump_source(&mut writer, &statistics).with_context(|| {
+    dump_source(&mut writer, &features, &statistics).with_context(|| {
         format!(
             "Failed to write source code to {}",
             output
@@ -63,6 +65,7 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
 
 fn dump_source(
     writer: &mut dyn io::Write,
+    features: &[BoxedBoardFeatureSource],
     statistics: &[BoardFeatureStatistics],
 ) -> anyhow::Result<()> {
     writeln!(
@@ -73,7 +76,7 @@ fn dump_source(
         writer,
         "// To regenerate, run: make regenerate-board-feature-stats"
     )?;
-    for (f, stats) in iter::zip(ALL_BOARD_FEATURES, statistics) {
+    for (f, stats) in iter::zip(features, statistics) {
         writeln!(writer)?;
         writeln!(
             writer,
