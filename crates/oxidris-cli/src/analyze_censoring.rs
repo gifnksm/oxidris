@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::Context;
 use clap::Args;
-use oxidris_ai::{board_feature::ALL_BOARD_FEATURES, placement_analysis::PlacementAnalysis};
+use oxidris_evaluator::{board_feature::ALL_BOARD_FEATURES, placement_analysis::PlacementAnalysis};
 use oxidris_stats::survival::KaplanMeierCurve;
 
 use crate::data::{

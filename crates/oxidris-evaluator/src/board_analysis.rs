@@ -1,3 +1,34 @@
+//! Lazy-evaluated board metrics for feature extraction.
+//!
+//! This module provides [`BoardAnalysis`], which computes various board state metrics
+//! (heights, holes, transitions, wells, etc.) on-demand and caches the results.
+//!
+//! # Design
+//!
+//! - **Lazy evaluation**: Metrics are computed only when accessed, using `OnceCell` for caching
+//! - **Efficient**: Each metric is calculated once and reused by multiple features
+//! - **Complete**: Provides all raw metrics needed by board features
+//!
+//! # Usage
+//!
+//! Board features use `BoardAnalysis` internally via [`PlacementAnalysis`](crate::placement_analysis::PlacementAnalysis):
+//!
+//! ```rust,ignore
+//! let analysis = PlacementAnalysis::from_board(&board, placement);
+//! let board_analysis = analysis.board_analysis();
+//! let num_holes = board_analysis.num_holes();
+//! let max_height = board_analysis.max_height();
+//! ```
+//!
+//! # Available Metrics
+//!
+//! - **Heights**: `column_heights`, `max_height`, `center_column_max_height`, `total_height`
+//! - **Holes**: `num_holes`, `sum_of_hole_depth`
+//! - **Transitions**: `row_transitions`, `column_transitions`
+//! - **Surface**: `surface_bumpiness`, `surface_roughness`
+//! - **Wells**: `column_well_depths`, `sum_of_deep_well_depth`, `edge_iwell_depth`
+//! - **Other**: `column_occupied_cells`
+
 use std::{cell::OnceCell, iter};
 
 use oxidris_engine::BitBoard;

@@ -7,6 +7,26 @@ use super::{
     block_board::Block,
 };
 
+/// A Tetris piece (tetromino) with position, rotation, and type.
+///
+/// This represents a piece at a specific location and orientation on the board.
+/// Pieces are immutable - movement and rotation operations return new `Piece` instances.
+///
+/// # Coordinate System
+///
+/// - Position is relative to the top-left of the board
+/// - Rotation is tracked as 0° (spawn), 90° right, 180°, or 270° right
+/// - Each piece type has a 4×4 bounding box that rotates
+///
+/// # Example
+///
+/// ```
+/// use oxidris_engine::{Piece, PieceKind};
+///
+/// let piece = Piece::new(PieceKind::T);
+/// let moved = piece.right().unwrap();
+/// let rotated = moved.rotated_right();
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Piece {
     position: PiecePosition,
@@ -154,6 +174,27 @@ impl Piece {
     }
 }
 
+/// Attempts simplified wall kick after a failed rotation.
+///
+/// This is **not** a full Super Rotation System (SRS) implementation. Instead, it tries
+/// 4 simple offsets in order: up, right, down, left. The first valid position is returned.
+///
+/// # Differences from Standard SRS
+///
+/// - No official kick tables (5 test positions per rotation state)
+/// - No piece-specific patterns (I-piece vs. other pieces)
+/// - No rotation state-aware offsets
+///
+/// See [Engine Implementation Notes](../../../docs/architecture/engine/README.md) for details.
+///
+/// # Arguments
+///
+/// * `board` - Current board state for collision detection
+/// * `piece` - The rotated piece that collided
+///
+/// # Returns
+///
+/// The first valid kick position, or `None` if all kicks fail.
 fn super_rotation(board: &BitBoard, piece: Piece) -> Option<Piece> {
     let pieces = [piece.up(), piece.right(), piece.down(), piece.left()];
     for piece in pieces.iter().flatten() {
@@ -164,6 +205,17 @@ fn super_rotation(board: &BitBoard, piece: Piece) -> Option<Piece> {
     None
 }
 
+/// Position of a piece on the board.
+///
+/// Coordinates are stored as `u8` for compactness and represent the anchor point
+/// of the piece within its 4×4 bounding box.
+///
+/// # Coordinate System
+///
+/// - (0, 0) is at the top-left of the playable area
+/// - X increases rightward (columns)
+/// - Y increases downward (rows)
+/// - Includes sentinel margins for boundary checking
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PiecePosition {
     x: u8,
@@ -228,9 +280,16 @@ impl PiecePosition {
     }
 }
 
-/// Represents the rotation state of a piece.
+/// Rotation state of a piece.
 ///
-/// 0: 0 degrees, 1: 90° right, 2: 180°, 3: 90° left.
+/// Represents one of four rotation states:
+///
+/// - `0`: 0° (spawn orientation)
+/// - `1`: 90° clockwise
+/// - `2`: 180°
+/// - `3`: 270° clockwise (90° counterclockwise)
+///
+/// Rotation operations wrap around modulo 4.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PieceRotation(u8);
 
@@ -312,8 +371,18 @@ impl PieceKind {
     }
 }
 
+/// Bitboard representation of a piece within its 4×4 bounding box.
+///
+/// Each element is a 16-bit integer representing 4 rows of 4 bits each.
+/// Used for efficient collision detection with the board's bitboard representation.
 pub(crate) type PieceMask = [u16; 4];
 
+/// Generates all 4 rotation states of a piece mask by rotating 90° clockwise.
+///
+/// # Arguments
+///
+/// * `size` - Effective size of the piece (3 for most pieces, 4 for I, 2 for O)
+/// * `mask` - Initial piece mask at 0° rotation
 const fn mask_rotations(size: usize, mask: PieceMask) -> [PieceMask; 4] {
     let mut rotates = [mask; 4];
     let mut i = 1;
@@ -371,9 +440,18 @@ const PIECE_MASKS: [[PieceMask; 4]; PieceKind::LEN] = {
     ]
 };
 
-/// Piece shape (4x4 cell array).
+/// Piece shape represented as a 4×4 cell array.
+///
+/// Used for rendering and analysis. Each cell is either `Block::Empty` or
+/// `Block::Piece(kind)` indicating the piece type.
 type PieceShape = [[Block; 4]; 4];
 
+/// Generates all 4 rotation states of a piece shape by rotating 90° clockwise.
+///
+/// # Arguments
+///
+/// * `size` - Effective size of the piece (3 for most pieces, 4 for I, 2 for O)
+/// * `shape` - Initial piece shape at 0° rotation
 const fn shape_rotations(size: usize, shape: &PieceShape) -> [PieceShape; 4] {
     let mut rotates = [*shape; 4];
     let mut i = 1;

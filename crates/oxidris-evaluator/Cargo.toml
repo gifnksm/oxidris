@@ -1,0 +1,11 @@
+[package]
+name = "oxidris-evaluator"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+oxidris-engine.workspace = true
+
+[lints]
+workspace = true

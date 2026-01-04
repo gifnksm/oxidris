@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Context as _;
-use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
 
 use crate::{
     analysis,

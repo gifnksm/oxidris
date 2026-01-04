@@ -5,26 +5,167 @@
 //!
 //! # Typology
 //!
-//! - Risk: thresholded danger that escalates rapidly beyond a safe limit (e.g., [`DeepWellRisk`], [`TopOutRisk`]).
-//! - Penalty: smooth negative signals (e.g., [`HolesPenalty`], [`HoleDepthPenalty`], [`RowTransitionsPenalty`], [`ColumnTransitionsPenalty`], [`SurfaceBumpinessPenalty`], [`SurfaceRoughnessPenalty`], [`TotalHeightPenalty`], [`WellDepthPenalty`]).
-//! - Reward: smooth positive signals (e.g., [`IWellReward`]).
-//! - Bonus: discrete strong rewards (e.g., [`LineClearBonus`]).
+//! Features follow a naming convention based on their behavior:
 //!
-//! # Design
+//! - **Risk**: Thresholded danger that escalates rapidly beyond a safe limit (e.g., [`DeepWellRisk`], [`TopOutRisk`])
+//! - **Penalty**: Smooth negative signals (e.g., [`HolesPenalty`], [`HoleDepthPenalty`], [`RowTransitionsPenalty`])
+//! - **Reward**: Smooth positive signals (e.g., [`IWellReward`])
+//! - **Bonus**: Discrete strong rewards (e.g., [`LineClearBonus`])
 //!
-//! - Normalization clips to practical in-game spans (≈ P05–P95) via `NORMALIZATION_MIN`/`NORMALIZATION_MAX`.
-//! - [`BoardFeatureSource`] defines [`extract_raw`] → optional [`transform`] → [`normalize`] with min/max span and signal.
-//! - Transforms are feature-specific: e.g., [`TopOutRisk`] uses a thresholded linear ramp above a safe height; [`IWellReward`] uses a triangular peak centered at depth 4.
-//! - [`ALL_BOARD_FEATURES`] lists the active features and supports batch measurement.
+//! # Feature Categories
 //!
-//! [`extract_raw`]: BoardFeatureSource::extract_raw
-//! [`transform`]: BoardFeatureSource::transform
-//! [`normalize`]: BoardFeatureSource::normalize
+//! Features are categorized by their role in gameplay:
+//!
+//! ## Survival Features
+//!
+//! Directly affect game termination (when the game ends):
+//!
+//! - [`HolesPenalty`] - Number of holes (empty cells with blocks above)
+//! - [`HoleDepthPenalty`] - Sum of depths of all holes
+//! - [`MaxHeightPenalty`] - Maximum column height
+//! - [`TotalHeightPenalty`] - Sum of all column heights
+//! - [`CenterColumnsPenalty`] - Sum of center column heights (columns 3-6)
+//! - [`WellDepthPenalty`] - Depth of deepest well
+//! - [`TopOutRisk`] - Risk of topping out (height-based threshold)
+//! - [`CenterTopOutRisk`] - Risk of topping out in center columns
+//! - [`DeepWellRisk`] - Risk from excessively deep wells
+//!
+//! ## Structure Features
+//!
+//! Affect placement flexibility and future options:
+//!
+//! - [`SurfaceBumpinessPenalty`] - Sum of absolute height differences between adjacent columns
+//! - [`SurfaceRoughnessPenalty`] - Variance in column heights
+//! - [`RowTransitionsPenalty`] - Number of horizontal empty-to-filled transitions
+//! - [`ColumnTransitionsPenalty`] - Number of vertical empty-to-filled transitions
+//!
+//! ## Score Features
+//!
+//! Directly contribute to game score:
+//!
+//! - [`LineClearBonus`] - Number of lines cleared by this placement
+//! - [`IWellReward`] - Quality of I-piece well setup (depth ~4 is optimal)
+//!
+//! # Feature Processing Pipeline
+//!
+//! Each feature goes through a three-step pipeline:
+//!
+//! 1. **Extract Raw** - Extract raw value from board state (e.g., count holes)
+//! 2. **Transform** - Transform raw value into meaningful representation
+//! 3. **Normalize** - Scale to \[0.0, 1.0\] using P05-P95 percentiles
+//!
+//! ## Transformation
+//!
+//! Most features use linear transformation (`raw as f32`), but some use custom transformations:
+//!
+//! - [`LineClearBonus`]: Exponential weighting (4-line Tetris gets 6× weight)
+//! - [`IWellReward`]: Triangular peak centered at depth 4 (optimal for I-pieces)
+//!
+//! ## Normalization
+//!
+//! Normalization ranges vary by feature type:
+//!
+//! - **Penalty features** use P05-P95 range (smooth penalties across full observed range)
+//! - **Risk features** use P75-P95 range (threshold-based, ignoring safe lower values)
+//! - **Bonus/Reward features** use fixed ranges (e.g., 0.0-6.0, 0.0-1.0) based on transform output
+//!
+//! For percentile-based features:
+//!
+//! - Percentiles are computed from actual gameplay data and stored in the `stats` module (auto-generated)
+//! - Values outside the percentile range are clipped to \[0.0, 1.0\]
+//!
+//! All negative features are inverted (lower raw values → higher normalized scores).
+//!
+//! # Design Decisions
+//!
+//! ## Why Percentile-Based Normalization?
+//!
+//! - **Data-driven**: Grounded in actual gameplay behavior
+//! - **Robust to outliers**: P05-P95 range clips extremes
+//! - **Simple and fast**: Linear scaling, no complex computation
+//!
+//! ## Current Limitations
+//!
+//! ### Linear Transformation for Survival Features
+//!
+//! Most survival features use linear transformation, which doesn't capture the non-linear
+//! relationship between feature values and survival time. For example, the first hole has
+//! much greater impact on survival than the 11th hole, but linear transformation treats
+//! `holes: 0→1` the same as `holes: 10→11`.
+//!
+//! ### Feature Redundancy
+//!
+//! The feature set has two types of redundancy issues:
+//!
+//! 1. **Duplicate features with different normalization ranges**:
+//!
+//!    - `TopOutRisk` vs `MaxHeightPenalty` - Both measure maximum height but with different normalization
+//!    - `CenterTopOutRisk` vs `CenterColumnsPenalty` - Both measure center column heights
+//!    - `DeepWellRisk` vs `WellDepthPenalty` - Both measure well depth
+//!
+//!    These duplicates exist as an ad-hoc attempt to capture non-linearity through different
+//!    scaling ranges, suggesting a systematic need for non-linear transformations.
+//!
+//! 2. **Similar features measuring overlapping properties**:
+//!
+//!    - `HolesPenalty` vs `HoleDepthPenalty` - Both measure holes (count vs depth)
+//!    - `SurfaceBumpinessPenalty` vs `SurfaceRoughnessPenalty` - Both measure surface irregularity
+//!    - `RowTransitionsPenalty` vs `ColumnTransitionsPenalty` - Both measure board complexity
+//!
+//!    These similar features may provide different perspectives on the same underlying property,
+//!    but the redundancy creates several issues:
+//!
+//!    - **Training difficulty**: The genetic algorithm must learn weights for correlated features,
+//!      which can lead to unstable or arbitrary weight assignments
+//!    - **Interpretability**: Hard to determine which features are truly important when multiple
+//!      features measure similar properties
+//!    - **Computational cost**: Extra feature computation and evaluation overhead
+//!
+//! Note: Type 1 redundancy (duplicate features with different ranges) is intentional—an ad-hoc
+//! workaround for the linear transformation limitation. Type 2 redundancy (overlapping features)
+//! may or may not be beneficial and warrants investigation.
 //!
 //! # Usage
 //!
-//! - `ALL_BOARD_FEATURES.measure(board, placement)` returns raw/transformed/normalized per feature.
-//! - `ALL_BOARD_FEATURES.measure_normalized(board, placement)` returns normalized scores for weighting.
+//! Features are typically used through [`PlacementEvaluator`](crate::placement_evaluator::PlacementEvaluator):
+//!
+//! ```rust,no_run
+//! use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+//! use oxidris_evaluator::placement_evaluator::FeatureBasedPlacementEvaluator;
+//!
+//! // Create evaluator with all features
+//! let features = ALL_BOARD_FEATURES.to_vec();
+//! let weights = vec![1.0; features.len()];
+//! let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
+//! ```
+//!
+//! Individual features can be computed directly using the trait methods:
+//!
+//! ```rust,ignore
+//! use oxidris_evaluator::board_feature::{BoardFeatureSource, HolesPenalty};
+//!
+//! let raw = HolesPenalty::extract_raw(&analysis);
+//! let transformed = HolesPenalty::transform(raw);
+//! let normalized = HolesPenalty::normalize(transformed);
+//! ```
+//!
+//! The [`BoardFeatureSource`] trait defines the feature interface:
+//!
+//! ```rust,ignore
+//! pub trait BoardFeatureSource {
+//!     const ID: &str;
+//!     const NAME: &str;
+//!     const NORMALIZATION_MIN: f32;
+//!     const NORMALIZATION_MAX: f32;
+//!     const SIGNAL: FeatureSignal;
+//!
+//!     fn extract_raw(analysis: &PlacementAnalysis) -> u32;
+//!     fn transform(raw: u32) -> f32;  // Default: raw as f32
+//!     fn normalize(transformed: f32) -> f32;
+//! }
+//! ```
+//!
+//! [`ALL_BOARD_FEATURES`] provides access to all active features for batch processing.
 
 use std::fmt;
 

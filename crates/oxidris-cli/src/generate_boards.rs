@@ -1,10 +1,10 @@
 use std::{collections::HashMap, fmt, path::PathBuf};
 
-use oxidris_ai::{
+use oxidris_engine::{GameField, GameStats};
+use oxidris_evaluator::{
     placement_analysis::PlacementAnalysis, placement_evaluator::PlacementEvaluator,
     turn_evaluator::TurnEvaluator,
 };
-use oxidris_engine::{GameField, GameStats};
 use rand::Rng;
 
 use crate::{

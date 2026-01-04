@@ -1,12 +1,11 @@
 [package]
-name = "oxidris-ai"
+name = "oxidris-training"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-arrayvec.workspace = true
-derive_more = { workspace = true, features = ["from_str"] }
 oxidris-engine.workspace = true
+oxidris-evaluator.workspace = true
 oxidris-stats.workspace = true
 rand.workspace = true
 rand_distr.workspace = true

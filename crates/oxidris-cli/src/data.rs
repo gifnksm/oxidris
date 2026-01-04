@@ -2,8 +2,10 @@ use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
 
 use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
-use oxidris_ai::board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue, DynBoardFeatureSource};
 use oxidris_engine::{BitBoard, Piece};
+use oxidris_evaluator::board_feature::{
+    ALL_BOARD_FEATURES, BoardFeatureValue, DynBoardFeatureSource,
+};
 use oxidris_stats::comprehensive::ComprehensiveStats;
 use serde::{Deserialize, Serialize};
 

@@ -8,9 +8,11 @@ anyhow = "1.0.100"
 chrono = { workspace = true, features = ["serde"] }
 clap.workspace = true
 crossterm.workspace = true
-oxidris-ai.workspace = true
+derive_more = { workspace = true, features = ["from_str"] }
 oxidris-engine.workspace = true
+oxidris-evaluator.workspace = true
 oxidris-stats.workspace = true
+oxidris-training.workspace = true
 rand.workspace = true
 ratatui.workspace = true
 serde.workspace = true

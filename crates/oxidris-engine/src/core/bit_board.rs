@@ -25,7 +25,17 @@ const FULL_ROW_MASK: u16 = (1 << TOTAL_WIDTH) - 1;
 const PLAYABLE_MASK: u16 = FULL_ROW_MASK & !SENTINEL_MASK;
 
 /// Single row in the bit board representation.
-/// Stores one row of the board as a u16 bitmask.
+///
+/// Stores one row of the board as a 16-bit bitmask where each bit represents a cell.
+///
+/// # Bit Layout (LSB to MSB)
+///
+/// - Bits 0-1: Left sentinel (walls)
+/// - Bits 2-11: Playable area (10 cells)
+/// - Bits 12-13: Right sentinel (walls)
+/// - Bits 14-15: Unused (padding)
+///
+/// Sentinel bits are always set to 1 to simplify collision detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BitRow {
     bits: u16,
@@ -247,7 +257,10 @@ impl BitBoard {
         false
     }
 
-    /// Fills the piece cells on the board.
+    /// Locks a piece onto the board by setting its occupied cells.
+    ///
+    /// This is called when a piece has reached its final position and should
+    /// become part of the static board state.
     pub fn fill_piece(&mut self, piece: Piece) {
         let x0 = piece.position().x();
         let y0 = piece.position().y();
@@ -276,17 +289,6 @@ impl BitBoard {
         // Fill cleared lines at the top with empty rows (only sentinels)
         playable_rows[..count].fill(BitRow::EMPTY);
         count
-    }
-
-    #[must_use]
-    pub fn max_height(&self) -> usize {
-        for y in Self::PLAYABLE_Y_RANGE {
-            let row = self.playable_row(y);
-            if row.iter_playable_cells().any(|occupied| occupied) {
-                return Self::PLAYABLE_HEIGHT - (y - SENTINEL_MARGIN_TOP);
-            }
-        }
-        0
     }
 
     /// Creates a `BitBoard` from ASCII art representation for testing.

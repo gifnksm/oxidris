@@ -1,6 +1,6 @@
 use std::array;
 
-use oxidris_ai::{
+use oxidris_evaluator::{
     board_feature::{ALL_BOARD_FEATURES, BoardFeatureValue},
     placement_analysis::PlacementAnalysis,
 };

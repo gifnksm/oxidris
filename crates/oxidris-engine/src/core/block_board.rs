@@ -4,13 +4,22 @@ use super::{
     SENTINEL_MARGIN_RIGHT, SENTINEL_MARGIN_TOP, TOTAL_HEIGHT, TOTAL_WIDTH,
 };
 
+/// A single cell in the block board representation.
+///
+/// Used for rendering and visual representation of the game state.
+/// Unlike [`BitBoard`](super::bit_board::BitBoard) which uses bits for collision detection,
+/// `Block` stores semantic information about what occupies each cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
 pub enum Block {
+    /// Empty cell (no piece).
     #[default]
     Empty,
+    /// Wall (sentinel border).
     Wall,
+    /// Ghost piece preview (shows where piece will land).
     Ghost,
+    /// Locked piece of a specific type.
     Piece(PieceKind),
 }
 
@@ -21,6 +30,10 @@ impl Block {
     }
 }
 
+/// A single row in the block board representation.
+///
+/// Stores a row of cells with the same layout as [`BitBoard`](super::bit_board::BitBoard)
+/// for coordinate compatibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockRow {
     cells: [Block; TOTAL_WIDTH],
@@ -52,6 +65,33 @@ impl BlockRow {
     }
 }
 
+/// Cell-by-cell board representation for rendering and analysis.
+///
+/// `BlockBoard` stores the board state as individual cells, making it suitable for:
+///
+/// - **Rendering**: Each cell knows its type (empty, wall, piece kind)
+/// - **Visual effects**: Can render ghost pieces (drop preview)
+/// - **Analysis**: Easy to inspect individual cells
+///
+/// This complements [`BitBoard`](super::bit_board::BitBoard) which is optimized for
+/// collision detection. Both use the same coordinate system and sentinel layout.
+///
+/// # Layout
+///
+/// - **Total dimensions**: 14×24 (includes 2-cell sentinel margins)
+/// - **Playable area**: 10×20 (standard Tetris)
+/// - **Coordinate compatibility**: Matches [`BitBoard`](super::bit_board::BitBoard) exactly
+///
+/// # Example
+///
+/// ```
+/// use oxidris_engine::BlockBoard;
+///
+/// let board = BlockBoard::INITIAL;
+/// for row in board.playable_rows() {
+///     // Process each row of playable cells
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct BlockBoard {
     rows: [BlockRow; TOTAL_HEIGHT],
@@ -100,24 +140,53 @@ impl BlockBoard {
         }
     };
 
+    /// Returns an iterator over the playable rows (excludes sentinel margins).
+    ///
+    /// Each row is a fixed-size array of playable cells.
     pub fn playable_rows(&self) -> impl Iterator<Item = &[Block; PLAYABLE_WIDTH]> {
         self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT]
             .iter()
             .map(BlockRow::playable_cells)
     }
 
+    /// Fills the piece's cells on the board with the piece's type.
+    ///
+    /// This is called when a piece is locked into position.
     pub fn fill_piece(&mut self, piece: Piece) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = Block::Piece(piece.kind());
         }
     }
 
+    /// Fills the piece's cells on the board with a specific block type.
+    ///
+    /// Useful for rendering ghost pieces (drop preview) or other visual effects.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidris_engine::{BlockBoard, Piece, PieceKind, Block};
+    ///
+    /// let mut board = BlockBoard::INITIAL;
+    /// let piece = Piece::new(PieceKind::T);
+    ///
+    /// // Render as ghost piece
+    /// board.fill_piece_as(piece, Block::Ghost);
+    /// ```
     pub fn fill_piece_as(&mut self, piece: Piece, cell: Block) {
         for (x, y) in piece.occupied_positions() {
             self.rows[y].cells[x] = cell;
         }
     }
 
+    /// Clears filled lines and returns the number of lines cleared.
+    ///
+    /// A line is filled when all playable cells contain non-empty blocks.
+    /// Cleared lines are removed and rows above shift down.
+    ///
+    /// # Returns
+    ///
+    /// The number of lines cleared (0-4 in standard gameplay).
     pub fn clear_lines(&mut self) -> usize {
         let playable_rows = &mut self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT];
         let mut count = 0;

@@ -1,5 +1,5 @@
 use crossterm::event::{self, Event, KeyEventKind};
-use oxidris_ai::board_feature::ALL_BOARD_FEATURES;
+use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::analyze_board_features::{

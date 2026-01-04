@@ -1,3 +1,68 @@
+//! Turn evaluation: selecting the best piece placement for the current turn.
+//!
+//! This module implements the second level of the evaluator architecture: choosing which
+//! placement to make for the current game turn by evaluating all possible options and
+//! selecting the one with the highest score.
+//!
+//! # How It Works
+//!
+//! Turn evaluation follows these steps:
+//!
+//! 1. **Enumerate Placements** - Generate all valid placements for current and hold pieces
+//! 2. **Score Each Placement** - Use placement evaluator to score each option
+//! 3. **Select Best** - Choose the placement with the highest score
+//!
+//! # Turn Plan
+//!
+//! A [`TurnPlan`] specifies the complete action for a turn:
+//! - Whether to use hold (swap current piece with held piece)
+//! - Final piece placement (position and rotation)
+//!
+//! The turn evaluator considers both the current falling piece and the hold piece,
+//! evaluating all valid placements for each.
+//!
+//! # Design: Greedy One-Step Lookahead
+//!
+//! The [`TurnEvaluator`] uses a greedy approach: it only looks at the immediate next
+//! placement, not future turns. This makes it fast but potentially suboptimal for
+//! multi-step strategies.
+//!
+//! **Advantages:**
+//!
+//! - Very fast (evaluates ~100-200 placements per turn)
+//! - No exponential search space
+//! - Good enough for most gameplay
+//!
+//! **Limitations:**
+//!
+//! - No multi-turn planning (e.g., setting up T-spins or back-to-back Tetrises)
+//! - Purely reactive, not strategic
+//!
+//! # Usage
+//!
+//! ```rust,no_run
+//! use oxidris_evaluator::{
+//!     board_feature::ALL_BOARD_FEATURES,
+//!     placement_evaluator::FeatureBasedPlacementEvaluator,
+//!     turn_evaluator::TurnEvaluator,
+//! };
+//!
+//! // Create placement evaluator
+//! let features = ALL_BOARD_FEATURES.to_vec();
+//! let weights = vec![1.0; features.len()];
+//! let placement_evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
+//!
+//! // Create turn evaluator
+//! let turn_evaluator = TurnEvaluator::new(Box::new(placement_evaluator));
+//!
+//! // Select best turn for current game state
+//! // (requires GameField - see oxidris_engine::GameField for details)
+//! // if let Some((turn_plan, analysis)) = turn_evaluator.select_best_turn(&field) {
+//! //     // Apply the selected turn
+//! //     turn_plan.apply(&analysis, &mut field, &mut stats);
+//! // }
+//! ```
+
 use std::iter;
 
 use arrayvec::ArrayVec;
@@ -5,8 +70,15 @@ use oxidris_engine::{BitBoard, CompletePieceDropError, GameField, GameStats, Pie
 
 use crate::{placement_analysis::PlacementAnalysis, placement_evaluator::PlacementEvaluator};
 
+/// Statistics tracking for game sessions.
+///
+/// This trait allows different statistics to be collected during gameplay,
+/// used by session evaluators to compute fitness scores during training.
 pub trait SessionStats: Sized {
+    /// Creates a new statistics tracker.
     fn new() -> Self;
+
+    /// Updates statistics after a piece is placed.
     fn complete_piece_drop(&mut self, analysis: &PlacementAnalysis);
 }
 
@@ -20,6 +92,9 @@ impl SessionStats for GameStats {
     }
 }
 
+/// A complete action plan for a single turn.
+///
+/// Specifies whether to use hold and where to place the resulting piece.
 #[derive(Debug, Clone, Copy)]
 pub struct TurnPlan {
     use_hold: bool,
@@ -27,16 +102,29 @@ pub struct TurnPlan {
 }
 
 impl TurnPlan {
+    /// Returns whether this turn plan uses the hold system.
     #[must_use]
     pub fn use_hold(&self) -> bool {
         self.use_hold
     }
 
+    /// Returns the final piece placement for this turn.
     #[must_use]
     pub fn placement(&self) -> Piece {
         self.placement
     }
 
+    /// Applies this turn plan to the game field.
+    ///
+    /// # Arguments
+    ///
+    /// * `analysis` - Placement analysis for the chosen placement
+    /// * `field` - Game field to modify
+    /// * `stats` - Statistics tracker to update
+    ///
+    /// # Returns
+    ///
+    /// Tuple of (lines cleared, result) where result indicates if the game ended
     pub fn apply<S>(
         &self,
         analysis: &PlacementAnalysis,
@@ -57,12 +145,17 @@ impl TurnPlan {
     }
 }
 
+/// Evaluates and selects the best placement for the current turn.
+///
+/// Uses a placement evaluator to score all possible placements and selects
+/// the one with the highest score.
 #[derive(Debug)]
 pub struct TurnEvaluator {
     placement_evaluator: Box<dyn PlacementEvaluator>,
 }
 
 impl TurnEvaluator {
+    /// Creates a new turn evaluator with the given placement evaluator.
     #[must_use]
     pub fn new(placement_evaluator: Box<dyn PlacementEvaluator>) -> Self {
         Self {
@@ -70,6 +163,16 @@ impl TurnEvaluator {
         }
     }
 
+    /// Selects the best turn for the current game state.
+    ///
+    /// Evaluates all possible placements (with and without hold) and returns
+    /// the one with the highest score according to the placement evaluator.
+    ///
+    /// # Arguments
+    /// * `field` - Current game field state
+    ///
+    /// # Returns
+    /// `Some((turn_plan, analysis))` if a valid placement exists, `None` if game over
     #[must_use]
     pub fn select_best_turn(&self, field: &GameField) -> Option<(TurnPlan, PlacementAnalysis)> {
         let mut best_score = f32::MIN;

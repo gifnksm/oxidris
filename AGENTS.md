@@ -1,140 +1,207 @@
 # Agent Instructions
 
+This file serves as the entry point and quick reference for AI assistants, providing project context, documentation structure, key guidelines, and code locations.
+
+- **Document type**: Reference
+- **Purpose**: Central guide for AI assistants working on Oxidris
+- **Audience**: AI assistants (primary), human contributors (reference)
+- **When to read**: At the start of any conversation about the project
+- **Prerequisites**: None (this is the entry point)
+- **Related documents**: [CONTRIBUTING.md](CONTRIBUTING.md) (for human contributors), [docs/README.md](docs/README.md) (documentation hub)
+
 ## Project Context
 
-This is Oxidris, a Tetris AI project that uses statistical analysis for board evaluation. 
+> **Important:** This is a **hobby project** focused on learning and experimentation. Practical utility and academic rigor are not primary goals. Future improvements are documented as independent project proposals to be pursued based on interest.
 
-**Current State:**
-- Feature-based evaluation with automated P05-P95 percentile normalization from gameplay data
-- Genetic algorithm for weight optimization
-- Improving to survival-time-based transformations using Kaplan-Meier analysis (Phase 3)
+**Development Status:** This project is in active development and not yet published externally. The codebase is internal-only, which means:
 
-**Future:** Score-based optimization and multi-objective strategies (Phase 4+)
+- Breaking changes are acceptable and don't require special consideration
+- Experimentation and refactoring are encouraged
+- Focus is on learning and improvement, not backward compatibility
+
+This is Oxidris, a playable Tetris game with AI players that learn through statistical analysis and genetic algorithms. You can play the game yourself or watch trained AI models play automatically.
+
+## How to Use This Guide
+
+This file (AGENTS.md) serves as the **entry point** for AI assistants working on Oxidris:
+
+- **Project context** - Development status, goals, current focus
+- **Navigation hub** - Documentation structure and where to find things
+- **Quick reference** - Summary of key guidelines
+- **Code index** - Important file locations
+
+**For detailed guidance**:
+
+- **How to organize docs** → [Documentation Guidelines](docs/ai/documentation-guidelines.md)
+- **How to conduct reviews** → [Review Process](docs/ai/review-process.md)
+- **When to ask first** → [When to Ask](docs/ai/when-to-ask.md)
 
 ## Documentation Structure
 
-```
+```text
 docs/
 ├── README.md                          # Documentation hub
-├── evaluator/                         # Evaluator system
-│   ├── README.md                      # Overview
-│   ├── current-status.md              # Current implementation and issues
-│   └── km-feature-transform/          # KM-based feature transformation
-│       ├── README.md                  # Overview and status
-│       ├── design.md                  # Algorithm details
-│       └── roadmap.md                 # Phase 1-6 plan
-└── engine/                            # Engine implementation
-    └── implementation-notes.md        # Engine details and limitations
+├── ai/                                # Guidelines for AI assistants
+│   ├── documentation-guidelines.md    # [RULES] How to organize documentation
+│   ├── review-process.md              # [PROCESS] How to conduct reviews
+│   └── when-to-ask.md                 # [CHECKLIST] When to ask before changes
+├── architecture/                      # System design documentation
+│   ├── README.md                      # Architecture overview
+│   ├── evaluator/                     # Evaluator system
+│   │   └── README.md                  # Evaluator overview and architecture
+│   ├── training/                      # Training system
+│   │   └── README.md                  # GA, fitness functions, training process
+│   └── engine/                        # Game engine
+│       └── README.md                  # Engine details and limitations (simplified SRS)
+├── projects/                          # Active project documentation
+│   └── km-feature-transform/          # KM-based survival features (active)
+│       ├── README.md                  # Project overview
+│       ├── design.md                  # Design and architecture
+│       └── roadmap.md                 # Phase-by-phase plan
+└── future-projects.md                 # Improvement proposals (all systems)
 ```
 
 ## When to Read Documentation
 
-### Always read when:
-- Discussing evaluator design or feature normalization
-- Planning new features or modifications
-- Answering questions about design decisions
-- Implementing evaluation-related code
-- Discussing roadmap or next steps
-- Making changes to the evaluator system
-- Discussing game engine mechanics or rotation system
-- Answering questions about SRS implementation or limitations
+Always read when:
 
-### Start here:
-1. **`docs/README.md`** - Understand overall structure and navigation
-2. **`docs/evaluator/README.md`** - Evaluator system overview
-3. **`docs/evaluator/current-status.md`** - Current implementation and issues
-4. **`docs/evaluator/km-feature-transform/`** - KM feature transformation project
-5. **`docs/engine/implementation-notes.md`** - Engine limitations (simplified SRS, etc.)
+- Starting a new conversation about the project
+- User asks about design decisions, architecture, or roadmap
+- Making changes that affect multiple systems
+- Uncertain about project structure or conventions
+- Implementing features related to documented systems (Evaluator, Training, Engine)
+- Proposing new improvements or changes
 
-### You don't need to read when:
-- Fixing unrelated bugs
-- Making trivial code changes
-- Discussing topics unrelated to evaluator or engine mechanics
+Start here:
+
+1. **`docs/README.md`** - Documentation hub and navigation
+2. **`docs/architecture/README.md`** - Architecture overview
+3. **System-specific docs** - Read based on what you're working on:
+   - Evaluator: `docs/architecture/evaluator/`
+   - Training: `docs/architecture/training/`
+   - Engine: `docs/architecture/engine/`
+4. **`docs/projects/km-feature-transform/`** - Current active project
+5. **`docs/future-projects.md`** - When discussing new improvements
+
+You don't need to read when:
+
+- Making trivial fixes (typos, formatting)
+- User asks unrelated questions
+- Changes are limited to well-understood, isolated code
 
 ## Key Design Principles
 
-1. **Data-driven**: Use statistical analysis of actual gameplay data
-2. **Trade-offs via learning**: Let genetic algorithms discover optimal weights, don't hard-code rules
-3. **Interpretable**: Transformations should have clear meaning
-4. **Two-stage transform/normalize** (Phase 3 goal): Feature value → survival time → 0-1 range
+See [Design Principles in README](README.md#design-principles) for the project principles that guide all development:
 
-## Current Status (Phase 3)
+1. **Data-driven**: Use statistics, not intuition
+2. **Interpretable**: Keep transformations meaningful
+3. **Well-documented**: Update docs with code changes
 
-- ✅ Feature-based evaluators with automated P05-P95 calculation
-- ✅ Data generation and KM survival analysis tools
-- 🔄 Survival-based transformation (feature value → survival time)
-- 🔄 KM-based evaluator implementation
-- 📋 Integration with GA training and benchmarking
+## Current Focus
 
-See `docs/evaluator/current-status.md` for detailed status.
+**Active Project:** KM-Based Survival Feature Normalization (Phase 3)
 
-## Documentation Maintenance
+- ✅ Phase 1-2: Data generation and KM survival analysis (completed)
+- 🔄 Phase 3: Infrastructure and trait integration (in progress)
+- 📋 Phase 4: Implementation and validation (not started)
 
-**When making changes, you MUST update documentation in the same commit.**
+**Scope:** Survival features (holes, height) only. Other improvements are separate future projects.
 
-### Update `docs/evaluator/current-status.md` when:
-- Changing current implementation details
-- Discovering new issues or limitations
-- Updating improvement plans
-- Adding/removing features
+See `docs/projects/km-feature-transform/` for details on the current active project.
 
-### Update `docs/evaluator/km-feature-transform/design.md` when:
-- Modifying KM-based normalization algorithm
-- Changing data structures (`NormalizationParams`, `NormalizationRange`, etc.)
-- Adding usage examples or integration patterns
+## Guidelines for AI Assistants
 
-### Update `docs/evaluator/km-feature-transform/README.md` when:
-- Changing implementation status (completed/in-progress/not-started)
-- Updating overview or concept explanation
-- Discovering limitations or issues
+### Communication
 
-### Update `docs/evaluator/km-feature-transform/roadmap.md` when:
-- Completing phases or tasks
-- Making design decisions that affect future phases
-- Adding new phases or changing priorities
-- Updating timeline estimates
+- **Language matching**: Always respond in the same language the user used
+  - If user writes in Japanese, respond in Japanese
+  - If user writes in English, respond in English
+  - Match the language for all responses, including technical discussions
 
-### Update `docs/README.md` when:
-- Adding new documentation files or sections
-- Completing major milestones (phases)
-- Changing project status overview
+### Documentation
 
-### Keep documentation synchronized:
-- Update docs in the same commit as code changes
-- Document design decisions immediately after making them
-- Add new issues to "Known Limitations" when discovered
-- Move resolved questions from "Open Questions" to "Design Decisions"
+- **Distribution**: Rustdoc vs Markdown (source of truth for implementation)
+  - **Rustdoc**: Current implementation, design decisions, API usage, trade-offs (single crate/module scope)
+  - **Markdown (docs/)**: System-wide architecture (across crates), project context, navigation, future work
+  - **Rule**: Implementation details and "why" go in rustdoc; system architecture and navigation go in Markdown
+  - **No duplication**: Markdown should link to rustdoc, not duplicate implementation details
+- **Organization**: See [Documentation Guidelines](docs/ai/documentation-guidelines.md)
+  - Follow the documented structure strictly
+  - Don't mix concerns (evaluator/training/engine)
+  - Avoid duplication between Markdown and rustdoc
+- **Maintenance**: Keep docs synchronized with code changes in the same commit
+
+### Review Process
+
+- **Review process**: See [Review Process](docs/ai/review-process.md)
+  - Start with overview, then step-by-step details
+  - Show progress indicators (3/5 items)
+  - Support interruption and resumption
+  - Group large changes into phases
+  - Fix minor issues silently, ask about medium issues, stop for major issues
+
+### When to Ask
+
+- **Before making changes**: See [When to Ask](docs/ai/when-to-ask.md)
+  - Documentation structure changes
+  - Code architecture changes
+  - Adding dependencies
+  - Changing active project scope
+  - **When in doubt, ask first**
 
 ## Code Locations
 
-### Core Implementation
+### Evaluator system
+
+- **Features**: `crates/oxidris-evaluator/src/board_feature/mod.rs`
+- **Board analysis**: `crates/oxidris-evaluator/src/board_analysis.rs`
+- **Placement evaluator**: `crates/oxidris-evaluator/src/placement_evaluator.rs`
+- **Session evaluators**: `crates/oxidris-evaluator/src/session_evaluator.rs`
+- **Turn evaluator**: `crates/oxidris-evaluator/src/turn_evaluator.rs`
+
+### Training system
+
+- **Genetic algorithm**: `crates/oxidris-training/src/genetic.rs`
+- **Weight operations**: `crates/oxidris-training/src/weights.rs`
+- **Training script**: `crates/oxidris-cli/src/train_ai.rs`
+- **Data generation**: `crates/oxidris-cli/src/generate_boards.rs`
+
+### KM-based normalization
+
+- **KM estimator**: `crates/oxidris-stats/src/survival.rs`
 - **Data structures**: `crates/oxidris-cli/src/data.rs`
 - **Normalization generation**: `crates/oxidris-cli/src/analyze_censoring.rs`
-- **Features**: `crates/oxidris-ai/src/board_feature/mod.rs`
-- **KM estimator**: `crates/oxidris-stats/src/survival.rs`
-- **Board analysis**: `crates/oxidris-engine/src/board_analysis.rs`
 
-### Evaluators
-- **Legacy evaluators**: `crates/oxidris-ai/src/evaluator/`
-- **KM-based evaluator**: `crates/oxidris-ai/src/evaluator/km_based.rs` (planned)
+### Models and Data
+
+- **Trained models**: `models/ai/aggro.json`, `models/ai/defensive.json`
+- **Training data**: `data/boards.json` (generated, not in repo)
+- **Normalization params**: `data/normalization_params.json` (generated, not in repo)
 
 ## Quick Reference
 
+### Current Project Status
+
+- **Active:** KM-Based Survival Feature Normalization (Phase 3)
+- **Focus:** Survival features (holes, height) only
+- See [KM Project Docs](docs/projects/km-feature-transform/) for details
+
 ### Feature Categories
-1. **Survival Features**: Directly affect game termination (holes, height)
-2. **Structure Features**: Affect placement flexibility (bumpiness, transitions)
-3. **Score Features**: Directly contribute to score (line clears) - Phase 4
 
-### Normalization Approach
-- **P05-P95 robust scaling**: Use 5th and 95th percentiles by board count
-- **Two-stage pipeline**: Transform (raw → KM median) then normalize (KM median → 0-1)
-- **Interpretable**: KM median = expected survival time in turns
+See [Evaluator Documentation](docs/architecture/evaluator/README.md) for details on:
 
-### Current Phase (Phase 3)
-Focus on completing KM-based evaluator implementation:
-- Remove duplicate `*_risk` features
-- Implement `KMBasedEvaluator` struct
-- Integrate with genetic algorithm
-- Test and benchmark
+- Survival Features (directly affect game termination)
+- Structure Features (affect placement flexibility)
+- Score Features (directly contribute to score)
 
-See roadmap for Phases 4-6 (score features, structure validation, advanced techniques).
+### Technical Details
+
+- **Evaluator:** [Evaluator System](docs/architecture/evaluator/README.md)
+- **Training:** [Training System](docs/architecture/training/README.md)
+- **Engine:** [Implementation Notes](docs/architecture/engine/README.md)
+- **Future Work:** [Future Projects](docs/future-projects.md)
+
+### Contributing
+
+- **For humans:** See [CONTRIBUTING.md](CONTRIBUTING.md)
+- **For AI assistants:** Follow guidelines in [docs/ai/](docs/ai/)

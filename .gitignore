@@ -1,2 +1,5 @@
 /target
 /data
+
+# Review checkpoints (temporary working files for AI-assisted reviews)
+/.review-checkpoints

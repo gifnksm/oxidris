@@ -1,8 +1,19 @@
 # KM-Based Feature Transform Project
 
+This project applies survival-time-based transformations using Kaplan-Meier analysis to survival features (holes, height).
+
+- **Document type**: Explanation
+- **Purpose**: Project overview, design rationale, and implementation status for KM-based feature normalization
+- **Audience**: AI assistants, human contributors working on evaluator features
+- **When to read**: When working on feature normalization, survival analysis, or understanding the KM-based approach
+- **Prerequisites**: [Evaluator Documentation](../../architecture/evaluator/README.md) for feature system context
+- **Related documents**: [design.md](./design.md) (detailed architecture), [roadmap.md](./roadmap.md) (implementation phases)
+
 ## Overview
 
-This project replaces the current linear feature normalization with **survival-time-based transformations** using Kaplan-Meier (KM) survival analysis.
+This project applies **survival-time-based transformations** using Kaplan-Meier (KM) survival analysis to **survival features** (holes, height). The goal is to replace linear normalization with non-linear, data-driven transformations that capture the true relationship between feature values and survival time.
+
+**Scope**: This project focuses on survival features only. Structure features (bumpiness, transitions) and score optimization are out of scope and may be addressed in future projects.
 
 ## The Core Idea
 
@@ -10,24 +21,26 @@ This project replaces the current linear feature normalization with **survival-t
 
 Feature values are linearly transformed then normalized to 0-1 using auto-generated P05-P95 percentiles:
 
-```
+```text
 holes=0  → 0.0  → normalized = 1.0 (best, at P05)
 holes=5  → 5.0  → normalized = 0.375
 holes=8  → 8.0  → normalized = 0.0 (worst, at P95)
 holes=20 → 20.0 → normalized = 0.0 (clamped)
 ```
 
-**Note**: The P05 and P95 values (0 and 8 in this example) are automatically computed from gameplay data, not manually defined.
+> [!NOTE]
+> The P05 and P95 values (0 and 8 in this example) are automatically computed from gameplay data, not manually defined.
 
 **Problem**: Linear transformation (`raw as f32`) doesn't reflect actual impact on survival.
+
 - Treats `holes=0→1` the same as `holes=7→8` in the transformation step
-- The relationship between feature values and survival time is non-linear, but transformation is linear
+- The relationship between holes/height and survival time is non-linear, but transformation is linear
 
 ### New Approach (KM-Based Transform)
 
 Transform feature values through **survival time** before normalizing:
 
-```
+```text
 holes=0  → survival=322.8 turns → normalized = 1.0 (best)
 holes=5  → survival=120.0 turns → normalized = 0.36
 holes=10 → survival=50.0 turns  → normalized = 0.14
@@ -42,12 +55,13 @@ holes=20 → survival=8.2 turns   → normalized = 0.0 (worst)
 
 Games that survive beyond `MAX_TURNS` are "censored" - we don't know their true survival time:
 
-```
+```text
 Game A: holes=0, survived 500 turns → CENSORED at 500
 Game B: holes=10, died at 50 turns  → OBSERVED at 50
 ```
 
 **Issue**: Naive statistics (mean, median) underestimate survival for good states.
+
 - Good boards are more likely to be censored
 - Bias can be up to 56% for some features
 
@@ -110,32 +124,60 @@ let normalized = (survival - km_min) / (km_max - km_min);  // 0.54
    - Focuses on common gameplay scenarios
 
 5. **Eliminates duplicates**: Non-linear transform removes need for `*_risk` features
-   - Current: `max_height_penalty` and `top_out_risk` both needed
-   - With KM: Single feature with non-linear transform captures both
+   - Current: `max_height_penalty` and `top_out_risk` both needed (different normalization ranges)
+   - With KM: Single feature with non-linear transform captures both behaviors
+
+## Project Scope
+
+### In Scope: Survival Features
+
+Features that directly affect game termination:
+
+- `holes_penalty` - holes prevent piece placement
+- `hole_depth_penalty` - deeper holes are harder to clear
+- `max_height_penalty` - height determines remaining space
+- `center_columns_penalty` - center height affects placement options
+- `total_height_penalty` - overall board pressure
+
+These features have clear, direct impact on survival time, making KM-based normalization appropriate.
+
+### Out of Scope
+
+**Structure Features** (bumpiness, transitions, well depth):
+
+- Indirect impact on survival (via placement flexibility)
+- May require different normalization approach (e.g., placement-flexibility-based)
+- Should be evaluated in a separate project after survival features succeed
+
+**Score Features** (line clears, tetris setup):
+
+- Different optimization objective (maximize score, not survival)
+- May require score-based normalization or multi-objective optimization
+- Future work after survival optimization is validated
 
 ## Current Status
 
-### ✅ Completed
+### ✅ Completed (Phase 1-2)
 
 - Data generation with diverse evaluators
-- KM survival analysis implementation (`crates/oxidris-stats/src/survival.rs`)
-- Normalization parameter generation (`crates/oxidris-cli/src/analyze_censoring.rs`)
-- Data structures (`NormalizationParams`, `FeatureNormalization`, `NormalizationRange`)
-- Two-stage design (`transform_mapping` + `normalization`)
-- CLI tool with `--normalization-output` flag
-- Documentation
+- KM survival analysis implementation
+- Normalization parameter generation
+- Data structures for KM normalization
+- Two-stage design (transform → normalize)
+- CLI tools and documentation
 
-### 🔄 In Progress
+### 🔄 In Progress (Phase 3)
+
+- Design `BoardFeatureSource` trait integration
+- Remove incorrect `transform_and_normalize()` helper method
+
+### 📋 Not Started (Phase 4)
 
 - Remove duplicate `*_risk` features
-- Implement `KMBasedEvaluator` using normalization parameters
-- Integrate with genetic algorithm training
-
-### 📋 Not Started
-
-- Training with KM-based evaluator
-- Benchmarking vs percentile-based approach
-- Weight interpretation analysis
+- Integrate KM normalization into `BoardFeatureSource` trait
+- Implement KM-based survival features
+- Train and benchmark survival-focused evaluator
+- Validate improvements over linear normalization
 
 ## Usage
 
@@ -191,33 +233,36 @@ let score = evaluator.evaluate(&board, piece);
 
 ## Next Steps
 
-1. **Remove duplicate features** from `ALL_BOARD_FEATURES`
-   - Keep: `max_height_penalty`, `center_columns_penalty`, `well_depth_penalty`
-   - Remove: `top_out_risk`, `center_top_out_risk`, `deep_well_risk`
+See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
-2. **Implement KMBasedEvaluator**
-   - Load normalization parameters
-   - Apply two-stage transform+normalize
-   - Initialize weights: `weight = 1.0 / km_range`
+### Phase 3: Complete Infrastructure
 
-3. **Train and benchmark**
-   - Train with genetic algorithm
-   - Compare fitness vs percentile-based
-   - Analyze learned weights
+- Design `BoardFeatureSource` trait integration
+- Remove incorrect helper methods
 
-4. **Validate improvements**
-   - Measure survival time improvement
-   - Check weight interpretability
-   - Verify non-linear effects captured
+### Phase 4: Implement Survival Features
+
+1. Clean up feature set (remove duplicate `*_risk` features)
+2. Integrate KM normalization into `BoardFeatureSource` trait
+3. Implement KM-based survival features
+4. Train survival-focused evaluator
+5. Benchmark vs. linear normalization
+
+### Success Criteria
+
+- Survival-based evaluator achieves ≥ current heuristic evaluator survival time
+- Survival features show strong correlation with survival (|r| > 0.5)
+- Learned weights are interpretable (correlate with feature km_range)
+- KM transform demonstrates clear improvement over linear transform
 
 ## Documentation
 
-- **[design.md](./design.md)** - Detailed algorithm specification and data structures
-- **[roadmap.md](./roadmap.md)** - Phase 1-6 development plan with tasks and timeline
+- **[design.md](./design.md)** - Target architecture for KM-based normalization
+- **[roadmap.md](./roadmap.md)** - Implementation phases and status
 
 ## Code Locations
 
 - **KM Estimator**: `crates/oxidris-stats/src/survival.rs`
 - **Data Structures**: `crates/oxidris-cli/src/data.rs`
 - **Normalization Generation**: `crates/oxidris-cli/src/analyze_censoring.rs`
-- **Feature Definitions**: `crates/oxidris-ai/src/board_feature/mod.rs`
+- **Feature Definitions**: `crates/oxidris-evaluator/src/board_feature/mod.rs`

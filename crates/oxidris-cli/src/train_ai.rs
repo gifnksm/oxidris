@@ -1,17 +1,23 @@
 use std::{iter, path::PathBuf};
 
 use chrono::Utc;
-use oxidris_ai::{
-    AiType,
+use oxidris_engine::GameField;
+use oxidris_evaluator::{
     board_feature::ALL_BOARD_FEATURES,
-    genetic::{Population, PopulationEvolver},
     session_evaluator::{
         AggroSessionEvaluator, DefaultSessionEvaluator, DefensiveSessionEvaluator, SessionEvaluator,
     },
 };
-use oxidris_engine::GameField;
+use oxidris_training::genetic::{Population, PopulationEvolver};
 
 use crate::{data::Model, util::Output};
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, derive_more::FromStr)]
+pub enum AiType {
+    #[default]
+    Aggro,
+    Defensive,
+}
 
 const GAMES_PER_INDIVIDUAL: usize = 3;
 const TURN_LIMIT: usize = 3000;

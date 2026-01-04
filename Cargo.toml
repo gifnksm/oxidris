@@ -18,8 +18,9 @@ ratatui = "0.30.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
 
-oxidris-ai = { path = "crates/oxidris-ai" }
 oxidris-engine = { path = "crates/oxidris-engine" }
+oxidris-evaluator = { path = "crates/oxidris-evaluator" }
+oxidris-training = { path = "crates/oxidris-training" }
 oxidris-stats = { path = "crates/oxidris-stats" }
 
 [workspace.lints.clippy]
