@@ -120,10 +120,6 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 **In Progress:**
 
-- [ ] Remove incorrect `transform_and_normalize()` helper method
-  - Does not integrate with existing `BoardFeatureSource` trait
-  - Bypasses existing feature analysis tools
-
 - [ ] Design `BoardFeatureSource` trait integration
   - How to load KM normalization parameters
   - How to implement KM-based `transform()` method

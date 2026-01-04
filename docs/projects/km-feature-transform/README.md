@@ -169,7 +169,6 @@ These features have clear, direct impact on survival time, making KM-based norma
 ### 🔄 In Progress (Phase 3)
 
 - Design `BoardFeatureSource` trait integration
-- Remove incorrect `transform_and_normalize()` helper method
 
 ### 📋 Not Started (Phase 4)
 

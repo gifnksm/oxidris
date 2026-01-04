@@ -66,21 +66,6 @@ pub struct FeatureNormalization {
     pub stats: NormalizationStats,
 }
 
-impl FeatureNormalization {
-    /// Transform raw value to KM median, then normalize to 0-1
-    pub fn transform_and_normalize(&self, raw_value: u32) -> f64 {
-        // Step 1: Transform (raw -> KM median)
-        let km_median = self
-            .transform_mapping
-            .get(&raw_value)
-            .copied()
-            .unwrap_or(self.normalization.km_min); // Default to worst case
-
-        // Step 2: Normalize (KM median -> 0-1)
-        self.normalization.normalize(km_median)
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NormalizationRange {
     pub km_min: f64,
