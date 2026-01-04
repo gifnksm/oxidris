@@ -25,10 +25,8 @@
 //! - [`MaxHeightPenalty`] - Maximum column height
 //! - [`TotalHeightPenalty`] - Sum of all column heights
 //! - [`CenterColumnsPenalty`] - Sum of center column heights (columns 3-6)
-//! - [`WellDepthPenalty`] - Depth of deepest well
 //! - [`TopOutRisk`] - Risk of topping out (height-based threshold)
 //! - [`CenterTopOutRisk`] - Risk of topping out in center columns
-//! - [`DeepWellRisk`] - Risk from excessively deep wells
 //!
 //! ## Structure Features
 //!
@@ -38,6 +36,8 @@
 //! - [`SurfaceRoughnessPenalty`] - Variance in column heights
 //! - [`RowTransitionsPenalty`] - Number of horizontal empty-to-filled transitions
 //! - [`ColumnTransitionsPenalty`] - Number of vertical empty-to-filled transitions
+//! - [`WellDepthPenalty`] - Depth of deepest well (reduces placement flexibility)
+//! - [`DeepWellRisk`] - Risk from excessively deep wells (reduces recovery options)
 //!
 //! ## Score Features
 //!
