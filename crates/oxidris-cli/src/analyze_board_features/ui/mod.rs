@@ -1,4 +1,4 @@
-use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
+use oxidris_evaluator::board_feature::BoxedBoardFeature;
 
 use self::app::App;
 
@@ -11,7 +11,7 @@ mod app;
 mod screens;
 
 pub(crate) fn run_tui(
-    features: Vec<BoxedBoardFeatureSource>,
+    features: Vec<BoxedBoardFeature>,
     board_samples: Vec<BoardSample>,
     statistics: Vec<BoardFeatureStatistics>,
     board_index: BoardIndex,

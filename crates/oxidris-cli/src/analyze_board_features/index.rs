@@ -1,4 +1,4 @@
-use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
+use oxidris_evaluator::board_feature::BoxedBoardFeature;
 
 use super::data::BoardSample;
 
@@ -8,7 +8,7 @@ pub struct BoardIndex {
 }
 
 impl BoardIndex {
-    pub fn new(features: &[BoxedBoardFeatureSource], board_samples: &[BoardSample]) -> Self {
+    pub fn new(features: &[BoxedBoardFeature], board_samples: &[BoardSample]) -> Self {
         Self {
             sorted_indices: (0..features.len())
                 .map(|feature_idx| {

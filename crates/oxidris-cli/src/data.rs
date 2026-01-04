@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
 use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
 use oxidris_engine::{BitBoard, Piece};
-use oxidris_evaluator::board_feature::{self, BoardFeatureValue, BoxedBoardFeatureSource};
+use oxidris_evaluator::board_feature::{self, BoardFeatureValue, BoxedBoardFeature};
 use oxidris_stats::comprehensive::ComprehensiveStats;
 use serde::{Deserialize, Serialize};
 
@@ -98,14 +98,12 @@ impl NormalizationStats {
 }
 
 impl Model {
-    pub(crate) fn to_feature_weights(
-        &self,
-    ) -> anyhow::Result<(Vec<BoxedBoardFeatureSource>, Vec<f32>)> {
+    pub(crate) fn to_feature_weights(&self) -> anyhow::Result<(Vec<BoxedBoardFeature>, Vec<f32>)> {
         let all_features = board_feature::all_board_features();
         self.placement_weights
             .iter()
             .map(
-                |(feature_id, weight)| -> anyhow::Result<(BoxedBoardFeatureSource, f32)> {
+                |(feature_id, weight)| -> anyhow::Result<(BoxedBoardFeature, f32)> {
                     let feature = all_features
                         .iter()
                         .find(|f| f.id() == feature_id)

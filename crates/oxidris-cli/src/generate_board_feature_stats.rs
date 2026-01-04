@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Context as _;
-use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
+use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
 
 use crate::{
     analysis,
@@ -65,7 +65,7 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
 
 fn dump_source(
     writer: &mut dyn io::Write,
-    features: &[BoxedBoardFeatureSource],
+    features: &[BoxedBoardFeature],
     statistics: &[BoardFeatureStatistics],
 ) -> anyhow::Result<()> {
     writeln!(

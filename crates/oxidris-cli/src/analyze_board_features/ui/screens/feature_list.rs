@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
+use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use oxidris_stats::comprehensive::ComprehensiveStats;
 use ratatui::{
     Frame,
@@ -19,13 +19,13 @@ use crate::analyze_board_features::ui::app::{AppData, Screen};
 
 #[derive(Debug)]
 pub struct FeatureListScreen {
-    features: Vec<BoxedBoardFeatureSource>,
+    features: Vec<BoxedBoardFeature>,
     selected_feature: usize,
 }
 
 impl FeatureListScreen {
     #[must_use]
-    pub fn new(features: Vec<BoxedBoardFeatureSource>) -> Self {
+    pub fn new(features: Vec<BoxedBoardFeature>) -> Self {
         Self {
             features,
             selected_feature: 0,
@@ -147,7 +147,7 @@ impl FeatureListScreen {
 }
 
 struct FeatureSelector<'a> {
-    features: &'a [BoxedBoardFeatureSource],
+    features: &'a [BoxedBoardFeature],
     selected_feature: usize,
 }
 

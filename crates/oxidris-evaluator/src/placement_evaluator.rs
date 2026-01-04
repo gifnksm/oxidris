@@ -61,7 +61,7 @@
 
 use std::{fmt, iter};
 
-use crate::{board_feature::BoxedBoardFeatureSource, placement_analysis::PlacementAnalysis};
+use crate::{board_feature::BoxedBoardFeature, placement_analysis::PlacementAnalysis};
 
 /// Evaluates piece placements by assigning scores.
 ///
@@ -103,7 +103,7 @@ pub trait PlacementEvaluator: fmt::Debug + Send + Sync {
 /// ```
 #[derive(Debug, Clone)]
 pub struct FeatureBasedPlacementEvaluator {
-    features: Vec<BoxedBoardFeatureSource>,
+    features: Vec<BoxedBoardFeature>,
     weights: Vec<f32>,
 }
 
@@ -119,7 +119,7 @@ impl FeatureBasedPlacementEvaluator {
     ///
     /// Panics if `features.len() != weights.len()`
     #[must_use]
-    pub fn new(features: Vec<BoxedBoardFeatureSource>, weights: Vec<f32>) -> Self {
+    pub fn new(features: Vec<BoxedBoardFeature>, weights: Vec<f32>) -> Self {
         assert_eq!(features.len(), weights.len());
         Self { features, weights }
     }

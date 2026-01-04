@@ -9,7 +9,7 @@ use std::{
 use anyhow::Context;
 use clap::Args;
 use oxidris_evaluator::{
-    board_feature::{self, BoxedBoardFeatureSource},
+    board_feature::{self, BoxedBoardFeature},
     placement_analysis::PlacementAnalysis,
 };
 use oxidris_stats::survival::KaplanMeierCurve;
@@ -109,7 +109,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 
 #[expect(clippy::cast_precision_loss)]
 fn generate_normalization_params(
-    normalize_features: &[BoxedBoardFeatureSource],
+    normalize_features: &[BoxedBoardFeature],
     sessions: &[data::SessionData],
     max_turns: usize,
 ) -> anyhow::Result<NormalizationParams> {
@@ -329,7 +329,7 @@ fn analyze_by_capture_phase(sessions: &[crate::data::SessionData], max_turns: us
 
 #[expect(clippy::cast_precision_loss)]
 fn analyze_feature_survival(
-    feature: &BoxedBoardFeatureSource,
+    feature: &BoxedBoardFeature,
     sessions: &[crate::data::SessionData],
     output_dir: Option<&PathBuf>,
 ) -> anyhow::Result<()> {
@@ -493,7 +493,7 @@ fn analyze_by_evaluator(sessions: &[crate::data::SessionData]) {
 
 #[expect(clippy::cast_precision_loss)]
 fn analyze_by_feature(
-    all_features: &[BoxedBoardFeatureSource],
+    all_features: &[BoxedBoardFeature],
     feature_id: &str,
     sessions: &[crate::data::SessionData],
 ) -> anyhow::Result<()> {

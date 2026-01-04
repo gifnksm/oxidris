@@ -1,5 +1,5 @@
 use oxidris_evaluator::{
-    board_feature::{BoardFeatureValue, BoxedBoardFeatureSource},
+    board_feature::{BoardFeatureValue, BoxedBoardFeature},
     placement_analysis::PlacementAnalysis,
 };
 use oxidris_stats::comprehensive::ComprehensiveStats;
@@ -7,7 +7,7 @@ use oxidris_stats::comprehensive::ComprehensiveStats;
 use crate::data::{BoardAndPlacement, BoardFeatureStatistics, BoardSample, SessionData};
 
 pub fn extract_all_board_features(
-    features: &[BoxedBoardFeatureSource],
+    features: &[BoxedBoardFeature],
     sessions: &[SessionData],
 ) -> Vec<BoardSample> {
     sessions
@@ -18,7 +18,7 @@ pub fn extract_all_board_features(
 }
 
 fn extract_board_features(
-    features: &[BoxedBoardFeatureSource],
+    features: &[BoxedBoardFeature],
     board: &BoardAndPlacement,
 ) -> BoardSample {
     let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
@@ -33,7 +33,7 @@ fn extract_board_features(
 }
 
 pub fn coimpute_statistics(
-    features: &[BoxedBoardFeatureSource],
+    features: &[BoxedBoardFeature],
     board_samples: &[BoardSample],
 ) -> Vec<BoardFeatureStatistics> {
     (0..features.len())

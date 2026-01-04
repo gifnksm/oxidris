@@ -116,7 +116,7 @@ use rand::{Rng, seq::IndexedRandom};
 
 use oxidris_engine::GameField;
 use oxidris_evaluator::{
-    board_feature::BoxedBoardFeatureSource, placement_evaluator::FeatureBasedPlacementEvaluator,
+    board_feature::BoxedBoardFeature, placement_evaluator::FeatureBasedPlacementEvaluator,
     session_evaluator::SessionEvaluator, turn_evaluator::TurnEvaluator,
 };
 
@@ -178,7 +178,7 @@ impl Individual {
 /// provides methods for fitness evaluation and statistics computation.
 #[derive(Debug, Clone)]
 pub struct Population {
-    board_features: Vec<BoxedBoardFeatureSource>,
+    board_features: Vec<BoxedBoardFeature>,
     individuals: Vec<Individual>,
 }
 
@@ -193,7 +193,7 @@ impl Population {
     /// * `max_weight` - Maximum weight value before normalization
     #[must_use]
     pub fn random<R>(
-        board_features: Vec<BoxedBoardFeatureSource>,
+        board_features: Vec<BoxedBoardFeature>,
         count: usize,
         rng: &mut R,
         max_weight: f32,
