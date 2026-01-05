@@ -241,11 +241,8 @@ fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 
 pub trait BoardFeature: fmt::Debug + Send + Sync {
     fn id(&self) -> &str;
     fn name(&self) -> &str;
+    fn feature_source_type_name(&self) -> Option<&str>;
     fn clone_boxed(&self) -> BoxedBoardFeature;
-
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
 
     #[must_use]
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
@@ -319,6 +316,10 @@ where
         &self.name
     }
 
+    fn feature_source_type_name(&self) -> Option<&str> {
+        Some(std::any::type_name::<S>())
+    }
+
     fn clone_boxed(&self) -> BoxedBoardFeature {
         Box::new(self.clone())
     }
@@ -363,8 +364,8 @@ pub const LINEAR_HOLES_PENALTY: LinearNormalized<HolesPenalty> = LinearNormalize
     Cow::Borrowed("linear_holes_penalty"),
     Cow::Borrowed("Holes Penalty (Linear)"),
     FeatureSignal::Negative,
-    HolesPenalty::TRANSFORMED_P05,
-    HolesPenalty::TRANSFORMED_P95,
+    HolesPenalty::P05,
+    HolesPenalty::P95,
     HolesPenalty,
 );
 
@@ -405,8 +406,8 @@ pub const LINEAR_HOLE_DEPTH_PENALTY: LinearNormalized<HoleDepthPenalty> = Linear
     Cow::Borrowed("linear_hole_depth_penalty"),
     Cow::Borrowed("Hole Depth Penalty (Linear)"),
     FeatureSignal::Negative,
-    HoleDepthPenalty::TRANSFORMED_P05,
-    HoleDepthPenalty::TRANSFORMED_P95,
+    HoleDepthPenalty::P05,
+    HoleDepthPenalty::P95,
     HoleDepthPenalty,
 );
 
@@ -445,8 +446,8 @@ pub const LINEAR_ROW_TRANSITIONS_PENALTY: LinearNormalized<RowTransitionsPenalty
         Cow::Borrowed("linear_row_transitions_penalty"),
         Cow::Borrowed("Row Transitions Penalty (Linear)"),
         FeatureSignal::Negative,
-        RowTransitionsPenalty::TRANSFORMED_P05,
-        RowTransitionsPenalty::TRANSFORMED_P95,
+        RowTransitionsPenalty::P05,
+        RowTransitionsPenalty::P95,
         RowTransitionsPenalty,
     );
 
@@ -481,8 +482,8 @@ pub const LINEAR_COLUMN_TRANSITIONS_PENALTY: LinearNormalized<ColumnTransitionsP
         Cow::Borrowed("linear_column_transitions_penalty"),
         Cow::Borrowed("Column Transitions Penalty (Linear)"),
         FeatureSignal::Negative,
-        ColumnTransitionsPenalty::TRANSFORMED_P05,
-        ColumnTransitionsPenalty::TRANSFORMED_P95,
+        ColumnTransitionsPenalty::P05,
+        ColumnTransitionsPenalty::P95,
         ColumnTransitionsPenalty,
     );
 
@@ -521,8 +522,8 @@ pub const LINEAR_SURFACE_BUMPINESS_PENALTY: LinearNormalized<SurfaceBumpinessPen
         Cow::Borrowed("linear_surface_bumpiness_penalty"),
         Cow::Borrowed("Surface Bumpiness Penalty (Linear)"),
         FeatureSignal::Negative,
-        SurfaceBumpinessPenalty::TRANSFORMED_P05,
-        SurfaceBumpinessPenalty::TRANSFORMED_P95,
+        SurfaceBumpinessPenalty::P05,
+        SurfaceBumpinessPenalty::P95,
         SurfaceBumpinessPenalty,
     );
 
@@ -562,8 +563,8 @@ pub const LINEAR_SURFACE_ROUGHNESS_PENALTY: LinearNormalized<SurfaceRoughnessPen
         Cow::Borrowed("linear_surface_roughness_penalty"),
         Cow::Borrowed("Surface Roughness Penalty (Linear)"),
         FeatureSignal::Negative,
-        SurfaceRoughnessPenalty::TRANSFORMED_P05,
-        SurfaceRoughnessPenalty::TRANSFORMED_P95,
+        SurfaceRoughnessPenalty::P05,
+        SurfaceRoughnessPenalty::P95,
         SurfaceRoughnessPenalty,
     );
 
@@ -601,8 +602,8 @@ pub const LINEAR_WELL_DEPTH_PENALTY: LinearNormalized<WellDepthPenalty> = Linear
     Cow::Borrowed("linear_well_depth_penalty"),
     Cow::Borrowed("Well Depth Penalty (Linear)"),
     FeatureSignal::Negative,
-    WellDepthPenalty::TRANSFORMED_P05,
-    WellDepthPenalty::TRANSFORMED_P95,
+    WellDepthPenalty::P05,
+    WellDepthPenalty::P95,
     WellDepthPenalty,
 );
 
@@ -640,8 +641,8 @@ pub const LINEAR_DEEP_WELL_RISK: LinearNormalized<DeepWellRisk> = LinearNormaliz
     Cow::Borrowed("linear_deep_well_risk"),
     Cow::Borrowed("Deep Well Risk (Linear)"),
     FeatureSignal::Negative,
-    DeepWellRisk::TRANSFORMED_P75,
-    DeepWellRisk::TRANSFORMED_P95,
+    DeepWellRisk::P75,
+    DeepWellRisk::P95,
     DeepWellRisk,
 );
 
@@ -678,8 +679,8 @@ pub const LINEAR_MAX_HEIGHT_PENALTY: LinearNormalized<MaxHeightPenalty> = Linear
     Cow::Borrowed("linear_max_height_penalty"),
     Cow::Borrowed("Max Height Penalty (Linear)"),
     FeatureSignal::Negative,
-    MaxHeightPenalty::TRANSFORMED_P05,
-    MaxHeightPenalty::TRANSFORMED_P95,
+    MaxHeightPenalty::P05,
+    MaxHeightPenalty::P95,
     MaxHeightPenalty,
 );
 
@@ -717,8 +718,8 @@ pub const LINEAR_CENTER_COLUMN_PENALTY: LinearNormalized<CenterColumnsPenalty> =
         Cow::Borrowed("linear_center_columns_penalty"),
         Cow::Borrowed("Center Columns Penalty (Linear)"),
         FeatureSignal::Negative,
-        CenterColumnsPenalty::TRANSFORMED_P05,
-        CenterColumnsPenalty::TRANSFORMED_P95,
+        CenterColumnsPenalty::P05,
+        CenterColumnsPenalty::P95,
         CenterColumnsPenalty,
     );
 
@@ -760,8 +761,8 @@ pub const LINEAR_CENTER_TOP_OUT_RISK: LinearNormalized<CenterTopOutRisk> = Linea
     Cow::Borrowed("linear_center_top_out_risk"),
     Cow::Borrowed("Center Top-Out Risk (Linear)"),
     FeatureSignal::Negative,
-    CenterTopOutRisk::TRANSFORMED_P75,
-    CenterTopOutRisk::TRANSFORMED_P95,
+    CenterTopOutRisk::P75,
+    CenterTopOutRisk::P95,
     CenterTopOutRisk,
 );
 
@@ -796,8 +797,8 @@ pub const LINEAR_TOP_OUT_RISK: LinearNormalized<TopOutRisk> = LinearNormalized::
     Cow::Borrowed("linear_top_out_risk"),
     Cow::Borrowed("Top-Out Risk (Linear)"),
     FeatureSignal::Negative,
-    TopOutRisk::TRANSFORMED_P75,
-    TopOutRisk::TRANSFORMED_P95,
+    TopOutRisk::P75,
+    TopOutRisk::P95,
     TopOutRisk,
 );
 
@@ -834,8 +835,8 @@ pub const LINEAR_TOTAL_HEIGHT_PENALTY: LinearNormalized<TotalHeightPenalty> = Li
     Cow::Borrowed("linear_total_height_penalty"),
     Cow::Borrowed("Total Height Penalty (Linear)"),
     FeatureSignal::Negative,
-    TotalHeightPenalty::TRANSFORMED_P05,
-    TotalHeightPenalty::TRANSFORMED_P95,
+    TotalHeightPenalty::P05,
+    TotalHeightPenalty::P95,
     TotalHeightPenalty,
 );
 
@@ -898,6 +899,10 @@ impl BoardFeature for LineClearBonus {
         "Line Clear Bonus"
     }
 
+    fn feature_source_type_name(&self) -> Option<&str> {
+        None
+    }
+
     fn clone_boxed(&self) -> BoxedBoardFeature {
         Box::new(self.clone())
     }
@@ -955,6 +960,10 @@ impl BoardFeature for IWellReward {
 
     fn name(&self) -> &'static str {
         "I-Well Reward"
+    }
+
+    fn feature_source_type_name(&self) -> Option<&str> {
+        None
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {

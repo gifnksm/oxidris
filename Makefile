@@ -72,7 +72,7 @@ regenerate-board-data: $(DATA_DIR)/boards.json | $(DATA_DIR)/
 regenerate-board-feature-stats: $(DATA_DIR)/boards.json
 	cargo run --release -- generate-board-feature-stats \
 		$(DATA_DIR)/boards.json \
-		--output crates/oxidris-ai/src/board_feature/stats.rs
+		--output crates/oxidris-evaluator/src/board_feature/stats.rs
 
 ## Train an aggressive AI using genetic algorithms
 .PHONY: train-ai-aggro

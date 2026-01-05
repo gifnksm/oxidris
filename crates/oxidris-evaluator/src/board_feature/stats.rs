@@ -2,451 +2,157 @@
 // To regenerate, run: make regenerate-board-feature-stats
 
 impl crate::board_feature::HolesPenalty {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 0.0;
-    pub const RAW_P10: f32 = 0.0;
-    pub const RAW_P25: f32 = 0.0;
-    pub const RAW_P50: f32 = 1.0;
-    pub const RAW_P75: f32 = 3.0;
-    pub const RAW_P90: f32 = 6.0;
-    pub const RAW_P95: f32 = 8.0;
-    pub const RAW_P99: f32 = 11.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 0.0;
-    pub const TRANSFORMED_P10: f32 = 0.0;
-    pub const TRANSFORMED_P25: f32 = 0.0;
-    pub const TRANSFORMED_P50: f32 = 1.0;
-    pub const TRANSFORMED_P75: f32 = 3.0;
-    pub const TRANSFORMED_P90: f32 = 6.0;
-    pub const TRANSFORMED_P95: f32 = 8.0;
-    pub const TRANSFORMED_P99: f32 = 11.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.25;
-    pub const NORMALIZED_P25: f32 = 0.625;
-    pub const NORMALIZED_P50: f32 = 0.875;
-    pub const NORMALIZED_P75: f32 = 1.0;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
+    pub const P01: f32 = 0.0;
+    pub const P05: f32 = 0.0;
+    pub const P10: f32 = 0.0;
+    pub const P25: f32 = 1.0;
+    pub const P50: f32 = 5.0;
+    pub const P75: f32 = 14.0;
+    pub const P90: f32 = 26.0;
+    pub const P95: f32 = 33.0;
+    pub const P99: f32 = 63.0;
 }
 
 impl crate::board_feature::HoleDepthPenalty {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 0.0;
-    pub const RAW_P10: f32 = 0.0;
-    pub const RAW_P25: f32 = 0.0;
-    pub const RAW_P50: f32 = 1.0;
-    pub const RAW_P75: f32 = 11.0;
-    pub const RAW_P90: f32 = 32.0;
-    pub const RAW_P95: f32 = 50.0;
-    pub const RAW_P99: f32 = 85.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 0.0;
-    pub const TRANSFORMED_P10: f32 = 0.0;
-    pub const TRANSFORMED_P25: f32 = 0.0;
-    pub const TRANSFORMED_P50: f32 = 1.0;
-    pub const TRANSFORMED_P75: f32 = 11.0;
-    pub const TRANSFORMED_P90: f32 = 32.0;
-    pub const TRANSFORMED_P95: f32 = 50.0;
-    pub const TRANSFORMED_P99: f32 = 85.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.36;
-    pub const NORMALIZED_P25: f32 = 0.78;
-    pub const NORMALIZED_P50: f32 = 0.98;
-    pub const NORMALIZED_P75: f32 = 1.0;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::RowTransitionsPenalty {
-    pub const RAW_P01: f32 = 2.0;
-    pub const RAW_P05: f32 = 4.0;
-    pub const RAW_P10: f32 = 4.0;
-    pub const RAW_P25: f32 = 7.0;
-    pub const RAW_P50: f32 = 11.0;
-    pub const RAW_P75: f32 = 17.0;
-    pub const RAW_P90: f32 = 27.0;
-    pub const RAW_P95: f32 = 34.0;
-    pub const RAW_P99: f32 = 52.0;
-    pub const TRANSFORMED_P01: f32 = 2.0;
-    pub const TRANSFORMED_P05: f32 = 4.0;
-    pub const TRANSFORMED_P10: f32 = 4.0;
-    pub const TRANSFORMED_P25: f32 = 7.0;
-    pub const TRANSFORMED_P50: f32 = 11.0;
-    pub const TRANSFORMED_P75: f32 = 17.0;
-    pub const TRANSFORMED_P90: f32 = 27.0;
-    pub const TRANSFORMED_P95: f32 = 34.0;
-    pub const TRANSFORMED_P99: f32 = 52.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.233_333_35;
-    pub const NORMALIZED_P25: f32 = 0.566_666_66;
-    pub const NORMALIZED_P50: f32 = 0.766_666_65;
-    pub const NORMALIZED_P75: f32 = 0.9;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::ColumnTransitionsPenalty {
-    pub const RAW_P01: f32 = 3.0;
-    pub const RAW_P05: f32 = 5.0;
-    pub const RAW_P10: f32 = 6.0;
-    pub const RAW_P25: f32 = 8.0;
-    pub const RAW_P50: f32 = 10.0;
-    pub const RAW_P75: f32 = 15.0;
-    pub const RAW_P90: f32 = 19.0;
-    pub const RAW_P95: f32 = 23.0;
-    pub const RAW_P99: f32 = 29.0;
-    pub const TRANSFORMED_P01: f32 = 3.0;
-    pub const TRANSFORMED_P05: f32 = 5.0;
-    pub const TRANSFORMED_P10: f32 = 6.0;
-    pub const TRANSFORMED_P25: f32 = 8.0;
-    pub const TRANSFORMED_P50: f32 = 10.0;
-    pub const TRANSFORMED_P75: f32 = 15.0;
-    pub const TRANSFORMED_P90: f32 = 19.0;
-    pub const TRANSFORMED_P95: f32 = 23.0;
-    pub const TRANSFORMED_P99: f32 = 29.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.222_222_21;
-    pub const NORMALIZED_P25: f32 = 0.444_444_42;
-    pub const NORMALIZED_P50: f32 = 0.722_222_2;
-    pub const NORMALIZED_P75: f32 = 0.833_333_3;
-    pub const NORMALIZED_P90: f32 = 0.944_444_4;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::SurfaceBumpinessPenalty {
-    pub const RAW_P01: f32 = 2.0;
-    pub const RAW_P05: f32 = 3.0;
-    pub const RAW_P10: f32 = 4.0;
-    pub const RAW_P25: f32 = 6.0;
-    pub const RAW_P50: f32 = 8.0;
-    pub const RAW_P75: f32 = 12.0;
-    pub const RAW_P90: f32 = 19.0;
-    pub const RAW_P95: f32 = 27.0;
-    pub const RAW_P99: f32 = 45.0;
-    pub const TRANSFORMED_P01: f32 = 2.0;
-    pub const TRANSFORMED_P05: f32 = 3.0;
-    pub const TRANSFORMED_P10: f32 = 4.0;
-    pub const TRANSFORMED_P25: f32 = 6.0;
-    pub const TRANSFORMED_P50: f32 = 8.0;
-    pub const TRANSFORMED_P75: f32 = 12.0;
-    pub const TRANSFORMED_P90: f32 = 19.0;
-    pub const TRANSFORMED_P95: f32 = 27.0;
-    pub const TRANSFORMED_P99: f32 = 45.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.333_333_3;
-    pub const NORMALIZED_P25: f32 = 0.625;
-    pub const NORMALIZED_P50: f32 = 0.791_666_7;
-    pub const NORMALIZED_P75: f32 = 0.875;
-    pub const NORMALIZED_P90: f32 = 0.958_333_3;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::SurfaceRoughnessPenalty {
-    pub const RAW_P01: f32 = 2.0;
-    pub const RAW_P05: f32 = 4.0;
-    pub const RAW_P10: f32 = 6.0;
-    pub const RAW_P25: f32 = 8.0;
-    pub const RAW_P50: f32 = 11.0;
-    pub const RAW_P75: f32 = 16.0;
-    pub const RAW_P90: f32 = 24.0;
-    pub const RAW_P95: f32 = 34.0;
-    pub const RAW_P99: f32 = 63.0;
-    pub const TRANSFORMED_P01: f32 = 2.0;
-    pub const TRANSFORMED_P05: f32 = 4.0;
-    pub const TRANSFORMED_P10: f32 = 6.0;
-    pub const TRANSFORMED_P25: f32 = 8.0;
-    pub const TRANSFORMED_P50: f32 = 11.0;
-    pub const TRANSFORMED_P75: f32 = 16.0;
-    pub const TRANSFORMED_P90: f32 = 24.0;
-    pub const TRANSFORMED_P95: f32 = 34.0;
-    pub const TRANSFORMED_P99: f32 = 63.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.333_333_3;
-    pub const NORMALIZED_P25: f32 = 0.6;
-    pub const NORMALIZED_P50: f32 = 0.766_666_65;
-    pub const NORMALIZED_P75: f32 = 0.866_666_7;
-    pub const NORMALIZED_P90: f32 = 0.933_333_34;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::WellDepthPenalty {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 0.0;
-    pub const RAW_P10: f32 = 0.0;
-    pub const RAW_P25: f32 = 0.0;
-    pub const RAW_P50: f32 = 1.0;
-    pub const RAW_P75: f32 = 3.0;
-    pub const RAW_P90: f32 = 8.0;
-    pub const RAW_P95: f32 = 13.0;
-    pub const RAW_P99: f32 = 24.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 0.0;
-    pub const TRANSFORMED_P10: f32 = 0.0;
-    pub const TRANSFORMED_P25: f32 = 0.0;
-    pub const TRANSFORMED_P50: f32 = 1.0;
-    pub const TRANSFORMED_P75: f32 = 3.0;
-    pub const TRANSFORMED_P90: f32 = 8.0;
-    pub const TRANSFORMED_P95: f32 = 13.0;
-    pub const TRANSFORMED_P99: f32 = 24.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.384_615_36;
-    pub const NORMALIZED_P25: f32 = 0.769_230_8;
-    pub const NORMALIZED_P50: f32 = 0.923_076_9;
-    pub const NORMALIZED_P75: f32 = 1.0;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::DeepWellRisk {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 0.0;
-    pub const RAW_P10: f32 = 0.0;
-    pub const RAW_P25: f32 = 0.0;
-    pub const RAW_P50: f32 = 1.0;
-    pub const RAW_P75: f32 = 3.0;
-    pub const RAW_P90: f32 = 8.0;
-    pub const RAW_P95: f32 = 13.0;
-    pub const RAW_P99: f32 = 24.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 0.0;
-    pub const TRANSFORMED_P10: f32 = 0.0;
-    pub const TRANSFORMED_P25: f32 = 0.0;
-    pub const TRANSFORMED_P50: f32 = 1.0;
-    pub const TRANSFORMED_P75: f32 = 3.0;
-    pub const TRANSFORMED_P90: f32 = 8.0;
-    pub const TRANSFORMED_P95: f32 = 13.0;
-    pub const TRANSFORMED_P99: f32 = 24.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.5;
-    pub const NORMALIZED_P25: f32 = 1.0;
-    pub const NORMALIZED_P50: f32 = 1.0;
-    pub const NORMALIZED_P75: f32 = 1.0;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
+    pub const P01: f32 = 0.0;
+    pub const P05: f32 = 0.0;
+    pub const P10: f32 = 0.0;
+    pub const P25: f32 = 3.0;
+    pub const P50: f32 = 19.0;
+    pub const P75: f32 = 78.0;
+    pub const P90: f32 = 188.0;
+    pub const P95: f32 = 260.0;
+    pub const P99: f32 = 499.0;
 }
 
 impl crate::board_feature::MaxHeightPenalty {
-    pub const RAW_P01: f32 = 1.0;
-    pub const RAW_P05: f32 = 2.0;
-    pub const RAW_P10: f32 = 2.0;
-    pub const RAW_P25: f32 = 3.0;
-    pub const RAW_P50: f32 = 5.0;
-    pub const RAW_P75: f32 = 8.0;
-    pub const RAW_P90: f32 = 12.0;
-    pub const RAW_P95: f32 = 14.0;
-    pub const RAW_P99: f32 = 18.0;
-    pub const TRANSFORMED_P01: f32 = 1.0;
-    pub const TRANSFORMED_P05: f32 = 2.0;
-    pub const TRANSFORMED_P10: f32 = 2.0;
-    pub const TRANSFORMED_P25: f32 = 3.0;
-    pub const TRANSFORMED_P50: f32 = 5.0;
-    pub const TRANSFORMED_P75: f32 = 8.0;
-    pub const TRANSFORMED_P90: f32 = 12.0;
-    pub const TRANSFORMED_P95: f32 = 14.0;
-    pub const TRANSFORMED_P99: f32 = 18.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.166_666_69;
-    pub const NORMALIZED_P25: f32 = 0.5;
-    pub const NORMALIZED_P50: f32 = 0.75;
-    pub const NORMALIZED_P75: f32 = 0.916_666_7;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::CenterColumnsPenalty {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 1.0;
-    pub const RAW_P10: f32 = 1.0;
-    pub const RAW_P25: f32 = 2.0;
-    pub const RAW_P50: f32 = 4.0;
-    pub const RAW_P75: f32 = 7.0;
-    pub const RAW_P90: f32 = 12.0;
-    pub const RAW_P95: f32 = 14.0;
-    pub const RAW_P99: f32 = 18.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 1.0;
-    pub const TRANSFORMED_P10: f32 = 1.0;
-    pub const TRANSFORMED_P25: f32 = 2.0;
-    pub const TRANSFORMED_P50: f32 = 4.0;
-    pub const TRANSFORMED_P75: f32 = 7.0;
-    pub const TRANSFORMED_P90: f32 = 12.0;
-    pub const TRANSFORMED_P95: f32 = 14.0;
-    pub const TRANSFORMED_P99: f32 = 18.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.153_846_14;
-    pub const NORMALIZED_P25: f32 = 0.538_461_57;
-    pub const NORMALIZED_P50: f32 = 0.769_230_8;
-    pub const NORMALIZED_P75: f32 = 0.923_076_9;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::CenterTopOutRisk {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 1.0;
-    pub const RAW_P10: f32 = 1.0;
-    pub const RAW_P25: f32 = 2.0;
-    pub const RAW_P50: f32 = 4.0;
-    pub const RAW_P75: f32 = 7.0;
-    pub const RAW_P90: f32 = 12.0;
-    pub const RAW_P95: f32 = 14.0;
-    pub const RAW_P99: f32 = 18.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 1.0;
-    pub const TRANSFORMED_P10: f32 = 1.0;
-    pub const TRANSFORMED_P25: f32 = 2.0;
-    pub const TRANSFORMED_P50: f32 = 4.0;
-    pub const TRANSFORMED_P75: f32 = 7.0;
-    pub const TRANSFORMED_P90: f32 = 12.0;
-    pub const TRANSFORMED_P95: f32 = 14.0;
-    pub const TRANSFORMED_P99: f32 = 18.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.285_714_27;
-    pub const NORMALIZED_P25: f32 = 1.0;
-    pub const NORMALIZED_P50: f32 = 1.0;
-    pub const NORMALIZED_P75: f32 = 1.0;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
-}
-
-impl crate::board_feature::TopOutRisk {
-    pub const RAW_P01: f32 = 1.0;
-    pub const RAW_P05: f32 = 2.0;
-    pub const RAW_P10: f32 = 2.0;
-    pub const RAW_P25: f32 = 3.0;
-    pub const RAW_P50: f32 = 5.0;
-    pub const RAW_P75: f32 = 8.0;
-    pub const RAW_P90: f32 = 12.0;
-    pub const RAW_P95: f32 = 14.0;
-    pub const RAW_P99: f32 = 18.0;
-    pub const TRANSFORMED_P01: f32 = 1.0;
-    pub const TRANSFORMED_P05: f32 = 2.0;
-    pub const TRANSFORMED_P10: f32 = 2.0;
-    pub const TRANSFORMED_P25: f32 = 3.0;
-    pub const TRANSFORMED_P50: f32 = 5.0;
-    pub const TRANSFORMED_P75: f32 = 8.0;
-    pub const TRANSFORMED_P90: f32 = 12.0;
-    pub const TRANSFORMED_P95: f32 = 14.0;
-    pub const TRANSFORMED_P99: f32 = 18.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.333_333_3;
-    pub const NORMALIZED_P25: f32 = 1.0;
-    pub const NORMALIZED_P50: f32 = 1.0;
-    pub const NORMALIZED_P75: f32 = 1.0;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
+    pub const P01: f32 = 2.0;
+    pub const P05: f32 = 2.0;
+    pub const P10: f32 = 3.0;
+    pub const P25: f32 = 4.0;
+    pub const P50: f32 = 8.0;
+    pub const P75: f32 = 13.0;
+    pub const P90: f32 = 17.0;
+    pub const P95: f32 = 18.0;
+    pub const P99: f32 = 20.0;
 }
 
 impl crate::board_feature::TotalHeightPenalty {
-    pub const RAW_P01: f32 = 4.0;
-    pub const RAW_P05: f32 = 8.0;
-    pub const RAW_P10: f32 = 10.0;
-    pub const RAW_P25: f32 = 16.0;
-    pub const RAW_P50: f32 = 31.0;
-    pub const RAW_P75: f32 = 60.0;
-    pub const RAW_P90: f32 = 93.0;
-    pub const RAW_P95: f32 = 113.0;
-    pub const RAW_P99: f32 = 140.0;
-    pub const TRANSFORMED_P01: f32 = 4.0;
-    pub const TRANSFORMED_P05: f32 = 8.0;
-    pub const TRANSFORMED_P10: f32 = 10.0;
-    pub const TRANSFORMED_P25: f32 = 16.0;
-    pub const TRANSFORMED_P50: f32 = 31.0;
-    pub const TRANSFORMED_P75: f32 = 60.0;
-    pub const TRANSFORMED_P90: f32 = 93.0;
-    pub const TRANSFORMED_P95: f32 = 113.0;
-    pub const TRANSFORMED_P99: f32 = 140.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.190_476_18;
-    pub const NORMALIZED_P25: f32 = 0.504_761_93;
-    pub const NORMALIZED_P50: f32 = 0.780_952_4;
-    pub const NORMALIZED_P75: f32 = 0.923_809_5;
-    pub const NORMALIZED_P90: f32 = 0.980_952_4;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
+    pub const P01: f32 = 6.0;
+    pub const P05: f32 = 12.0;
+    pub const P10: f32 = 16.0;
+    pub const P25: f32 = 32.0;
+    pub const P50: f32 = 65.0;
+    pub const P75: f32 = 108.0;
+    pub const P90: f32 = 143.0;
+    pub const P95: f32 = 159.0;
+    pub const P99: f32 = 179.0;
 }
 
-impl crate::board_feature::LineClearBonus {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 0.0;
-    pub const RAW_P10: f32 = 0.0;
-    pub const RAW_P25: f32 = 0.0;
-    pub const RAW_P50: f32 = 0.0;
-    pub const RAW_P75: f32 = 1.0;
-    pub const RAW_P90: f32 = 1.0;
-    pub const RAW_P95: f32 = 2.0;
-    pub const RAW_P99: f32 = 3.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 0.0;
-    pub const TRANSFORMED_P10: f32 = 0.0;
-    pub const TRANSFORMED_P25: f32 = 0.0;
-    pub const TRANSFORMED_P50: f32 = 0.0;
-    pub const TRANSFORMED_P75: f32 = 0.0;
-    pub const TRANSFORMED_P90: f32 = 0.0;
-    pub const TRANSFORMED_P95: f32 = 1.0;
-    pub const TRANSFORMED_P99: f32 = 2.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.0;
-    pub const NORMALIZED_P25: f32 = 0.0;
-    pub const NORMALIZED_P50: f32 = 0.0;
-    pub const NORMALIZED_P75: f32 = 0.0;
-    pub const NORMALIZED_P90: f32 = 0.0;
-    pub const NORMALIZED_P95: f32 = 0.166_666_67;
-    pub const NORMALIZED_P99: f32 = 0.333_333_34;
+impl crate::board_feature::CenterColumnsPenalty {
+    pub const P01: f32 = 1.0;
+    pub const P05: f32 = 2.0;
+    pub const P10: f32 = 2.0;
+    pub const P25: f32 = 4.0;
+    pub const P50: f32 = 8.0;
+    pub const P75: f32 = 13.0;
+    pub const P90: f32 = 16.0;
+    pub const P95: f32 = 18.0;
+    pub const P99: f32 = 20.0;
 }
 
-impl crate::board_feature::IWellReward {
-    pub const RAW_P01: f32 = 0.0;
-    pub const RAW_P05: f32 = 0.0;
-    pub const RAW_P10: f32 = 0.0;
-    pub const RAW_P25: f32 = 1.0;
-    pub const RAW_P50: f32 = 2.0;
-    pub const RAW_P75: f32 = 4.0;
-    pub const RAW_P90: f32 = 6.0;
-    pub const RAW_P95: f32 = 9.0;
-    pub const RAW_P99: f32 = 13.0;
-    pub const TRANSFORMED_P01: f32 = 0.0;
-    pub const TRANSFORMED_P05: f32 = 0.0;
-    pub const TRANSFORMED_P10: f32 = 0.0;
-    pub const TRANSFORMED_P25: f32 = 0.0;
-    pub const TRANSFORMED_P50: f32 = 0.0;
-    pub const TRANSFORMED_P75: f32 = 0.5;
-    pub const TRANSFORMED_P90: f32 = 1.0;
-    pub const TRANSFORMED_P95: f32 = 1.0;
-    pub const TRANSFORMED_P99: f32 = 1.0;
-    pub const NORMALIZED_P01: f32 = 0.0;
-    pub const NORMALIZED_P05: f32 = 0.0;
-    pub const NORMALIZED_P10: f32 = 0.0;
-    pub const NORMALIZED_P25: f32 = 0.0;
-    pub const NORMALIZED_P50: f32 = 0.0;
-    pub const NORMALIZED_P75: f32 = 0.5;
-    pub const NORMALIZED_P90: f32 = 1.0;
-    pub const NORMALIZED_P95: f32 = 1.0;
-    pub const NORMALIZED_P99: f32 = 1.0;
+impl crate::board_feature::TopOutRisk {
+    pub const P01: f32 = 2.0;
+    pub const P05: f32 = 2.0;
+    pub const P10: f32 = 3.0;
+    pub const P25: f32 = 4.0;
+    pub const P50: f32 = 8.0;
+    pub const P75: f32 = 13.0;
+    pub const P90: f32 = 17.0;
+    pub const P95: f32 = 18.0;
+    pub const P99: f32 = 20.0;
+}
+
+impl crate::board_feature::CenterTopOutRisk {
+    pub const P01: f32 = 1.0;
+    pub const P05: f32 = 2.0;
+    pub const P10: f32 = 2.0;
+    pub const P25: f32 = 4.0;
+    pub const P50: f32 = 8.0;
+    pub const P75: f32 = 13.0;
+    pub const P90: f32 = 16.0;
+    pub const P95: f32 = 18.0;
+    pub const P99: f32 = 20.0;
+}
+
+impl crate::board_feature::SurfaceBumpinessPenalty {
+    pub const P01: f32 = 2.0;
+    pub const P05: f32 = 3.0;
+    pub const P10: f32 = 4.0;
+    pub const P25: f32 = 6.0;
+    pub const P50: f32 = 8.0;
+    pub const P75: f32 = 14.0;
+    pub const P90: f32 = 25.0;
+    pub const P95: f32 = 32.0;
+    pub const P99: f32 = 48.0;
+}
+
+impl crate::board_feature::SurfaceRoughnessPenalty {
+    pub const P01: f32 = 2.0;
+    pub const P05: f32 = 4.0;
+    pub const P10: f32 = 6.0;
+    pub const P25: f32 = 8.0;
+    pub const P50: f32 = 12.0;
+    pub const P75: f32 = 19.0;
+    pub const P90: f32 = 33.0;
+    pub const P95: f32 = 45.0;
+    pub const P99: f32 = 69.0;
+}
+
+impl crate::board_feature::RowTransitionsPenalty {
+    pub const P01: f32 = 3.0;
+    pub const P05: f32 = 5.0;
+    pub const P10: f32 = 7.0;
+    pub const P25: f32 = 11.0;
+    pub const P50: f32 = 20.0;
+    pub const P75: f32 = 35.0;
+    pub const P90: f32 = 47.0;
+    pub const P95: f32 = 54.0;
+    pub const P99: f32 = 67.0;
+}
+
+impl crate::board_feature::ColumnTransitionsPenalty {
+    pub const P01: f32 = 5.0;
+    pub const P05: f32 = 8.0;
+    pub const P10: f32 = 9.0;
+    pub const P25: f32 = 11.0;
+    pub const P50: f32 = 17.0;
+    pub const P75: f32 = 30.0;
+    pub const P90: f32 = 46.0;
+    pub const P95: f32 = 54.0;
+    pub const P99: f32 = 64.0;
+}
+
+impl crate::board_feature::WellDepthPenalty {
+    pub const P01: f32 = 0.0;
+    pub const P05: f32 = 0.0;
+    pub const P10: f32 = 0.0;
+    pub const P25: f32 = 0.0;
+    pub const P50: f32 = 1.0;
+    pub const P75: f32 = 4.0;
+    pub const P90: f32 = 10.0;
+    pub const P95: f32 = 15.0;
+    pub const P99: f32 = 25.0;
+}
+
+impl crate::board_feature::DeepWellRisk {
+    pub const P01: f32 = 0.0;
+    pub const P05: f32 = 0.0;
+    pub const P10: f32 = 0.0;
+    pub const P25: f32 = 0.0;
+    pub const P50: f32 = 1.0;
+    pub const P75: f32 = 4.0;
+    pub const P90: f32 = 10.0;
+    pub const P95: f32 = 15.0;
+    pub const P99: f32 = 25.0;
 }

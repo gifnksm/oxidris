@@ -77,22 +77,19 @@ fn dump_source(
         "// To regenerate, run: make regenerate-board-feature-stats"
     )?;
     for (f, stats) in iter::zip(features, statistics) {
+        let Some(type_name) = f.feature_source_type_name() else {
+            continue;
+        };
         writeln!(writer)?;
         writeln!(
             writer,
             "impl {} {{",
-            f.type_name().replace("oxidris_ai::", "crate::")
+            type_name.replace("oxidris_evaluator::", "crate::")
         )?;
-        for (kind, stats) in [
-            ("RAW", &stats.raw),
-            ("TRANSFORMED", &stats.transformed),
-            ("NORMALIZED", &stats.normalized),
-        ] {
-            for percentile in [1u8, 5, 10, 25, 50, 75, 90, 95, 99] {
-                let value = stats.percentiles.get(f32::from(percentile)).unwrap();
-                let s = util::format_f32(value);
-                writeln!(writer, "    pub const {kind}_P{percentile:02}: f32 = {s};",)?;
-            }
+        for percentile in [1u8, 5, 10, 25, 50, 75, 90, 95, 99] {
+            let value = stats.raw.percentiles.get(f32::from(percentile)).unwrap();
+            let s = util::format_f32(value);
+            writeln!(writer, "    pub const P{percentile:02}: f32 = {s};",)?;
         }
         writeln!(writer, "}}")?;
     }
