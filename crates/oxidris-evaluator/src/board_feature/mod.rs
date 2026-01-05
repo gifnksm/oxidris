@@ -130,11 +130,11 @@
 //! Features are typically used through [`PlacementEvaluator`](crate::placement_evaluator::PlacementEvaluator):
 //!
 //! ```rust,no_run
-//! use oxidris_evaluator::board_feature::ALL_BOARD_FEATURES;
+//! use oxidris_evaluator::board_feature;
 //! use oxidris_evaluator::placement_evaluator::FeatureBasedPlacementEvaluator;
 //!
 //! // Create evaluator with all features
-//! let features = ALL_BOARD_FEATURES.to_vec();
+//! let features = board_feature::all_board_features();
 //! let weights = vec![1.0; features.len()];
 //! let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 //! ```
@@ -165,7 +165,7 @@
 //! }
 //! ```
 //!
-//! [`ALL_BOARD_FEATURES`] provides access to all active features for batch processing.
+//! [`all_board_features()`] provides access to all active features for batch processing.
 
 use std::fmt;
 

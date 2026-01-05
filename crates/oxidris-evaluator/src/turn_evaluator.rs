@@ -42,13 +42,13 @@
 //!
 //! ```rust,no_run
 //! use oxidris_evaluator::{
-//!     board_feature::ALL_BOARD_FEATURES,
+//!     board_feature,
 //!     placement_evaluator::FeatureBasedPlacementEvaluator,
 //!     turn_evaluator::TurnEvaluator,
 //! };
 //!
 //! // Create placement evaluator
-//! let features = ALL_BOARD_FEATURES.to_vec();
+//! let features = board_feature::all_board_features();
 //! let weights = vec![1.0; features.len()];
 //! let placement_evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 //!

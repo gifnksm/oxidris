@@ -360,7 +360,6 @@ impl BoardFeatureSource for HolesPenalty {
 Because KM normalization is integrated into `BoardFeatureSource`, all existing tools work without modification:
 
 - `analyze-board-features` TUI - visualizes KM-normalized features
-- `ALL_BOARD_FEATURES.measure()` - computes KM-transformed values
 - `generate-board-feature-stats` - can generate KM-based percentile stats
 
 The two-stage design maintains the same trait interface:

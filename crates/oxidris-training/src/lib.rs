@@ -60,14 +60,14 @@
 //! ```rust,ignore
 //! use oxidris_training::genetic::{Population, GeneticAlgorithmParams};
 //! use oxidris_evaluator::{
-//!     board_feature::ALL_BOARD_FEATURES,
+//!     board_feature,
 //!     session_evaluator::{DefaultSessionEvaluator, AggroSessionEvaluator},
 //! };
 //!
 //! // Create initial population
 //! let params = GeneticAlgorithmParams::default();
 //! let mut population = Population::new(
-//!     ALL_BOARD_FEATURES.to_vec(),
+//!     board_feature::all_board_features(),
 //!     params,
 //! );
 //!

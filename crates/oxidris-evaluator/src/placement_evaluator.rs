@@ -42,12 +42,12 @@
 //!
 //! ```rust,no_run
 //! use oxidris_evaluator::{
-//!     board_feature::ALL_BOARD_FEATURES,
+//!     board_feature,
 //!     placement_evaluator::{PlacementEvaluator, FeatureBasedPlacementEvaluator},
 //! };
 //!
 //! // Create evaluator with features and weights
-//! let features = ALL_BOARD_FEATURES.to_vec();
+//! let features = board_feature::all_board_features();
 //! let weights = vec![1.0; features.len()]; // Example weights
 //! let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 //!
@@ -93,11 +93,11 @@ pub trait PlacementEvaluator: fmt::Debug + Send + Sync {
 ///
 /// ```rust,no_run
 /// use oxidris_evaluator::{
-///     board_feature::ALL_BOARD_FEATURES,
+///     board_feature,
 ///     placement_evaluator::FeatureBasedPlacementEvaluator,
 /// };
 ///
-/// let features = ALL_BOARD_FEATURES.to_vec();
+/// let features = board_feature::all_board_features();
 /// let weights = vec![1.0; features.len()];
 /// let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 /// ```

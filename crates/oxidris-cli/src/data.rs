@@ -108,9 +108,7 @@ impl Model {
                         .iter()
                         .find(|f| f.id() == feature_id)
                         .ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "Feature ID {feature_id} in model not found in ALL_BOARD_FEATURES"
-                            )
+                            anyhow::anyhow!("Feature ID {feature_id} in model not found")
                         })?;
                     Ok((feature.clone_boxed(), *weight))
                 },
