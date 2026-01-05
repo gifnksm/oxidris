@@ -71,12 +71,6 @@ generate-board-data: $(BOARDS_DATA)
 regenerate-board-data: REGENERATE_BOARDS_JSON=1
 regenerate-board-data: $(BOARDS_DATA)
 
-.PHONY: regenerate-board-feature-stats
-regenerate-board-feature-stats: $(BOARDS_DATA)
-	cargo run --release -- generate-board-feature-stats \
-		$(BOARDS_DATA) \
-		--output crates/oxidris-evaluator/src/board_feature/stats.rs
-
 ## Train an aggressive AI using genetic algorithms
 .PHONY: train-ai-aggro
 train-ai-aggro: REGENERATE_AI_MODEL_JSON=1

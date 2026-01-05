@@ -54,14 +54,13 @@
 //!
 //! ```rust,no_run
 //! use oxidris_evaluator::{
-//!     board_feature,
 //!     placement_evaluator::{PlacementEvaluator, FeatureBasedPlacementEvaluator},
 //!     turn_evaluator::TurnEvaluator,
 //! };
+//! # let features = todo!(); // Build features with normalization parameters
+//! # let weights = todo!(); // Load trained weights
 //!
 //! // Create placement evaluator with features and weights
-//! let features = board_feature::all_board_features();
-//! let weights = vec![1.0; features.len()]; // Example weights
 //! let placement_evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 //!
 //! // Create turn evaluator

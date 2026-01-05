@@ -59,15 +59,13 @@
 //!
 //! ```rust,ignore
 //! use oxidris_training::genetic::{Population, GeneticAlgorithmParams};
-//! use oxidris_evaluator::{
-//!     board_feature,
-//!     session_evaluator::{DefaultSessionEvaluator, AggroSessionEvaluator},
-//! };
+//! use oxidris_evaluator::session_evaluator::{DefaultSessionEvaluator, AggroSessionEvaluator};
+//! # let features = todo!(); // Build features with normalization parameters
 //!
 //! // Create initial population
 //! let params = GeneticAlgorithmParams::default();
 //! let mut population = Population::new(
-//!     board_feature::all_board_features(),
+//!     features,
 //!     params,
 //! );
 //!

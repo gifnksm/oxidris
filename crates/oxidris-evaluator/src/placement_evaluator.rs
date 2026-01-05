@@ -41,14 +41,11 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! use oxidris_evaluator::{
-//!     board_feature,
-//!     placement_evaluator::{PlacementEvaluator, FeatureBasedPlacementEvaluator},
-//! };
+//! use oxidris_evaluator::placement_evaluator::{PlacementEvaluator, FeatureBasedPlacementEvaluator};
+//! # let features = todo!(); // Build features with normalization parameters
+//! # let weights = todo!(); // Load trained weights
 //!
 //! // Create evaluator with features and weights
-//! let features = board_feature::all_board_features();
-//! let weights = vec![1.0; features.len()]; // Example weights
 //! let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 //!
 //! // Score a placement
@@ -92,13 +89,10 @@ pub trait PlacementEvaluator: fmt::Debug + Send + Sync {
 /// # Example
 ///
 /// ```rust,no_run
-/// use oxidris_evaluator::{
-///     board_feature,
-///     placement_evaluator::FeatureBasedPlacementEvaluator,
-/// };
+/// use oxidris_evaluator::placement_evaluator::FeatureBasedPlacementEvaluator;
+/// # let features = todo!(); // Build features with normalization parameters
+/// # let weights = todo!(); // Load trained weights
 ///
-/// let features = board_feature::all_board_features();
-/// let weights = vec![1.0; features.len()];
 /// let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 /// ```
 #[derive(Debug, Clone)]
