@@ -168,12 +168,12 @@ These features have clear, direct impact on survival time, making KM-based norma
 
 ### 🔄 In Progress (Phase 3)
 
-- Design `BoardFeatureSource` trait integration
+- Design `BoardFeature` trait integration
 
 ### 📋 Not Started (Phase 4)
 
 - Remove duplicate `*_risk` features
-- Integrate KM normalization into `BoardFeatureSource` trait
+- Integrate KM normalization into `BoardFeature` trait architecture
 - Implement KM-based survival features
 - Train and benchmark survival-focused evaluator
 - Validate improvements over linear normalization
@@ -236,13 +236,13 @@ See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
 ### Phase 3: Complete Infrastructure
 
-- Design `BoardFeatureSource` trait integration
+- Design `BoardFeature` trait integration
 - Remove incorrect helper methods
 
 ### Phase 4: Implement Survival Features
 
 1. Clean up feature set (remove duplicate `*_risk` features)
-2. Integrate KM normalization into `BoardFeatureSource` trait
+2. Integrate KM normalization into `BoardFeature` trait architecture
 3. Implement KM-based survival features
 4. Train survival-focused evaluator
 5. Benchmark vs. linear normalization

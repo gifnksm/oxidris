@@ -47,7 +47,7 @@ Time-limited projects currently in progress.
 
 The project is currently integrating Kaplan-Meier survival analysis for feature normalization:
 
-- Integrating KM-based normalization into the `BoardFeatureSource` trait
+- Integrating KM-based normalization into the `BoardFeature` trait architecture
 - Applying survival-time-based transformations to survival features (holes, height)
 - Validating improvements over linear normalization
 

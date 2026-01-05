@@ -139,35 +139,49 @@
 //! let evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
 //! ```
 //!
-//! Individual features can be computed directly using the trait methods:
+//! Individual features can be computed directly using feature constants:
 //!
-//! ```rust,ignore
-//! use oxidris_evaluator::board_feature::{BoardFeatureSource, HolesPenalty};
+//! ```rust,no_run
+//! use oxidris_evaluator::{placement_analysis::PlacementAnalysis, board_feature::{BoardFeature, LINEAR_HOLES_PENALTY}};
 //!
-//! let raw = HolesPenalty::extract_raw(&analysis);
-//! let transformed = HolesPenalty::transform(raw);
-//! let normalized = HolesPenalty::normalize(transformed);
+//! let analysis: PlacementAnalysis = todo!();
+//!
+//! // Compute full feature value (raw → transform → normalize)
+//! let feature_value = LINEAR_HOLES_PENALTY.compute_feature_value(&analysis);
+//!
+//! // Or access individual steps
+//! let raw = LINEAR_HOLES_PENALTY.extract_raw(&analysis);
+//! let transformed = LINEAR_HOLES_PENALTY.transform(raw);
+//! let normalized = LINEAR_HOLES_PENALTY.normalize(transformed);
 //! ```
 //!
-//! The [`BoardFeatureSource`] trait defines the feature interface:
+//! # Trait Architecture
 //!
-//! ```rust,ignore
-//! pub trait BoardFeatureSource {
-//!     const ID: &str;
-//!     const NAME: &str;
-//!     const NORMALIZATION_MIN: f32;
-//!     const NORMALIZATION_MAX: f32;
-//!     const SIGNAL: FeatureSignal;
+//! The feature system uses two main traits:
 //!
-//!     fn extract_raw(analysis: &PlacementAnalysis) -> u32;
-//!     fn transform(raw: u32) -> f32;  // Default: raw as f32
-//!     fn normalize(transformed: f32) -> f32;
-//! }
-//! ```
+//! ## [`BoardFeature`] - Public API
+//!
+//! The main trait for feature objects, providing:
+//!
+//! - Metadata access: `id()`, `name()`
+//! - Feature computation: `extract_raw()`, `transform()`, `normalize()`
+//! - Complete pipeline: `compute_feature_value()`
+//! - Dynamic dispatch: `clone_boxed()`
+//!
+//! All feature constants (e.g., [`LINEAR_HOLES_PENALTY`]) implement this trait.
+//!
+//! ## [`BoardFeatureSource`] - Internal Implementation
+//!
+//! A minimal trait for extracting raw values from board states:
+//!
+//! - Feature computation: `extract_raw()` method only
+//!
+//! Feature source types (e.g., [`HolesPenalty`]) implement this trait and are wrapped
+//! by [`LinearNormalized`] to provide transformation and normalization.
 //!
 //! [`all_board_features()`] provides access to all active features for batch processing.
 
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use crate::placement_analysis::PlacementAnalysis;
 
@@ -177,20 +191,20 @@ mod stats;
 pub fn all_board_features() -> Vec<BoxedBoardFeature> {
     vec![
         // survival features
-        Box::new(LinearNormalized(HolesPenalty)),
-        Box::new(LinearNormalized(HoleDepthPenalty)),
-        Box::new(LinearNormalized(MaxHeightPenalty)),
-        Box::new(LinearNormalized(TotalHeightPenalty)),
-        Box::new(LinearNormalized(CenterColumnsPenalty)),
-        Box::new(LinearNormalized(TopOutRisk)),
-        Box::new(LinearNormalized(CenterTopOutRisk)),
+        Box::new(LINEAR_HOLES_PENALTY),
+        Box::new(LINEAR_HOLE_DEPTH_PENALTY),
+        Box::new(LINEAR_MAX_HEIGHT_PENALTY),
+        Box::new(LINEAR_TOTAL_HEIGHT_PENALTY),
+        Box::new(LINEAR_CENTER_COLUMN_PENALTY),
+        Box::new(LINEAR_TOP_OUT_RISK),
+        Box::new(LINEAR_CENTER_TOP_OUT_RISK),
         // structure features
-        Box::new(LinearNormalized(SurfaceBumpinessPenalty)),
-        Box::new(LinearNormalized(SurfaceRoughnessPenalty)),
-        Box::new(LinearNormalized(RowTransitionsPenalty)),
-        Box::new(LinearNormalized(ColumnTransitionsPenalty)),
-        Box::new(LinearNormalized(WellDepthPenalty)),
-        Box::new(LinearNormalized(DeepWellRisk)),
+        Box::new(LINEAR_SURFACE_BUMPINESS_PENALTY),
+        Box::new(LINEAR_SURFACE_ROUGHNESS_PENALTY),
+        Box::new(LINEAR_ROW_TRANSITIONS_PENALTY),
+        Box::new(LINEAR_COLUMN_TRANSITIONS_PENALTY),
+        Box::new(LINEAR_WELL_DEPTH_PENALTY),
+        Box::new(LINEAR_DEEP_WELL_RISK),
         // score features
         Box::new(LineClearBonus),
         Box::new(IWellReward),
@@ -211,44 +225,36 @@ pub struct BoardFeatureValue {
 }
 
 pub trait BoardFeatureSource {
-    const ID: &str;
-    const NAME: &str;
-    const SIGNAL: FeatureSignal;
-
     #[must_use]
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
 }
 
-pub trait BoardFeatureSourceWithNorm: BoardFeatureSource {
-    const NORMALIZATION_MIN: f32;
-    const NORMALIZATION_MAX: f32;
+fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 {
+    let span = max - min;
+    let norm = ((val - min) / span).clamp(0.0, 1.0);
+    match signal {
+        FeatureSignal::Positive => norm,
+        FeatureSignal::Negative => 1.0 - norm,
+    }
 }
 
-pub trait BoardFeature: Clone + fmt::Debug + Send + Sync {
-    const ID: &str;
-    const NAME: &str;
-    const NORMALIZATION_MIN: f32;
-    const NORMALIZATION_MAX: f32;
-    const SIGNAL: FeatureSignal;
+pub trait BoardFeature: fmt::Debug + Send + Sync {
+    fn id(&self) -> &str;
+    fn name(&self) -> &str;
+    fn clone_boxed(&self) -> BoxedBoardFeature;
+
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 
     #[must_use]
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
 
     #[must_use]
-    #[expect(clippy::cast_precision_loss)]
-    fn transform(&self, raw: u32) -> f32 {
-        raw as f32
-    }
+    fn transform(&self, raw: u32) -> f32;
 
     #[must_use]
-    fn normalize(&self, transformed: f32) -> f32 {
-        let span = Self::NORMALIZATION_MAX - Self::NORMALIZATION_MIN;
-        let norm = ((transformed - Self::NORMALIZATION_MIN) / span).clamp(0.0, 1.0);
-        match Self::SIGNAL {
-            FeatureSignal::Positive => norm,
-            FeatureSignal::Negative => 1.0 - norm,
-        }
-    }
+    fn normalize(&self, transformed: f32) -> f32;
 
     #[must_use]
     fn compute_feature_value(&self, analysis: &PlacementAnalysis) -> BoardFeatureValue {
@@ -263,32 +269,7 @@ pub trait BoardFeature: Clone + fmt::Debug + Send + Sync {
     }
 }
 
-pub trait DynBoardFeature: fmt::Debug + Send + Sync {
-    #[must_use]
-    fn id(&self) -> &'static str;
-    #[must_use]
-    fn name(&self) -> &'static str;
-    #[must_use]
-    fn type_name(&self) -> &'static str;
-    #[must_use]
-    fn normalization_min(&self) -> f32;
-    #[must_use]
-    fn normalization_max(&self) -> f32;
-    #[must_use]
-    fn signal(&self) -> FeatureSignal;
-    #[must_use]
-    fn clone_boxed(&self) -> BoxedBoardFeature;
-    #[must_use]
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
-    #[must_use]
-    fn transform(&self, raw: u32) -> f32;
-    #[must_use]
-    fn normalize(&self, transformed: f32) -> f32;
-    #[must_use]
-    fn compute_feature_value(&self, analysis: &PlacementAnalysis) -> BoardFeatureValue;
-}
-
-pub type BoxedBoardFeature = Box<dyn DynBoardFeature>;
+pub type BoxedBoardFeature = Box<dyn BoardFeature>;
 
 impl Clone for BoxedBoardFeature {
     fn clone(&self) -> Self {
@@ -296,32 +277,46 @@ impl Clone for BoxedBoardFeature {
     }
 }
 
-impl<T> DynBoardFeature for T
+#[derive(Debug, Clone)]
+pub struct LinearNormalized<S> {
+    id: Cow<'static, str>,
+    name: Cow<'static, str>,
+    signal: FeatureSignal,
+    normalize_min: f32,
+    normalize_max: f32,
+    source: S,
+}
+
+impl<S> LinearNormalized<S> {
+    pub const fn new(
+        id: Cow<'static, str>,
+        name: Cow<'static, str>,
+        signal: FeatureSignal,
+        normalize_min: f32,
+        normalize_max: f32,
+        source: S,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            signal,
+            normalize_min,
+            normalize_max,
+            source,
+        }
+    }
+}
+
+impl<S> BoardFeature for LinearNormalized<S>
 where
-    T: BoardFeature + 'static,
+    S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
 {
-    fn id(&self) -> &'static str {
-        T::ID
+    fn id(&self) -> &str {
+        &self.id
     }
 
-    fn name(&self) -> &'static str {
-        T::NAME
-    }
-
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<T>()
-    }
-
-    fn normalization_min(&self) -> f32 {
-        T::NORMALIZATION_MIN
-    }
-
-    fn normalization_max(&self) -> f32 {
-        T::NORMALIZATION_MAX
-    }
-
-    fn signal(&self) -> FeatureSignal {
-        T::SIGNAL
+    fn name(&self) -> &str {
+        &self.name
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {
@@ -329,37 +324,21 @@ where
     }
 
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        T::extract_raw(self, analysis)
+        self.source.extract_raw(analysis)
     }
 
+    #[expect(clippy::cast_precision_loss)]
     fn transform(&self, raw: u32) -> f32 {
-        T::transform(self, raw)
+        raw as f32
     }
 
     fn normalize(&self, transformed: f32) -> f32 {
-        T::normalize(self, transformed)
-    }
-
-    fn compute_feature_value(&self, analysis: &PlacementAnalysis) -> BoardFeatureValue {
-        T::compute_feature_value(self, analysis)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LinearNormalized<S>(S);
-
-impl<S> BoardFeature for LinearNormalized<S>
-where
-    S: BoardFeatureSourceWithNorm + Clone + fmt::Debug + Send + Sync,
-{
-    const ID: &str = S::ID;
-    const NAME: &str = S::NAME;
-    const NORMALIZATION_MIN: f32 = S::NORMALIZATION_MIN;
-    const NORMALIZATION_MAX: f32 = S::NORMALIZATION_MAX;
-    const SIGNAL: FeatureSignal = S::SIGNAL;
-
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        self.0.extract_raw(analysis)
+        linear_normalize(
+            transformed,
+            self.signal,
+            self.normalize_min,
+            self.normalize_max,
+        )
     }
 }
 
@@ -380,22 +359,22 @@ where
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer holes is better).
+pub const LINEAR_HOLES_PENALTY: LinearNormalized<HolesPenalty> = LinearNormalized::new(
+    Cow::Borrowed("linear_holes_penalty"),
+    Cow::Borrowed("Holes Penalty (Linear)"),
+    FeatureSignal::Negative,
+    HolesPenalty::TRANSFORMED_P05,
+    HolesPenalty::TRANSFORMED_P95,
+    HolesPenalty,
+);
+
 #[derive(Debug, Clone)]
 pub struct HolesPenalty;
 
 impl BoardFeatureSource for HolesPenalty {
-    const ID: &str = "holes_penalty";
-    const NAME: &str = "Holes Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().num_holes().into()
     }
-}
-
-impl BoardFeatureSourceWithNorm for HolesPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for cumulative hole depth (weighted by blocks above each hole).
@@ -422,22 +401,22 @@ impl BoardFeatureSourceWithNorm for HolesPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower holes is better).
+pub const LINEAR_HOLE_DEPTH_PENALTY: LinearNormalized<HoleDepthPenalty> = LinearNormalized::new(
+    Cow::Borrowed("linear_hole_depth_penalty"),
+    Cow::Borrowed("Hole Depth Penalty (Linear)"),
+    FeatureSignal::Negative,
+    HoleDepthPenalty::TRANSFORMED_P05,
+    HoleDepthPenalty::TRANSFORMED_P95,
+    HoleDepthPenalty,
+);
+
 #[derive(Debug, Clone)]
 pub struct HoleDepthPenalty;
 
 impl BoardFeatureSource for HoleDepthPenalty {
-    const ID: &str = "hole_depth";
-    const NAME: &str = "Hole Depth";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().sum_of_hole_depth()
     }
-}
-
-impl BoardFeatureSourceWithNorm for HoleDepthPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for horizontal fragmentation by counting occupancy changes between adjacent cells within each row.
@@ -461,22 +440,23 @@ impl BoardFeatureSourceWithNorm for HoleDepthPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
+pub const LINEAR_ROW_TRANSITIONS_PENALTY: LinearNormalized<RowTransitionsPenalty> =
+    LinearNormalized::new(
+        Cow::Borrowed("linear_row_transitions_penalty"),
+        Cow::Borrowed("Row Transitions Penalty (Linear)"),
+        FeatureSignal::Negative,
+        RowTransitionsPenalty::TRANSFORMED_P05,
+        RowTransitionsPenalty::TRANSFORMED_P95,
+        RowTransitionsPenalty,
+    );
+
 #[derive(Debug, Clone)]
 pub struct RowTransitionsPenalty;
 
 impl BoardFeatureSource for RowTransitionsPenalty {
-    const ID: &str = "row_transitions_penalty";
-    const NAME: &str = "Row Transitions Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().row_transitions()
     }
-}
-
-impl BoardFeatureSourceWithNorm for RowTransitionsPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for vertical fragmentation within columns by counting occupancy changes from top to bottom.
@@ -496,22 +476,23 @@ impl BoardFeatureSourceWithNorm for RowTransitionsPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
+pub const LINEAR_COLUMN_TRANSITIONS_PENALTY: LinearNormalized<ColumnTransitionsPenalty> =
+    LinearNormalized::new(
+        Cow::Borrowed("linear_column_transitions_penalty"),
+        Cow::Borrowed("Column Transitions Penalty (Linear)"),
+        FeatureSignal::Negative,
+        ColumnTransitionsPenalty::TRANSFORMED_P05,
+        ColumnTransitionsPenalty::TRANSFORMED_P95,
+        ColumnTransitionsPenalty,
+    );
+
 #[derive(Debug, Clone)]
 pub struct ColumnTransitionsPenalty;
 
 impl BoardFeatureSource for ColumnTransitionsPenalty {
-    const ID: &str = "column_transitions_penalty";
-    const NAME: &str = "Column Transitions Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().column_transitions()
     }
-}
-
-impl BoardFeatureSourceWithNorm for ColumnTransitionsPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for surface height variation between adjacent columns.
@@ -535,22 +516,23 @@ impl BoardFeatureSourceWithNorm for ColumnTransitionsPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (flatter surface is better).
+pub const LINEAR_SURFACE_BUMPINESS_PENALTY: LinearNormalized<SurfaceBumpinessPenalty> =
+    LinearNormalized::new(
+        Cow::Borrowed("linear_surface_bumpiness_penalty"),
+        Cow::Borrowed("Surface Bumpiness Penalty (Linear)"),
+        FeatureSignal::Negative,
+        SurfaceBumpinessPenalty::TRANSFORMED_P05,
+        SurfaceBumpinessPenalty::TRANSFORMED_P95,
+        SurfaceBumpinessPenalty,
+    );
+
 #[derive(Debug, Clone)]
 pub struct SurfaceBumpinessPenalty;
 
 impl BoardFeatureSource for SurfaceBumpinessPenalty {
-    const ID: &str = "surface_bumpiness_penalty";
-    const NAME: &str = "Surface Bumpiness Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().surface_bumpiness()
     }
-}
-
-impl BoardFeatureSourceWithNorm for SurfaceBumpinessPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for local surface curvature using second-order height differences (discrete Laplacian).
@@ -575,22 +557,23 @@ impl BoardFeatureSourceWithNorm for SurfaceBumpinessPenalty {
 ///
 /// - Clipped to `[P05, P95]`
 /// - `SIGNAL` = Negative (flatter surface is better).
+pub const LINEAR_SURFACE_ROUGHNESS_PENALTY: LinearNormalized<SurfaceRoughnessPenalty> =
+    LinearNormalized::new(
+        Cow::Borrowed("linear_surface_roughness_penalty"),
+        Cow::Borrowed("Surface Roughness Penalty (Linear)"),
+        FeatureSignal::Negative,
+        SurfaceRoughnessPenalty::TRANSFORMED_P05,
+        SurfaceRoughnessPenalty::TRANSFORMED_P95,
+        SurfaceRoughnessPenalty,
+    );
+
 #[derive(Debug, Clone)]
 pub struct SurfaceRoughnessPenalty;
 
 impl BoardFeatureSource for SurfaceRoughnessPenalty {
-    const ID: &str = "surface_roughness_penalty";
-    const NAME: &str = "Surface Roughness Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().surface_roughness()
     }
-}
-
-impl BoardFeatureSourceWithNorm for SurfaceRoughnessPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for excessive single-column well depth; thresholds shallow wells.
@@ -614,22 +597,22 @@ impl BoardFeatureSourceWithNorm for SurfaceRoughnessPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
+pub const LINEAR_WELL_DEPTH_PENALTY: LinearNormalized<WellDepthPenalty> = LinearNormalized::new(
+    Cow::Borrowed("linear_well_depth_penalty"),
+    Cow::Borrowed("Well Depth Penalty (Linear)"),
+    FeatureSignal::Negative,
+    WellDepthPenalty::TRANSFORMED_P05,
+    WellDepthPenalty::TRANSFORMED_P95,
+    WellDepthPenalty,
+);
+
 #[derive(Debug, Clone)]
 pub struct WellDepthPenalty;
 
 impl BoardFeatureSource for WellDepthPenalty {
-    const ID: &str = "well_depth_penalty";
-    const NAME: &str = "Well Depth Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().sum_of_deep_well_depth()
     }
-}
-
-impl BoardFeatureSourceWithNorm for WellDepthPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Thresholded risk for dangerously deep wells beyond safe operational limits.
@@ -653,22 +636,22 @@ impl BoardFeatureSourceWithNorm for WellDepthPenalty {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
+pub const LINEAR_DEEP_WELL_RISK: LinearNormalized<DeepWellRisk> = LinearNormalized::new(
+    Cow::Borrowed("linear_deep_well_risk"),
+    Cow::Borrowed("Deep Well Risk (Linear)"),
+    FeatureSignal::Negative,
+    DeepWellRisk::TRANSFORMED_P75,
+    DeepWellRisk::TRANSFORMED_P95,
+    DeepWellRisk,
+);
+
 #[derive(Debug, Clone)]
 pub struct DeepWellRisk;
 
 impl BoardFeatureSource for DeepWellRisk {
-    const ID: &str = "deep_well_risk";
-    const NAME: &str = "Deep Well Risk";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().sum_of_deep_well_depth()
     }
-}
-
-impl BoardFeatureSourceWithNorm for DeepWellRisk {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for maximum column height across the board.
@@ -691,22 +674,22 @@ impl BoardFeatureSourceWithNorm for DeepWellRisk {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower maximum height is better).
+pub const LINEAR_MAX_HEIGHT_PENALTY: LinearNormalized<MaxHeightPenalty> = LinearNormalized::new(
+    Cow::Borrowed("linear_max_height_penalty"),
+    Cow::Borrowed("Max Height Penalty (Linear)"),
+    FeatureSignal::Negative,
+    MaxHeightPenalty::TRANSFORMED_P05,
+    MaxHeightPenalty::TRANSFORMED_P95,
+    MaxHeightPenalty,
+);
+
 #[derive(Debug, Clone)]
 pub struct MaxHeightPenalty;
 
 impl BoardFeatureSource for MaxHeightPenalty {
-    const ID: &str = "max_height_penalty";
-    const NAME: &str = "Max Height Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().max_height().into()
     }
-}
-
-impl BoardFeatureSourceWithNorm for MaxHeightPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for maximum height in the center four columns.
@@ -729,22 +712,23 @@ impl BoardFeatureSourceWithNorm for MaxHeightPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower center height is better).
+pub const LINEAR_CENTER_COLUMN_PENALTY: LinearNormalized<CenterColumnsPenalty> =
+    LinearNormalized::new(
+        Cow::Borrowed("linear_center_columns_penalty"),
+        Cow::Borrowed("Center Columns Penalty (Linear)"),
+        FeatureSignal::Negative,
+        CenterColumnsPenalty::TRANSFORMED_P05,
+        CenterColumnsPenalty::TRANSFORMED_P95,
+        CenterColumnsPenalty,
+    );
+
 #[derive(Debug, Clone)]
 pub struct CenterColumnsPenalty;
 
 impl BoardFeatureSource for CenterColumnsPenalty {
-    const ID: &str = "center_columns_penalty";
-    const NAME: &str = "Center Columns Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().center_column_max_height().into()
     }
-}
-
-impl BoardFeatureSourceWithNorm for CenterColumnsPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Thresholded risk for top-out in the center 4 columns (columns 3-6).
@@ -772,22 +756,22 @@ impl BoardFeatureSourceWithNorm for CenterColumnsPenalty {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (lower height is better).
+pub const LINEAR_CENTER_TOP_OUT_RISK: LinearNormalized<CenterTopOutRisk> = LinearNormalized::new(
+    Cow::Borrowed("linear_center_top_out_risk"),
+    Cow::Borrowed("Center Top-Out Risk (Linear)"),
+    FeatureSignal::Negative,
+    CenterTopOutRisk::TRANSFORMED_P75,
+    CenterTopOutRisk::TRANSFORMED_P95,
+    CenterTopOutRisk,
+);
+
 #[derive(Debug, Clone)]
 pub struct CenterTopOutRisk;
 
 impl BoardFeatureSource for CenterTopOutRisk {
-    const ID: &str = "center_top_out_risk";
-    const NAME: &str = "Center Top-Out Risk";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().center_column_max_height().into()
     }
-}
-
-impl BoardFeatureSourceWithNorm for CenterTopOutRisk {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Thresholded risk for imminent top-out based on maximum column height.
@@ -808,22 +792,22 @@ impl BoardFeatureSourceWithNorm for CenterTopOutRisk {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (lower height is better).
+pub const LINEAR_TOP_OUT_RISK: LinearNormalized<TopOutRisk> = LinearNormalized::new(
+    Cow::Borrowed("linear_top_out_risk"),
+    Cow::Borrowed("Top-Out Risk (Linear)"),
+    FeatureSignal::Negative,
+    TopOutRisk::TRANSFORMED_P75,
+    TopOutRisk::TRANSFORMED_P95,
+    TopOutRisk,
+);
+
 #[derive(Debug, Clone)]
 pub struct TopOutRisk;
 
 impl BoardFeatureSource for TopOutRisk {
-    const ID: &str = "top_out_risk";
-    const NAME: &str = "Top-Out Risk";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().max_height().into()
     }
-}
-
-impl BoardFeatureSourceWithNorm for TopOutRisk {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P75;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Smooth penalty for global stacking pressure by summing all column heights.
@@ -846,22 +830,22 @@ impl BoardFeatureSourceWithNorm for TopOutRisk {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower total height is better).
+pub const LINEAR_TOTAL_HEIGHT_PENALTY: LinearNormalized<TotalHeightPenalty> = LinearNormalized::new(
+    Cow::Borrowed("linear_total_height_penalty"),
+    Cow::Borrowed("Total Height Penalty (Linear)"),
+    FeatureSignal::Negative,
+    TotalHeightPenalty::TRANSFORMED_P05,
+    TotalHeightPenalty::TRANSFORMED_P95,
+    TotalHeightPenalty,
+);
+
 #[derive(Debug, Clone)]
 pub struct TotalHeightPenalty;
 
 impl BoardFeatureSource for TotalHeightPenalty {
-    const ID: &str = "total_height_penalty";
-    const NAME: &str = "Total Height Penalty";
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().total_height().into()
     }
-}
-
-impl BoardFeatureSourceWithNorm for TotalHeightPenalty {
-    const NORMALIZATION_MIN: f32 = Self::TRANSFORMED_P05;
-    const NORMALIZATION_MAX: f32 = Self::TRANSFORMED_P95;
 }
 
 /// Discrete bonus for line clears with strong emphasis on efficient 4-line clears (tetrises).
@@ -906,11 +890,17 @@ impl BoardFeatureSourceWithNorm for TotalHeightPenalty {
 pub struct LineClearBonus;
 
 impl BoardFeature for LineClearBonus {
-    const ID: &str = "line_clear_bonus";
-    const NAME: &str = "Line Clear Bonus";
-    const NORMALIZATION_MIN: f32 = 0.0;
-    const NORMALIZATION_MAX: f32 = 6.0;
-    const SIGNAL: FeatureSignal = FeatureSignal::Positive;
+    fn id(&self) -> &'static str {
+        "line_clear_bonus"
+    }
+
+    fn name(&self) -> &'static str {
+        "Line Clear Bonus"
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeature {
+        Box::new(self.clone())
+    }
 
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         u32::try_from(analysis.cleared_lines()).unwrap()
@@ -919,6 +909,10 @@ impl BoardFeature for LineClearBonus {
     fn transform(&self, raw: u32) -> f32 {
         const WEIGHT: [f32; 5] = [0.0, 0.0, 1.0, 2.0, 6.0];
         WEIGHT[usize::try_from(raw).unwrap()]
+    }
+
+    fn normalize(&self, transformed: f32) -> f32 {
+        linear_normalize(transformed, FeatureSignal::Positive, 0.0, 6.0)
     }
 }
 
@@ -955,12 +949,17 @@ impl BoardFeature for LineClearBonus {
 pub struct IWellReward;
 
 impl BoardFeature for IWellReward {
-    const ID: &str = "i_well_reward";
-    const NAME: &str = "I-Well Reward";
+    fn id(&self) -> &'static str {
+        "i_well_reward"
+    }
 
-    const NORMALIZATION_MIN: f32 = 0.0;
-    const NORMALIZATION_MAX: f32 = 1.0;
-    const SIGNAL: FeatureSignal = FeatureSignal::Positive;
+    fn name(&self) -> &'static str {
+        "I-Well Reward"
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeature {
+        Box::new(self.clone())
+    }
 
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().edge_iwell_depth().into()
@@ -972,5 +971,9 @@ impl BoardFeature for IWellReward {
         const WIDTH: f32 = 2.0;
         let raw = raw as f32;
         (1.0 - ((raw - PEAK) / (PEAK / WIDTH)).abs()).clamp(0.0, 1.0)
+    }
+
+    fn normalize(&self, transformed: f32) -> f32 {
+        linear_normalize(transformed, FeatureSignal::Positive, 0.0, 1.0)
     }
 }

@@ -3,7 +3,7 @@
 This document describes the target architecture for KM-based feature normalization applied to survival features.
 
 - **Document type**: Explanation
-- **Purpose**: Detailed technical design for KM-based normalization integration into BoardFeatureSource trait
+- **Purpose**: Detailed technical design for KM-based normalization integration into BoardFeature trait
 - **Audience**: AI assistants, human contributors implementing feature normalization
 - **When to read**: When implementing KM-based features or understanding the normalization architecture
 - **Prerequisites**: [README.md](./README.md) for project overview; [Evaluator Documentation](../../architecture/evaluator/README.md) for trait context
@@ -15,7 +15,7 @@ This document describes the target architecture for KM-based feature normalizati
 
 ## Overview
 
-This document describes the target design for KM-based feature normalization applied to **survival features** (holes, height). The design integrates KM-based transforms into the `BoardFeatureSource` trait, enabling non-linear, survival-time-based transformations while maintaining compatibility with existing analysis tools.
+This document describes the target design for KM-based feature normalization applied to **survival features** (holes, height). The design integrates KM-based transforms into the `BoardFeature` trait architecture, enabling non-linear, survival-time-based transformations while maintaining compatibility with existing analysis tools.
 
 **Scope**: This design focuses on survival features only. Structure features and score optimization are out of scope for this project.
 
@@ -27,12 +27,12 @@ Traditional normalization approaches (min-max, z-score) fail to account for **ri
 - Censoring predominantly affects "good" board states (long survival)
 - Naive statistics (mean, percentiles) are biased when censoring is ignored
 
-**Solution:** Use Kaplan-Meier survival analysis to estimate survival curves, then integrate KM-based transforms into the `BoardFeatureSource` trait.
+**Solution:** Use Kaplan-Meier survival analysis to estimate survival curves, then integrate KM-based transforms into the `BoardFeature` trait architecture.
 
 ## Design Goals
 
 1. **Non-linear transformation**: Capture true relationship between survival feature values and survival time
-2. **Trait integration**: Work within existing `BoardFeatureSource` architecture
+2. **Trait integration**: Work within existing `BoardFeature` trait architecture
 3. **Tool compatibility**: Maintain compatibility with `analyze-board-features` and other tools
 4. **Interpretability**: Intermediate values (KM medians) have clear meaning as survival time
 5. **Data-driven**: Transformations learned from actual gameplay data
@@ -50,17 +50,18 @@ The implemented method is **P05-P95 robust normalization** with **2-stage transf
    - `km_max = KM median of P05 feature value` (good state)
    - `km_min = KM median of P95 feature value` (bad state)
 
-### Two-Stage Evaluation via BoardFeatureSource
+### Two-Stage Evaluation via BoardFeature Trait
 
-The `BoardFeatureSource` trait provides `transform()` and `normalize()` methods:
+The `BoardFeature` trait provides instance methods for `transform()` and `normalize()`:
 
 **Stage 1: Transform** (raw value → KM median)
 
 ```rust
-impl BoardFeatureSource for HolesPenalty {
-    fn transform(raw: u32) -> f32 {
+// KM-based transform would be implemented in LinearNormalized or custom feature
+impl BoardFeature for LinearNormalized<HolesPenalty> {
+    fn transform(&self, raw: u32) -> f32 {
         // Look up KM median from loaded normalization params
-        KM_PARAMS.get(raw).unwrap_or(KM_MIN)  // → 177.5 turns
+        self.km_params.get(raw).unwrap_or(self.km_min)  // → 177.5 turns
     }
 }
 ```
@@ -68,15 +69,17 @@ impl BoardFeatureSource for HolesPenalty {
 **Stage 2: Normalize** (KM median → 0-1)
 
 ```rust
-impl BoardFeatureSource for HolesPenalty {
-    fn normalize(transformed: f32) -> f32 {
-        let span = Self::NORMALIZATION_MAX - Self::NORMALIZATION_MIN;
-        ((transformed - Self::NORMALIZATION_MIN) / span).clamp(0.0, 1.0)
+impl BoardFeature for LinearNormalized<HolesPenalty> {
+    fn normalize(&self, transformed: f32) -> f32 {
+        let span = self.normalize_max - self.normalize_min;
+        ((transformed - self.normalize_min) / span).clamp(0.0, 1.0)
     }
 }
 ```
 
-Where `NORMALIZATION_MIN` = P95's KM median, `NORMALIZATION_MAX` = P05's KM median.
+Where `normalize_min` = P95's KM median, `normalize_max` = P05's KM median.
+
+**Note:** The current implementation uses `LinearNormalized<S>` wrapper struct that holds normalization parameters as instance fields. KM-based features would extend this pattern with KM lookup tables.
 
 ### Why This Method?
 
@@ -259,36 +262,54 @@ let km_range = stats.p05_km_median - stats.p95_km_median;
 
 This is useful for initializing feature weights to equalize their impact.
 
-## Integration with BoardFeatureSource
+## Integration with BoardFeature Trait
 
 ### Target Architecture
 
-KM normalization is integrated into the `BoardFeatureSource` trait, not as a separate system:
+KM normalization will be integrated into the `BoardFeature` trait architecture using instance-based methods:
 
 ```rust
 // Target design (Phase 3-4)
-pub trait BoardFeatureSource {
-    const ID: &str;
-    const NAME: &str;
+// KM-based feature using custom transformation
+pub struct KMNormalized<S> {
+    id: Cow<'static, str>,
+    name: Cow<'static, str>,
+    signal: FeatureSignal,
+    km_transform: BTreeMap<u32, f32>,  // raw → KM median lookup
+    normalize_min: f32,  // P95's KM median
+    normalize_max: f32,  // P05's KM median
+    source: S,
+}
+
+impl<S: BoardFeatureSource> BoardFeature for KMNormalized<S> {
+    fn id(&self) -> &str {
+        &self.id
+    }
     
-    // KM normalization range (loaded from data/normalization_params.json)
-    const NORMALIZATION_MIN: f32;  // P95's KM median
-    const NORMALIZATION_MAX: f32;  // P05's KM median
-    const SIGNAL: FeatureSignal;
+    fn name(&self) -> &str {
+        &self.name
+    }
     
-    fn extract_raw(analysis: &PlacementAnalysis) -> u32;
+    fn clone_boxed(&self) -> BoxedBoardFeature {
+        Box::new(self.clone())
+    }
+    
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
+        self.source.extract_raw(analysis)
+    }
     
     // Transform: raw → KM median (from lookup table)
-    fn transform(raw: u32) -> f32 {
-        KM_TRANSFORM_TABLE.get(Self::ID, raw)
-            .unwrap_or(Self::NORMALIZATION_MIN)
+    fn transform(&self, raw: u32) -> f32 {
+        self.km_transform.get(&raw)
+            .copied()
+            .unwrap_or(self.normalize_min)
     }
     
     // Normalize: KM median → 0-1 (linear scaling)
-    fn normalize(transformed: f32) -> f32 {
-        let span = Self::NORMALIZATION_MAX - Self::NORMALIZATION_MIN;
-        let norm = ((transformed - Self::NORMALIZATION_MIN) / span).clamp(0.0, 1.0);
-        match Self::SIGNAL {
+    fn normalize(&self, transformed: f32) -> f32 {
+        let span = self.normalize_max - self.normalize_min;
+        let norm = ((transformed - self.normalize_min) / span).clamp(0.0, 1.0);
+        match self.signal {
             FeatureSignal::Positive => norm,
             FeatureSignal::Negative => 1.0 - norm,
         }
@@ -296,68 +317,77 @@ pub trait BoardFeatureSource {
 }
 ```
 
-### Loading KM Transform Tables
+### Loading KM Transform Data
 
 ```rust
-// Global KM transform table (loaded at startup)
-struct KMTransformTable {
-    features: BTreeMap<String, BTreeMap<u32, f32>>,
+// Load normalization parameters from JSON at build/startup time
+fn load_km_normalization(path: &Path) -> Result<NormalizationParams> {
+    let params: NormalizationParams = serde_json::from_reader(File::open(path)?)?;
+    Ok(params)
 }
 
-impl KMTransformTable {
-    fn load(path: &Path) -> Result<Self> {
-        let params: NormalizationParams = serde_json::from_reader(File::open(path)?)?;
-        let mut features = BTreeMap::new();
+// Create KM-based feature instances with loaded data
+fn create_km_features(params: &NormalizationParams) -> Vec<BoxedBoardFeature> {
+    let mut features = Vec::new();
+    
+    // For each feature in the params
+    for (feature_id, feature_data) in &params.features {
+        let km_transform: BTreeMap<u32, f32> = feature_data.transform_mapping
+            .iter()
+            .map(|(k, v)| (*k, *v as f32))
+            .collect();
         
-        for (feature_id, feature_data) in params.features {
-            let mapping = feature_data.transform_mapping
-                .into_iter()
-                .map(|(k, v)| (k, v as f32))
-                .collect();
-            features.insert(feature_id, mapping);
-        }
+        let feature = KMNormalized {
+            id: Cow::Owned(feature_id.clone()),
+            name: Cow::Owned(format!("{} (KM)", feature_id)),
+            signal: FeatureSignal::Negative,  // Most survival features are negative
+            km_transform,
+            normalize_min: feature_data.km_min as f32,
+            normalize_max: feature_data.km_max as f32,
+            source: get_source_for_feature(feature_id),
+        };
         
-        Ok(Self { features })
+        features.push(Box::new(feature) as BoxedBoardFeature);
     }
     
-    fn get(&self, feature_id: &str, raw: u32) -> Option<f32> {
-        self.features.get(feature_id)?.get(&raw).copied()
-    }
+    features
 }
 ```
 
 ### Example: KM-Based HolesPenalty
 
 ```rust
-#[derive(Debug)]
+// Feature source remains simple - just extracts raw values
+#[derive(Debug, Clone)]
 pub struct HolesPenalty;
 
 impl BoardFeatureSource for HolesPenalty {
-    const ID: &str = "holes_penalty";
-    const NAME: &str = "Holes Penalty";
-    
-    // Loaded from normalization_params.json
-    const NORMALIZATION_MIN: f32 = 7.1;    // P95's KM median
-    const NORMALIZATION_MAX: f32 = 322.8;  // P05's KM median
-    const SIGNAL: FeatureSignal = FeatureSignal::Negative;
-    
-    fn extract_raw(analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().num_holes()
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
+        analysis.board_analysis().num_holes().into()
     }
-    
-    fn transform(raw: u32) -> f32 {
-        // Look up in KM transform table
-        KM_TRANSFORM_TABLE.get(Self::ID, raw)
-            .unwrap_or(Self::NORMALIZATION_MIN)
-    }
-    
-    // normalize() uses default implementation from trait
 }
+
+// KM-based feature constant (loaded from normalization_params.json)
+pub const KM_HOLES_PENALTY: KMNormalized<HolesPenalty> = KMNormalized {
+    id: Cow::Borrowed("km_holes_penalty"),
+    name: Cow::Borrowed("Holes Penalty (KM)"),
+    signal: FeatureSignal::Negative,
+    km_transform: load_km_transform("holes_penalty"),  // Loaded at build/startup
+    normalize_min: 7.1,    // P95's KM median
+    normalize_max: 322.8,  // P05's KM median
+    source: HolesPenalty,
+};
+
+// Usage
+let feature_value = KM_HOLES_PENALTY.compute_feature_value(&analysis);
+// holes=0:  raw=0 → transform → 322.8 → normalize → 1.00
+// holes=3:  raw=3 → transform → 177.5 → normalize → 0.54
+// holes=33: raw=33 → transform → 7.1 → normalize → 0.00
 ```
 
 ### Compatibility with Existing Tools
 
-Because KM normalization is integrated into `BoardFeatureSource`, all existing tools work without modification:
+Because KM normalization is integrated into the `BoardFeature` trait, all existing tools work without modification:
 
 - `analyze-board-features` TUI - visualizes KM-normalized features
 - `generate-board-feature-stats` - can generate KM-based percentile stats
@@ -435,7 +465,7 @@ Normalization parameters are only valid for data generated with the same MAX_TUR
 
 ## Key Design Decisions
 
-### Why Integrate with BoardFeatureSource?
+### Why Integrate with BoardFeature Trait?
 
 **Maintains existing architecture:**
 
@@ -450,7 +480,7 @@ Normalization parameters are only valid for data generated with the same MAX_TUR
 
 **Benefits:**
 
-- ✅ No changes to evaluator code (still uses `BoardFeatureSource`)
+- ✅ No changes to evaluator code (still uses `BoardFeature` trait)
 - ✅ No changes to analysis tools (`analyze-board-features`, etc.)
 - ✅ Easy to compare linear vs. KM normalization (just swap feature impl)
 - ✅ Intermediate values (KM medians) remain interpretable
@@ -466,8 +496,8 @@ Normalization parameters are only valid for data generated with the same MAX_TUR
   - Simple linear scaling
   - Easy to understand and debug
 
-**Alignment with BoardFeatureSource:**
-The original trait already had this separation:
+**Alignment with BoardFeature Trait:**
+The trait architecture already has this separation:
 
 ```rust
 fn transform(raw: u32) -> f32;           // Was: linear cast
@@ -508,9 +538,10 @@ See [roadmap.md](./roadmap.md) for detailed implementation plan:
 
 ### Table Loading Strategy
 
-- How to load KM transform tables at startup?
-  - Global static? Per-feature constants? Lazy loading?
-- Performance considerations for lookup during evaluation
+- How to load KM transform tables into feature constants?
+  - Build-time codegen? Runtime loading? Lazy initialization?
+- Performance considerations for BTreeMap lookup during evaluation
+  - Consider using arrays for dense mappings (e.g., holes 0-50)
 
 ### Handling Missing Values
 
