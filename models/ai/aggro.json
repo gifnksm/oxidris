@@ -1,22 +1,190 @@
 {
   "name": "aggro",
-  "trained_at": "2026-01-05T06:30:22.353572854Z",
-  "final_fitness": 2.5874443,
-  "placement_weights": {
-    "i_well_reward": 0.042057164,
-    "line_clear_bonus": 0.05540567,
-    "linear_center_columns_penalty": 0.008232013,
-    "linear_center_top_out_risk": 0.09840046,
-    "linear_column_transitions_penalty": 0.08210004,
-    "linear_deep_well_risk": 0.1128815,
-    "linear_hole_depth_penalty": 0.049438447,
-    "linear_holes_penalty": 0.16615506,
-    "linear_max_height_penalty": 0.101863176,
-    "linear_row_transitions_penalty": 0.03230861,
-    "linear_surface_bumpiness_penalty": 0.0079021165,
-    "linear_surface_roughness_penalty": 0.016935125,
-    "linear_top_out_risk": 0.20063002,
-    "linear_total_height_penalty": 0.022341676,
-    "linear_well_depth_penalty": 0.0033488728
-  }
+  "trained_at": "2026-01-05T11:25:16.578705124Z",
+  "final_fitness": 2.5134444,
+  "board_features": [
+    {
+      "id": "linear_holes_penalty",
+      "name": "Number of Holes Penalty (Linear)",
+      "source_id": "num_holes",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 0.0,
+          "normalize_max": 33.0
+        }
+      },
+      "weight": 0.20649305
+    },
+    {
+      "id": "linear_hole_depth_penalty",
+      "name": "Sum of Hole Depth Penalty (Linear)",
+      "source_id": "sum_of_hole_depth",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 0.0,
+          "normalize_max": 260.0
+        }
+      },
+      "weight": 0.00850143
+    },
+    {
+      "id": "linear_max_height_penalty",
+      "name": "Max Height Penalty (Linear)",
+      "source_id": "max_height",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 2.0,
+          "normalize_max": 18.0
+        }
+      },
+      "weight": 0.087656364
+    },
+    {
+      "id": "linear_center_columns_penalty",
+      "name": "Center Columns Max Height Penalty (Linear)",
+      "source_id": "center_column_max_height",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 2.0,
+          "normalize_max": 18.0
+        }
+      },
+      "weight": 0.06540998
+    },
+    {
+      "id": "linear_total_height_penalty",
+      "name": "Total Height Penalty (Linear)",
+      "source_id": "total_height",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 12.0,
+          "normalize_max": 159.0
+        }
+      },
+      "weight": 0.037023086
+    },
+    {
+      "id": "linear_top_out_risk",
+      "name": "Top-Out Risk (Linear)",
+      "source_id": "max_height",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 13.0,
+          "normalize_max": 18.0
+        }
+      },
+      "weight": 0.11466643
+    },
+    {
+      "id": "linear_center_top_out_risk",
+      "name": "Center Top-Out Risk (Linear)",
+      "source_id": "center_column_max_height",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 13.0,
+          "normalize_max": 18.0
+        }
+      },
+      "weight": 0.043360412
+    },
+    {
+      "id": "linear_surface_bumpiness_penalty",
+      "name": "Surface Bumpiness Penalty (Linear)",
+      "source_id": "surface_bumpiness",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 3.0,
+          "normalize_max": 32.0
+        }
+      },
+      "weight": 0.031557377
+    },
+    {
+      "id": "linear_surface_roughness_penalty",
+      "name": "Surface Roughness Penalty (Linear)",
+      "source_id": "surface_roughness",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 4.0,
+          "normalize_max": 45.0
+        }
+      },
+      "weight": 0.011707731
+    },
+    {
+      "id": "linear_row_transitions_penalty",
+      "name": "Row Transitions Penalty (Linear)",
+      "source_id": "row_transitions",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 5.0,
+          "normalize_max": 54.0
+        }
+      },
+      "weight": 0.014370439
+    },
+    {
+      "id": "linear_column_transitions_penalty",
+      "name": "Column Transitions Penalty (Linear)",
+      "source_id": "column_transitions",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 8.0,
+          "normalize_max": 54.0
+        }
+      },
+      "weight": 0.22762588
+    },
+    {
+      "id": "linear_well_depth_penalty",
+      "name": "Well Depth Penalty (Linear)",
+      "source_id": "sum_of_well_depth",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 0.0,
+          "normalize_max": 15.0
+        }
+      },
+      "weight": 0.0043132533
+    },
+    {
+      "id": "linear_deep_well_risk",
+      "name": "Deep Well Risk (Linear)",
+      "source_id": "sum_of_well_depth",
+      "processing": {
+        "linear_normalized": {
+          "signal": "negative",
+          "normalize_min": 4.0,
+          "normalize_max": 15.0
+        }
+      },
+      "weight": 0.108140886
+    },
+    {
+      "id": "line_clear_bonus",
+      "name": "Line Clear Bonus",
+      "source_id": "num_cleared_lines",
+      "processing": "line_clear_bonus",
+      "weight": 0.019174524
+    },
+    {
+      "id": "i_well_reward",
+      "name": "I-Well Reward",
+      "source_id": "edge_i_well_depth",
+      "processing": "i_well_reward",
+      "weight": 0.019999057
+    }
+  ]
 }

@@ -183,6 +183,8 @@
 
 use std::{borrow::Cow, fmt};
 
+use serde::{Deserialize, Serialize};
+
 use crate::board_feature::source::{EdgeIWellDepth, NumClearedLines};
 
 use crate::{
@@ -241,7 +243,8 @@ pub fn all_board_feature_sources() -> Vec<BoxedBoardFeatureSource> {
     ]
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FeatureSignal {
     Positive,
     Negative,
@@ -254,7 +257,7 @@ pub struct BoardFeatureValue {
     pub normalized: f32,
 }
 
-pub trait BoardFeatureSource {
+pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
     #[must_use]
     fn id(&self) -> &str;
     #[must_use]
@@ -277,6 +280,24 @@ impl Clone for BoxedBoardFeatureSource {
     }
 }
 
+impl BoardFeatureSource for BoxedBoardFeatureSource {
+    fn id(&self) -> &str {
+        self.as_ref().id()
+    }
+
+    fn name(&self) -> &str {
+        self.as_ref().name()
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
+        self.as_ref().clone_boxed()
+    }
+
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
+        self.as_ref().extract_raw(analysis)
+    }
+}
+
 fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 {
     let span = max - min;
     let norm = ((val - min) / span).clamp(0.0, 1.0);
@@ -290,6 +311,7 @@ pub trait BoardFeature: fmt::Debug + Send + Sync {
     fn id(&self) -> &str;
     fn name(&self) -> &str;
     fn feature_source(&self) -> &dyn BoardFeatureSource;
+    fn feature_processing(&self) -> FeatureProcessing;
     fn clone_boxed(&self) -> BoxedBoardFeature;
 
     #[must_use]
@@ -319,6 +341,40 @@ pub type BoxedBoardFeature = Box<dyn BoardFeature>;
 impl Clone for BoxedBoardFeature {
     fn clone(&self) -> Self {
         self.clone_boxed()
+    }
+}
+
+impl BoardFeature for BoxedBoardFeature {
+    fn id(&self) -> &str {
+        self.as_ref().id()
+    }
+
+    fn name(&self) -> &str {
+        self.as_ref().name()
+    }
+
+    fn feature_source(&self) -> &dyn BoardFeatureSource {
+        self.as_ref().feature_source()
+    }
+
+    fn feature_processing(&self) -> FeatureProcessing {
+        self.as_ref().feature_processing()
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeature {
+        self.as_ref().clone_boxed()
+    }
+
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
+        self.as_ref().extract_raw(analysis)
+    }
+
+    fn transform(&self, raw: u32) -> f32 {
+        self.as_ref().transform(raw)
+    }
+
+    fn normalize(&self, transformed: f32) -> f32 {
+        self.as_ref().normalize(transformed)
     }
 }
 
@@ -368,6 +424,14 @@ where
         &self.source
     }
 
+    fn feature_processing(&self) -> FeatureProcessing {
+        FeatureProcessing::LinearNormalized {
+            signal: self.signal,
+            normalize_min: self.normalize_min,
+            normalize_max: self.normalize_max,
+        }
+    }
+
     fn clone_boxed(&self) -> BoxedBoardFeature {
         Box::new(self.clone())
     }
@@ -388,6 +452,42 @@ where
             self.normalize_min,
             self.normalize_max,
         )
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeatureProcessing {
+    LinearNormalized {
+        signal: FeatureSignal,
+        normalize_min: f32,
+        normalize_max: f32,
+    },
+    LineClearBonus,
+    IWellReward,
+}
+
+impl FeatureProcessing {
+    pub fn apply<S>(&self, source: S) -> BoxedBoardFeature
+    where
+        S: BoardFeatureSource + Clone + 'static,
+    {
+        match self {
+            Self::LinearNormalized {
+                signal,
+                normalize_min,
+                normalize_max,
+            } => Box::new(LinearNormalized::new(
+                Cow::Owned(source.id().to_string()),
+                Cow::Owned(source.name().to_string()),
+                *signal,
+                *normalize_min,
+                *normalize_max,
+                source,
+            )) as BoxedBoardFeature,
+            Self::LineClearBonus => Box::new(LineClearBonus::new(source)),
+            FeatureProcessing::IWellReward => Box::new(IWellReward::new(source)),
+        }
     }
 }
 
@@ -818,21 +918,24 @@ pub const LINEAR_TOTAL_HEIGHT_PENALTY: LinearNormalized<TotalHeight> = LinearNor
 ///
 /// - Clipped to `[0.0, 6.0]` (transformed range).
 /// - `SIGNAL` = Positive (more lines cleared is better).
-pub const LINE_CLEAR_BONUS: LineClearBonus = LineClearBonus::new(NumClearedLines);
+pub const LINE_CLEAR_BONUS: LineClearBonus<NumClearedLines> = LineClearBonus::new(NumClearedLines);
 
 #[derive(Debug, Clone)]
-pub struct LineClearBonus {
-    source: NumClearedLines,
+pub struct LineClearBonus<S> {
+    source: S,
 }
 
-impl LineClearBonus {
+impl<S> LineClearBonus<S> {
     #[must_use]
-    pub const fn new(source: NumClearedLines) -> Self {
+    pub const fn new(source: S) -> Self {
         Self { source }
     }
 }
 
-impl BoardFeature for LineClearBonus {
+impl<S> BoardFeature for LineClearBonus<S>
+where
+    S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
+{
     fn id(&self) -> &'static str {
         "line_clear_bonus"
     }
@@ -843,6 +946,10 @@ impl BoardFeature for LineClearBonus {
 
     fn feature_source(&self) -> &dyn BoardFeatureSource {
         &self.source
+    }
+
+    fn feature_processing(&self) -> FeatureProcessing {
+        FeatureProcessing::LineClearBonus
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {
@@ -892,21 +999,24 @@ impl BoardFeature for LineClearBonus {
 /// - Complements [`LINEAR_DEEP_WELL_RISK`] by focusing on edge wells suitable for tetrises, while [`LINEAR_DEEP_WELL_RISK`] penalizes excessive depths.
 /// - Synergizes with [`LINE_CLEAR_BONUS`] to favor consistent tetrises.
 /// - The triangular transform naturally discourages both shallow wells (not ready) and overly deep wells (risky).
-pub const I_WELL_REWARD: IWellReward = IWellReward::new(EdgeIWellDepth);
+pub const I_WELL_REWARD: IWellReward<EdgeIWellDepth> = IWellReward::new(EdgeIWellDepth);
 
 #[derive(Debug, Clone)]
-pub struct IWellReward {
-    source: EdgeIWellDepth,
+pub struct IWellReward<S> {
+    source: S,
 }
 
-impl IWellReward {
+impl<S> IWellReward<S> {
     #[must_use]
-    pub const fn new(source: EdgeIWellDepth) -> Self {
+    pub const fn new(source: S) -> Self {
         Self { source }
     }
 }
 
-impl BoardFeature for IWellReward {
+impl<S> BoardFeature for IWellReward<S>
+where
+    S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
+{
     fn id(&self) -> &'static str {
         "i_well_reward"
     }
@@ -917,6 +1027,10 @@ impl BoardFeature for IWellReward {
 
     fn feature_source(&self) -> &dyn BoardFeatureSource {
         &self.source
+    }
+
+    fn feature_processing(&self) -> FeatureProcessing {
+        FeatureProcessing::IWellReward
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {

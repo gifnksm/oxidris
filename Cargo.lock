@@ -889,6 +889,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "oxidris-engine",
+ "serde",
 ]
 
 [[package]]

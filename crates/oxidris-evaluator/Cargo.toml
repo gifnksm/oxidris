@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 arrayvec.workspace = true
 oxidris-engine.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true

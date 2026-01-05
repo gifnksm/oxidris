@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
+use std::{fs::File, io::BufReader, path::Path};
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
+use oxidris_evaluator::board_feature::{self, BoxedBoardFeature, FeatureProcessing};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -10,7 +10,16 @@ pub struct AiModel {
     pub name: String,
     pub trained_at: DateTime<Utc>,
     pub final_fitness: f32,
-    pub placement_weights: BTreeMap<String, f32>,
+    pub board_features: Vec<TrainedBoardFeature>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TrainedBoardFeature {
+    pub id: String,
+    pub name: String,
+    pub source_id: String,
+    pub processing: FeatureProcessing,
+    pub weight: f32,
 }
 
 impl AiModel {
@@ -30,20 +39,19 @@ impl AiModel {
     }
 
     pub(crate) fn to_feature_weights(&self) -> anyhow::Result<(Vec<BoxedBoardFeature>, Vec<f32>)> {
-        let all_features = board_feature::all_board_features();
-        self.placement_weights
+        let all_sources = board_feature::all_board_feature_sources();
+        self.board_features
             .iter()
-            .map(
-                |(feature_id, weight)| -> anyhow::Result<(BoxedBoardFeature, f32)> {
-                    let feature = all_features
-                        .iter()
-                        .find(|f| f.id() == feature_id)
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("Feature ID {feature_id} in model not found")
-                        })?;
-                    Ok((feature.clone_boxed(), *weight))
-                },
-            )
+            .map(|tf| {
+                let source = all_sources
+                    .iter()
+                    .find(|s| s.id() == tf.source_id)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Feature source ID {} in model not found", tf.source_id)
+                    })?
+                    .clone();
+                Ok((tf.processing.apply(source), tf.weight))
+            })
             .collect()
     }
 }
