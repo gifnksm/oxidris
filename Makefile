@@ -39,6 +39,9 @@ FORCE:
 DATA_DIR := data
 MODELS_DIR := models
 
+SESSION_DATA := $(DATA_DIR)/boards.json
+NORMALIZATION_PARAMS := $(DATA_DIR)/normalization_params.json
+
 ## Play the game (default target)
 .PHONY: play
 play:
@@ -61,53 +64,57 @@ auto-play-defensive:
 
 ## Generate board data JSON file (if missing)
 .PHONY: generate-board-data
-generate-board-data: $(DATA_DIR)/boards.json
+generate-board-data: $(SESSION_DATA)
 
 ## Regenerate board data JSON file (force rebuild)
 .PHONY: regenerate-board-data
 regenerate-board-data: REGENERATE_BOARDS_JSON=1
-regenerate-board-data: $(DATA_DIR)/boards.json | $(DATA_DIR)/
+regenerate-board-data: $(SESSION_DATA)
 
 .PHONY: regenerate-board-feature-stats
-regenerate-board-feature-stats: $(DATA_DIR)/boards.json
+regenerate-board-feature-stats: $(SESSION_DATA)
 	cargo run --release -- generate-board-feature-stats \
-		$(DATA_DIR)/boards.json \
+		$(SESSION_DATA) \
 		--output crates/oxidris-evaluator/src/board_feature/stats.rs
 
 ## Train an aggressive AI using genetic algorithms
 .PHONY: train-ai-aggro
-train-ai-aggro:
-	cargo run --release -- train-ai --ai aggro --output $(MODELS_DIR)/ai/aggro.json
+train-ai-aggro: REGENERATE_AI_MODEL_JSON=1
+train-ai-aggro: $(MODELS_DIR)/ai/aggro.json
 
 ## Train a defensive AI using genetic algorithms
 .PHONY: train-ai-defensive
-train-ai-defensive:
-	cargo run --release -- train-ai --ai defensive --output $(MODELS_DIR)/ai/defensive.json
+train-ai-defensive: REGENERATE_AI_MODEL_JSON=1
+train-ai-defensive: $(MODELS_DIR)/ai/defensive.json
 
 ## Start the TUI for analyzing board features
 .PHONY: analyze-board-features
-analyze-board-features:
-	cargo run --release -- analyze-board-features $(DATA_DIR)/boards.json
+analyze-board-features: $(SESSION_DATA)
+	cargo run --release -- analyze-board-features $(SESSION_DATA)
 
 ## Analyze censoring effects
 .PHONY: analyze-censoring
-analyze-censoring:
-	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json
+analyze-censoring: $(SESSION_DATA)
+	cargo run --release -- analyze-censoring $(SESSION_DATA)
 
 ## Analyze censoring effects with Kaplan-Meier survival analysis
 .PHONY: analyze-censoring-km
-analyze-censoring-km:
-	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier
+analyze-censoring-km: $(SESSION_DATA)
+	cargo run --release -- analyze-censoring $(SESSION_DATA) --kaplan-meier
 
 ## Analyze censoring with Kaplan-Meier and export CSV curves
 .PHONY: analyze-censoring-km-csv
 analyze-censoring-km-csv:
-	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier --km-output-dir $(DATA_DIR)/km_curves
+	cargo run --release -- analyze-censoring $(SESSION_DATA) --kaplan-meier --km-output-dir $(DATA_DIR)/km_curves
 
 ## Generate normalization parameters from KM analysis
 .PHONY: generate-normalization
-generate-normalization:
-	cargo run --release -- analyze-censoring $(DATA_DIR)/boards.json --kaplan-meier --normalization-output $(DATA_DIR)/normalization_params.json
+generate-normalization: $(NORMALIZATION_PARAMS)
+
+## Regenerate normalization parameters from KM analysis
+.PHONY: regenerate-normalization
+regenerate-normalization: REGENERATE_NORMALIZATION_PARAMS=1
+regenerate-normalization: $(NORMALIZATION_PARAMS)
 
 ## Clean build artifacts
 .PHONY: clean
@@ -122,9 +129,16 @@ purge: clean
 # Artifact generation rules
 
 REGENERATE_BOARDS_JSON=
-
-$(DATA_DIR)/boards.json: $$(if $$(REGENERATE_BOARDS_JSON),FORCE) | $(DATA_DIR)/
+$(SESSION_DATA): $$(if $$(REGENERATE_BOARDS_JSON),FORCE) | $(DATA_DIR)/
 	cargo run --release -- generate-boards --output $@
+
+REGENERATE_AI_MODEL_JSON=
+$(MODELS_DIR)/ai/%.json: $$(if $$(REGENERATE_AI_MODEL_JSON),FORCE) | $(MODELS_DIR)/ai/
+	cargo run --release -- train-ai --ai $* --output $@
+
+REGENERATE_NORMALIZATION_PARAMS=
+$(NORMALIZATION_PARAMS): $$(if $$(REGENERATE_NORMALIZATION_PARAMS),FORCE) | $(DATA_DIR)/
+	cargo run --release -- analyze-censoring $(SESSION_DATA) --kaplan-meier --normalization-output $@
 
 # Pattern rule to create directories as needed
 %/:
