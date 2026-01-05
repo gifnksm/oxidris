@@ -1,28 +1,27 @@
 use std::path::PathBuf;
 
-use oxidris_evaluator::board_feature;
-
 use crate::{
     analysis::{BoardFeatureStatistics, BoardIndex, BoardSample},
     model::session::SessionCollection,
+    util,
 };
 
 mod ui;
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct AnalyzeBoardFeaturesArg {
-    /// Boards data file path
+    /// Board data file path
     boards_file: PathBuf,
 }
 
 pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     let AnalyzeBoardFeaturesArg { boards_file } = arg;
 
-    let features = board_feature::all_board_features();
-
     eprintln!("Loading boards from {}...", boards_file.display());
     let sessions = SessionCollection::open(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
+
+    let features = util::build_feature_from_session(&sessions)?;
 
     eprintln!("Computing featuress for all boards...");
     let board_samples = BoardSample::from_sessions(&features, &sessions);

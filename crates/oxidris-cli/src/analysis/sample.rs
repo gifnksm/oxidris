@@ -1,9 +1,52 @@
 use oxidris_evaluator::{
-    board_feature::{BoardFeatureValue, BoxedBoardFeature},
+    board_feature::{BoardFeatureValue, BoxedBoardFeature, BoxedBoardFeatureSource},
     placement_analysis::PlacementAnalysis,
 };
 
 use crate::model::session::{BoardAndPlacement, SessionData};
+
+/// Raw feature value sample (no normalization)
+///
+/// Contains only raw feature values extracted from board sources.
+/// Used for computing statistics before normalization.
+#[derive(Debug, Clone)]
+pub struct RawBoardSample {
+    /// The original board state and placement
+    #[expect(unused, reason = "may be used later")]
+    pub board: BoardAndPlacement,
+    /// Raw feature values (one per source)
+    pub raw_values: Vec<u32>,
+}
+
+impl RawBoardSample {
+    /// Create a raw feature sample from board sources
+    ///
+    /// Extracts raw values without any transformation or normalization.
+    /// This is used for computing statistics.
+    pub fn from_board(sources: &[BoxedBoardFeatureSource], board: &BoardAndPlacement) -> Self {
+        let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
+        let raw_values = sources
+            .iter()
+            .map(|source| source.extract_raw(&analysis))
+            .collect();
+        Self {
+            board: board.clone(),
+            raw_values,
+        }
+    }
+
+    /// Collect raw feature samples from session data
+    pub fn from_sessions(
+        sources: &[BoxedBoardFeatureSource],
+        sessions: &[SessionData],
+    ) -> Vec<RawBoardSample> {
+        sessions
+            .iter()
+            .flat_map(|session| &session.boards)
+            .map(|board| Self::from_board(sources, board))
+            .collect()
+    }
+}
 
 /// A board observation with computed feature values
 ///

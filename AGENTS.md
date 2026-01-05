@@ -149,6 +149,14 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
   - Changing active project scope
   - **When in doubt, ask first**
 
+### Terminal Tool Usage
+
+- **Git commands**: Always use `--no-pager` flag for git commands that show output
+  - Use `git --no-pager diff` instead of `git diff`
+  - Use `git --no-pager log` instead of `git log`
+  - Use `git --no-pager show` instead of `git show`
+  - Without `--no-pager`, the pager (like `less`) interferes with terminal output capture
+
 ## Code Locations
 
 ### Evaluator system

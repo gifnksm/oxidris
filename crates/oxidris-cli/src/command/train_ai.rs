@@ -3,7 +3,7 @@ use std::{iter, path::PathBuf};
 use chrono::Utc;
 use oxidris_engine::GameField;
 use oxidris_evaluator::{
-    board_feature::{self, BoxedBoardFeature},
+    board_feature::BoxedBoardFeature,
     session_evaluator::{
         AggroSessionEvaluator, DefaultSessionEvaluator, DefensiveSessionEvaluator, SessionEvaluator,
     },
@@ -11,8 +11,11 @@ use oxidris_evaluator::{
 use oxidris_training::genetic::{Individual, Population, PopulationEvolver};
 
 use crate::{
-    model::ai_model::{AiModel, TrainedBoardFeature},
-    util::Output,
+    model::{
+        ai_model::{AiModel, TrainedBoardFeature},
+        session::SessionCollection,
+    },
+    util::{self, Output},
 };
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, derive_more::FromStr)]
@@ -81,6 +84,8 @@ const fn evolver_by_phase(phase: EvolutaionPhase) -> PopulationEvolver {
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct TrainAiArg {
+    /// Boards data file path
+    boards_file: PathBuf,
     #[arg(long, default_value = "aggro")]
     ai: AiType,
     /// Output file path
@@ -89,7 +94,16 @@ pub(crate) struct TrainAiArg {
 }
 
 pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
-    let TrainAiArg { ai, output } = arg;
+    let TrainAiArg {
+        boards_file,
+        ai,
+        output,
+    } = arg;
+
+    eprintln!("Loading boards from {}...", boards_file.display());
+    let sessions = SessionCollection::open(boards_file)?.sessions;
+    eprintln!("Loaded {} sessions", sessions.len());
+
     let session_evaluator = match ai {
         AiType::Aggro => &DefaultSessionEvaluator::new(TURN_LIMIT, AggroSessionEvaluator::new())
             as &dyn SessionEvaluator,
@@ -98,7 +112,8 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
                 as &dyn SessionEvaluator
         }
     };
-    let features = board_feature::all_board_features();
+
+    let features = util::build_feature_from_session(&sessions)?;
 
     let mut rng = rand::rng();
     let mut population = Population::random(

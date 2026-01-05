@@ -5,6 +5,15 @@ use std::{
 };
 
 use anyhow::Context;
+use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
+
+use crate::{
+    analysis::{
+        BoardFeatureNormalizationParamCollection, FeatureBuilder, RawBoardSample,
+        RawFeatureStatistics,
+    },
+    model::session::SessionData,
+};
 
 #[derive(Debug)]
 pub enum Output {
@@ -113,4 +122,29 @@ pub fn format_f32(weight: f32) -> String {
         result.push_str(str::from_utf8(tail).unwrap());
     }
     result
+}
+
+pub fn build_feature_from_session(
+    sessions: &[SessionData],
+) -> anyhow::Result<Vec<BoxedBoardFeature>> {
+    let sources = board_feature::all_board_feature_sources();
+
+    eprintln!("Computing feature raw values for all boards...");
+    let raw_samples = RawBoardSample::from_sessions(&sources, sessions);
+    eprintln!("Extracted {} raw samples", raw_samples.len());
+
+    eprintln!("Computing raw feature statistics...");
+    let raw_stats = RawFeatureStatistics::from_samples(&sources, &raw_samples);
+    eprintln!("Raw feature statistics computed");
+
+    eprintln!("Computing feature normalization parameters...");
+    let norm_params = BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats);
+    eprintln!("Normalization parameters computed");
+
+    eprintln!("Building feature builder...");
+    let feature_builder = FeatureBuilder::new(norm_params);
+    let features = feature_builder.build_all_features()?;
+    eprintln!("Feature builder built");
+
+    Ok(features)
 }

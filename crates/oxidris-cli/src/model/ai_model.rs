@@ -50,7 +50,11 @@ impl AiModel {
                         anyhow::anyhow!("Feature source ID {} in model not found", tf.source_id)
                     })?
                     .clone();
-                Ok((tf.processing.apply(source), tf.weight))
+                Ok((
+                    tf.processing
+                        .apply(tf.id.clone().into(), tf.name.clone().into(), source),
+                    tf.weight,
+                ))
             })
             .collect()
     }

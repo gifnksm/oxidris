@@ -468,7 +468,12 @@ pub enum FeatureProcessing {
 }
 
 impl FeatureProcessing {
-    pub fn apply<S>(&self, source: S) -> BoxedBoardFeature
+    pub fn apply<S>(
+        &self,
+        id: Cow<'static, str>,
+        name: Cow<'static, str>,
+        source: S,
+    ) -> BoxedBoardFeature
     where
         S: BoardFeatureSource + Clone + 'static,
     {
@@ -478,15 +483,15 @@ impl FeatureProcessing {
                 normalize_min,
                 normalize_max,
             } => Box::new(LinearNormalized::new(
-                Cow::Owned(source.id().to_string()),
-                Cow::Owned(source.name().to_string()),
+                id,
+                name,
                 *signal,
                 *normalize_min,
                 *normalize_max,
                 source,
             )) as BoxedBoardFeature,
-            Self::LineClearBonus => Box::new(LineClearBonus::new(source)),
-            FeatureProcessing::IWellReward => Box::new(IWellReward::new(source)),
+            Self::LineClearBonus => Box::new(LineClearBonus::new(id, name, source)),
+            FeatureProcessing::IWellReward => Box::new(IWellReward::new(id, name, source)),
         }
     }
 }
@@ -918,17 +923,23 @@ pub const LINEAR_TOTAL_HEIGHT_PENALTY: LinearNormalized<TotalHeight> = LinearNor
 ///
 /// - Clipped to `[0.0, 6.0]` (transformed range).
 /// - `SIGNAL` = Positive (more lines cleared is better).
-pub const LINE_CLEAR_BONUS: LineClearBonus<NumClearedLines> = LineClearBonus::new(NumClearedLines);
+pub const LINE_CLEAR_BONUS: LineClearBonus<NumClearedLines> = LineClearBonus::new(
+    Cow::Borrowed("line_clear_bonus"),
+    Cow::Borrowed("Line Clear Bonus"),
+    NumClearedLines,
+);
 
 #[derive(Debug, Clone)]
 pub struct LineClearBonus<S> {
+    id: Cow<'static, str>,
+    name: Cow<'static, str>,
     source: S,
 }
 
 impl<S> LineClearBonus<S> {
     #[must_use]
-    pub const fn new(source: S) -> Self {
-        Self { source }
+    pub const fn new(id: Cow<'static, str>, name: Cow<'static, str>, source: S) -> Self {
+        Self { id, name, source }
     }
 }
 
@@ -936,12 +947,12 @@ impl<S> BoardFeature for LineClearBonus<S>
 where
     S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
 {
-    fn id(&self) -> &'static str {
-        "line_clear_bonus"
+    fn id(&self) -> &str {
+        &self.id
     }
 
-    fn name(&self) -> &'static str {
-        "Line Clear Bonus"
+    fn name(&self) -> &str {
+        &self.name
     }
 
     fn feature_source(&self) -> &dyn BoardFeatureSource {
@@ -999,17 +1010,23 @@ where
 /// - Complements [`LINEAR_DEEP_WELL_RISK`] by focusing on edge wells suitable for tetrises, while [`LINEAR_DEEP_WELL_RISK`] penalizes excessive depths.
 /// - Synergizes with [`LINE_CLEAR_BONUS`] to favor consistent tetrises.
 /// - The triangular transform naturally discourages both shallow wells (not ready) and overly deep wells (risky).
-pub const I_WELL_REWARD: IWellReward<EdgeIWellDepth> = IWellReward::new(EdgeIWellDepth);
+pub const I_WELL_REWARD: IWellReward<EdgeIWellDepth> = IWellReward::new(
+    Cow::Borrowed("i_well_reward"),
+    Cow::Borrowed("I-Well Reward"),
+    EdgeIWellDepth,
+);
 
 #[derive(Debug, Clone)]
 pub struct IWellReward<S> {
+    id: Cow<'static, str>,
+    name: Cow<'static, str>,
     source: S,
 }
 
 impl<S> IWellReward<S> {
     #[must_use]
-    pub const fn new(source: S) -> Self {
-        Self { source }
+    pub const fn new(id: Cow<'static, str>, name: Cow<'static, str>, source: S) -> Self {
+        Self { id, name, source }
     }
 }
 
@@ -1017,12 +1034,12 @@ impl<S> BoardFeature for IWellReward<S>
 where
     S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
 {
-    fn id(&self) -> &'static str {
-        "i_well_reward"
+    fn id(&self) -> &str {
+        &self.id
     }
 
-    fn name(&self) -> &'static str {
-        "I-Well Reward"
+    fn name(&self) -> &str {
+        &self.name
     }
 
     fn feature_source(&self) -> &dyn BoardFeatureSource {

@@ -23,7 +23,7 @@ use crate::{descriptive::DescriptiveStats, histogram::Histogram, percentiles::Pe
 /// ).unwrap();
 ///
 /// assert_eq!(stats.stats.mean, 5.5);
-/// assert_eq!(stats.get_percentile(50.0), Some(6.0));
+/// assert_eq!(stats.percentiles.get(50.0), Some(6.0));
 /// ```
 #[derive(Debug, Clone)]
 pub struct ComprehensiveStats {
@@ -167,41 +167,5 @@ impl ComprehensiveStats {
             percentiles,
             histogram,
         })
-    }
-
-    /// Gets the value at a specific percentile.
-    ///
-    /// This is a convenience method that delegates to `self.percentiles.get()`.
-    ///
-    /// # Arguments
-    ///
-    /// * `percentile` - The percentile to retrieve (0.0 to 100.0)
-    ///
-    /// # Returns
-    ///
-    /// The value at the specified percentile, or `None` if the percentile was not precomputed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use oxidris_stats::comprehensive::ComprehensiveStats;
-    ///
-    /// let values = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let stats = ComprehensiveStats::new(
-    ///     values,
-    ///     &[50.0, 95.0],
-    ///     5,
-    ///     None,
-    ///     None,
-    ///     None,
-    /// ).unwrap();
-    ///
-    /// assert_eq!(stats.get_percentile(50.0), Some(3.0));
-    /// assert_eq!(stats.get_percentile(95.0), Some(5.0));
-    /// assert_eq!(stats.get_percentile(25.0), None); // Not precomputed
-    /// ```
-    #[must_use]
-    pub fn get_percentile(&self, percentile: f32) -> Option<f32> {
-        self.percentiles.get(percentile)
     }
 }

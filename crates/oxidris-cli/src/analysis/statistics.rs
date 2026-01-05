@@ -1,7 +1,62 @@
-use oxidris_evaluator::board_feature::{BoardFeatureValue, BoxedBoardFeature};
+use oxidris_evaluator::board_feature::{
+    BoardFeatureValue, BoxedBoardFeature, BoxedBoardFeatureSource,
+};
 use oxidris_stats::comprehensive::ComprehensiveStats;
 
-use crate::analysis::BoardSample;
+use crate::analysis::{BoardSample, RawBoardSample};
+
+/// Statistical summary for raw feature values only
+///
+/// Contains statistics computed from raw feature values extracted
+/// by `BoardFeatureSource`, without any transformation or normalization.
+#[derive(Debug, Clone)]
+pub struct RawFeatureStatistics {
+    /// Statistics for raw feature values
+    pub raw: ComprehensiveStats,
+}
+
+impl RawFeatureStatistics {
+    /// Compute statistics from raw values
+    #[expect(clippy::cast_precision_loss)]
+    pub fn from_raw_values(values: &[u32]) -> Self {
+        assert!(
+            !values.is_empty(),
+            "Cannot compute statistics from empty values"
+        );
+
+        let raw_values = values.iter().map(|&v| v as f32);
+        let percentile_points = &[1.0, 5.0, 10.0, 25.0, 50.0, 75.0, 90.0, 95.0, 99.0];
+        let hist_num_bins = 11;
+
+        Self {
+            raw: ComprehensiveStats::new(
+                raw_values,
+                percentile_points,
+                hist_num_bins,
+                Some(0.0),
+                None,
+                Some(1.0),
+            )
+            .unwrap(),
+        }
+    }
+
+    /// Compute statistics for all sources across samples
+    pub fn from_samples(
+        sources: &[BoxedBoardFeatureSource],
+        samples: &[RawBoardSample],
+    ) -> Vec<Self> {
+        (0..sources.len())
+            .map(|i| {
+                let values = samples
+                    .iter()
+                    .map(|sample| sample.raw_values[i])
+                    .collect::<Vec<_>>();
+                RawFeatureStatistics::from_raw_values(&values)
+            })
+            .collect()
+    }
+}
 
 /// Statistical summary of a feature across multiple board samples
 ///

@@ -52,7 +52,7 @@
 //!     None,
 //!     None,
 //! ).unwrap();
-//! assert_eq!(stats.get_percentile(50.0), Some(6.0));
+//! assert_eq!(stats.percentiles.get(50.0), Some(6.0));
 //! ```
 //!
 //! ## Creating a histogram

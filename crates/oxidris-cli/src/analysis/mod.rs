@@ -42,8 +42,10 @@
 //! - Sample selection for training data visualization
 //! - Outlier detection and data quality validation
 
-pub use self::{index::*, sample::*, statistics::*};
+pub use self::{feature_builder::*, index::*, normalization::*, sample::*, statistics::*};
 
+mod feature_builder;
 mod index;
+mod normalization;
 mod sample;
 mod statistics;
