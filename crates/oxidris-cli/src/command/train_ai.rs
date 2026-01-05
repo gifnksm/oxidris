@@ -10,7 +10,7 @@ use oxidris_evaluator::{
 };
 use oxidris_training::genetic::{Population, PopulationEvolver};
 
-use crate::{data::Model, util::Output};
+use crate::{model::ai_model::AiModel, util::Output};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, derive_more::FromStr)]
 pub enum AiType {
@@ -172,7 +172,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         AiType::Defensive => "defensive",
     };
     let best_individual = population.individuals().first().unwrap();
-    let model = Model {
+    let model = AiModel {
         name: model_name.to_owned(),
         trained_at: Utc::now(),
         final_fitness: best_individual.fitness(),

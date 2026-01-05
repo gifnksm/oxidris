@@ -8,7 +8,7 @@ use oxidris_evaluator::{
 use rand::Rng;
 
 use crate::{
-    data::{BoardAndPlacement, SessionCollection, SessionData},
+    model::session::{BoardAndPlacement, SessionCollection, SessionData},
     util::Output,
 };
 

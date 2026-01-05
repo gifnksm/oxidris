@@ -4,7 +4,7 @@ use oxidris_evaluator::{
 };
 use oxidris_stats::comprehensive::ComprehensiveStats;
 
-use crate::data::{BoardAndPlacement, BoardFeatureStatistics, BoardSample, SessionData};
+use crate::model::session::{BoardAndPlacement, BoardFeatureStatistics, BoardSample, SessionData};
 
 pub fn extract_all_board_features(
     features: &[BoxedBoardFeature],

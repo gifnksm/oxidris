@@ -14,15 +14,10 @@ use oxidris_evaluator::{
 };
 
 use crate::{
-    data,
+    PlayMode,
+    model::ai_model::AiModel,
     ui::{input::Input, renderer::Renderer},
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PlayMode {
-    Manual,
-    Auto,
-}
 
 impl PlayMode {
     pub(crate) fn controls(self) -> &'static [(&'static str, &'static str)] {
@@ -157,7 +152,7 @@ pub(crate) struct AutoPlayArg {
 pub(crate) fn auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
     let AutoPlayArg { model_path } = arg;
 
-    let model = data::load_model(model_path)?;
+    let model = AiModel::open(model_path)?;
 
     let (features, weights) = model.to_feature_weights()?;
     let placement_evaluator = FeatureBasedPlacementEvaluator::new(features, weights);

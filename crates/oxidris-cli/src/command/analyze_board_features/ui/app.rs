@@ -2,9 +2,9 @@ use crossterm::event::{self, Event, KeyEventKind};
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::analyze_board_features::{
-    data::{BoardFeatureStatistics, BoardSample},
-    index::BoardIndex,
+use crate::{
+    command::analyze_board_features::index::BoardIndex,
+    model::session::{BoardFeatureStatistics, BoardSample},
 };
 
 use super::screens::feature_list::FeatureListScreen;
@@ -20,6 +20,7 @@ pub struct App {
 pub struct AppData {
     pub board_samples: Vec<BoardSample>,
     pub statistics: Vec<BoardFeatureStatistics>,
+    #[expect(unused, reason = "may be used later")] // TODO
     pub board_index: BoardIndex,
 }
 

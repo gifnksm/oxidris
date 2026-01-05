@@ -1,65 +1,15 @@
-use clap::{Parser, Subcommand};
-
-use self::{
-    analyze_board_features::AnalyzeBoardFeaturesArg,
-    analyze_censoring::AnalyzeCensoringArg,
-    generate_board_feature_stats::GenerateBoardFeatureStatsArg,
-    generate_boards::GenerateBoardsArg,
-    play::{AutoPlayArg, ManualPlayArg},
-    train_ai::TrainAiArg,
-};
-
 mod analysis;
-mod analyze_board_features;
-mod analyze_censoring;
-mod data;
-mod generate_board_feature_stats;
-mod generate_boards;
-mod play;
-mod train_ai;
+mod command;
+mod model;
 mod ui;
 mod util;
 
-#[derive(Debug, Clone, Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// What mode to run the program in
-    #[command(subcommand)]
-    mode: Option<Mode>,
-}
-
-#[derive(Debug, Clone, Subcommand)]
-enum Mode {
-    /// Run normal play
-    #[command(name = "play")]
-    ManualPlay(#[clap(flatten)] ManualPlayArg),
-    /// Run auto play
-    AutoPlay(#[clap(flatten)] AutoPlayArg),
-    /// Train AI using genetic algorithm
-    TrainAi(#[clap(flatten)] TrainAiArg),
-    /// Generate boards for training data
-    GenerateBoards(#[clap(flatten)] GenerateBoardsArg),
-    /// Analyze board features with TUI
-    AnalyzeBoardFeatures(#[clap(flatten)] AnalyzeBoardFeaturesArg),
-    /// Generate statistics about board features
-    GenerateBoardFeatureStats(#[clap(flatten)] GenerateBoardFeatureStatsArg),
-    /// Analyze censoring in board data
-    AnalyzeCensoring(#[clap(flatten)] AnalyzeCensoringArg),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlayMode {
+    Manual,
+    Auto,
 }
 
 fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    match cli
-        .mode
-        .unwrap_or(Mode::ManualPlay(ManualPlayArg::default()))
-    {
-        Mode::ManualPlay(arg) => play::manual(&arg)?,
-        Mode::AutoPlay(arg) => play::auto(&arg)?,
-        Mode::TrainAi(arg) => train_ai::run(&arg)?,
-        Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
-        Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,
-        Mode::GenerateBoardFeatureStats(arg) => generate_board_feature_stats::run(&arg)?,
-        Mode::AnalyzeCensoring(arg) => analyze_censoring::run(&arg)?,
-    }
-    Ok(())
+    command::run()
 }

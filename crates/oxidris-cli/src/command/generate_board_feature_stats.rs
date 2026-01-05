@@ -10,7 +10,7 @@ use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
 
 use crate::{
     analysis,
-    data::{self, BoardFeatureStatistics},
+    model::session::{BoardFeatureStatistics, SessionCollection},
     util::{self, Output},
 };
 
@@ -32,7 +32,7 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
     let features = board_feature::all_board_features();
 
     eprintln!("Loading boards from {}...", boards_file.display());
-    let boards = data::load_session_collection(boards_file)?.sessions;
+    let boards = SessionCollection::open(boards_file)?.sessions;
     eprintln!("Loaded {} boards", boards.len());
 
     eprintln!("Computing featuress for all boards...");

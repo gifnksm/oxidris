@@ -1,6 +1,6 @@
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 
-use super::data::BoardSample;
+use crate::model::session::BoardSample;
 
 #[derive(Debug, Clone)]
 pub struct BoardIndex {
@@ -29,6 +29,7 @@ impl BoardIndex {
         clippy::cast_possible_truncation,
         clippy::cast_precision_loss
     )]
+    #[expect(unused, reason = "may be used later")] // TODO
     pub fn get_boards_at_percentile(&self, feature_idx: usize, percentile: f32) -> &[usize] {
         let indices = &self.sorted_indices[feature_idx];
         let total = indices.len() as f32;
@@ -40,6 +41,7 @@ impl BoardIndex {
         &indices[start_idx..end_idx]
     }
 
+    #[expect(unused, reason = "may be used later")] // TODO
     pub fn get_boards_in_rank_range(
         &self,
         feature_idx: usize,
@@ -51,6 +53,7 @@ impl BoardIndex {
         &indices[start_rank..end_rank]
     }
 
+    #[expect(unused, reason = "may be used later")] // TODO
     pub fn get_board_rank(&self, feature_idx: usize, board_idx: usize) -> Option<usize> {
         self.sorted_indices[feature_idx]
             .iter()

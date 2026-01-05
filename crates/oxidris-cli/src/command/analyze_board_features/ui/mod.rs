@@ -1,11 +1,10 @@
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 
+use crate::model::session::{BoardFeatureStatistics, BoardSample};
+
 use self::app::App;
 
-use super::{
-    data::{BoardFeatureStatistics, BoardSample},
-    index::BoardIndex,
-};
+use super::index::BoardIndex;
 
 mod app;
 mod screens;

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use oxidris_evaluator::board_feature;
 
-use crate::{analysis, data};
+use crate::{analysis, model::session::SessionCollection};
 
 mod index;
 mod ui;
@@ -19,7 +19,7 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     let features = board_feature::all_board_features();
 
     eprintln!("Loading boards from {}...", boards_file.display());
-    let sessions = data::load_session_collection(boards_file)?.sessions;
+    let sessions = SessionCollection::open(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
 
     eprintln!("Computing featuress for all boards...");

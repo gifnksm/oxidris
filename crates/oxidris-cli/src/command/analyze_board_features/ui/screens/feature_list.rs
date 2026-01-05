@@ -15,7 +15,7 @@ use ratatui::{
     },
 };
 
-use crate::analyze_board_features::ui::app::{AppData, Screen};
+use crate::command::analyze_board_features::ui::app::{AppData, Screen};
 
 #[derive(Debug)]
 pub struct FeatureListScreen {

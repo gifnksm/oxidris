@@ -14,8 +14,11 @@ use oxidris_evaluator::{
 };
 use oxidris_stats::survival::KaplanMeierCurve;
 
-use crate::data::{
-    self, FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
+use crate::model::{
+    km_normalization::{
+        FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
+    },
+    session::{SessionCollection, SessionData},
 };
 
 #[derive(Debug, Clone, Args)]
@@ -54,7 +57,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    let collection = data::load_session_collection(&arg.boards)?;
+    let collection = SessionCollection::open(&arg.boards)?;
     let max_turns = collection.max_turns;
     let sessions = &collection.sessions;
 
@@ -110,7 +113,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 #[expect(clippy::cast_precision_loss)]
 fn generate_normalization_params(
     normalize_features: &[BoxedBoardFeatureSource],
-    sessions: &[data::SessionData],
+    sessions: &[SessionData],
     max_turns: usize,
 ) -> anyhow::Result<NormalizationParams> {
     let mut feature_normalizations = BTreeMap::<String, FeatureNormalization>::new();
@@ -234,7 +237,7 @@ fn save_normalization_params(params: &NormalizationParams, path: &PathBuf) -> an
 }
 
 #[expect(clippy::cast_precision_loss)]
-fn analyze_overall_censoring(sessions: &[crate::data::SessionData]) {
+fn analyze_overall_censoring(sessions: &[SessionData]) {
     let total_sessions = sessions.len();
     let censored_sessions = sessions.iter().filter(|s| !s.is_game_over).count();
     let complete_sessions = total_sessions - censored_sessions;
@@ -253,7 +256,7 @@ fn analyze_overall_censoring(sessions: &[crate::data::SessionData]) {
 }
 
 #[expect(clippy::cast_precision_loss)]
-fn analyze_by_capture_phase(sessions: &[crate::data::SessionData], max_turns: usize) {
+fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
     println!("Censoring by Capture Phase:");
     println!(
         "  {:<20} {:>8} {:>10} {:>12} {:>12} {:>8}",
@@ -330,7 +333,7 @@ fn analyze_by_capture_phase(sessions: &[crate::data::SessionData], max_turns: us
 #[expect(clippy::cast_precision_loss)]
 fn analyze_feature_survival(
     feature: &BoxedBoardFeatureSource,
-    sessions: &[crate::data::SessionData],
+    sessions: &[SessionData],
     output_dir: Option<&PathBuf>,
 ) -> anyhow::Result<()> {
     println!(
@@ -455,7 +458,7 @@ fn analyze_feature_survival(
 }
 
 #[expect(clippy::cast_precision_loss)]
-fn analyze_by_evaluator(sessions: &[crate::data::SessionData]) {
+fn analyze_by_evaluator(sessions: &[SessionData]) {
     println!("Censoring by Evaluator:");
     println!(
         "  {:<15} {:>10} {:>10} {:>12}",
@@ -495,7 +498,7 @@ fn analyze_by_evaluator(sessions: &[crate::data::SessionData]) {
 fn analyze_by_feature(
     all_features: &[BoxedBoardFeatureSource],
     feature_id: &str,
-    sessions: &[crate::data::SessionData],
+    sessions: &[SessionData],
 ) -> anyhow::Result<()> {
     // Find the feature
     let feature = all_features
