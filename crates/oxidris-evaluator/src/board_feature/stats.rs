@@ -37,18 +37,6 @@ impl crate::board_feature::source::MaxHeight {
     pub const P99: f32 = 20.0;
 }
 
-impl crate::board_feature::source::TotalHeight {
-    pub const P01: f32 = 6.0;
-    pub const P05: f32 = 12.0;
-    pub const P10: f32 = 16.0;
-    pub const P25: f32 = 32.0;
-    pub const P50: f32 = 65.0;
-    pub const P75: f32 = 108.0;
-    pub const P90: f32 = 143.0;
-    pub const P95: f32 = 159.0;
-    pub const P99: f32 = 179.0;
-}
-
 impl crate::board_feature::source::CenterColumnMaxHeight {
     pub const P01: f32 = 1.0;
     pub const P05: f32 = 2.0;
@@ -59,6 +47,18 @@ impl crate::board_feature::source::CenterColumnMaxHeight {
     pub const P90: f32 = 16.0;
     pub const P95: f32 = 18.0;
     pub const P99: f32 = 20.0;
+}
+
+impl crate::board_feature::source::TotalHeight {
+    pub const P01: f32 = 6.0;
+    pub const P05: f32 = 12.0;
+    pub const P10: f32 = 16.0;
+    pub const P25: f32 = 32.0;
+    pub const P50: f32 = 65.0;
+    pub const P75: f32 = 108.0;
+    pub const P90: f32 = 143.0;
+    pub const P95: f32 = 159.0;
+    pub const P99: f32 = 179.0;
 }
 
 impl crate::board_feature::source::SurfaceBumpiness {
