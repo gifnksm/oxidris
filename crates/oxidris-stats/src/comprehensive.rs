@@ -12,9 +12,9 @@ use crate::{descriptive::DescriptiveStats, histogram::Histogram, percentiles::Pe
 /// ```
 /// use oxidris_stats::comprehensive::ComprehensiveStats;
 ///
-/// let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+/// let values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
 /// let stats = ComprehensiveStats::new(
-///     &values,
+///     values,
 ///     &[25.0, 50.0, 75.0],  // Percentiles to compute
 ///     5,                     // Number of histogram bins
 ///     None,                  // Auto-detect min
@@ -59,9 +59,9 @@ impl ComprehensiveStats {
     /// ```
     /// use oxidris_stats::comprehensive::ComprehensiveStats;
     ///
-    /// let values = vec![5.0, 2.0, 8.0, 1.0, 9.0, 3.0];
+    /// let values = [5.0, 2.0, 8.0, 1.0, 9.0, 3.0];
     /// let stats = ComprehensiveStats::new(
-    ///     &values,
+    ///     values,
     ///     &[50.0, 95.0],
     ///     10,
     ///     None,
@@ -72,15 +72,18 @@ impl ComprehensiveStats {
     /// assert!(stats.stats.min <= stats.stats.max);
     /// ```
     #[must_use]
-    pub fn new(
-        values: &[f32],
+    pub fn new<I>(
+        values: I,
         percentile_points: &[f32],
         hist_num_bins: usize,
         hist_min: Option<f32>,
         hist_max: Option<f32>,
         hist_bin_width_unit: Option<f32>,
-    ) -> Option<Self> {
-        let mut sorted = values.to_vec();
+    ) -> Option<Self>
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        let mut sorted = values.into_iter().collect::<Vec<_>>();
         sorted.sort_by(f32::total_cmp);
         Self::from_sorted(
             &sorted,
@@ -120,7 +123,7 @@ impl ComprehensiveStats {
     /// ```
     /// use oxidris_stats::comprehensive::ComprehensiveStats;
     ///
-    /// let mut values = vec![5.0, 2.0, 8.0, 1.0, 9.0];
+    /// let mut values = [5.0, 2.0, 8.0, 1.0, 9.0];
     /// values.sort_by(f32::total_cmp);
     ///
     /// let stats = ComprehensiveStats::from_sorted(
@@ -183,9 +186,9 @@ impl ComprehensiveStats {
     /// ```
     /// use oxidris_stats::comprehensive::ComprehensiveStats;
     ///
-    /// let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let values = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let stats = ComprehensiveStats::new(
-    ///     &values,
+    ///     values,
     ///     &[50.0, 95.0],
     ///     5,
     ///     None,

@@ -49,19 +49,22 @@ impl Histogram {
     ///
     /// ```
     /// # use oxidris_stats::histogram::Histogram;
-    /// let values = vec![5.0, 2.0, 8.0, 1.0, 9.0, 3.0, 7.0, 4.0, 6.0, 10.0];
-    /// let histogram = Histogram::new(&values, 5, None, None, None);
+    /// let values = [5.0, 2.0, 8.0, 1.0, 9.0, 3.0, 7.0, 4.0, 6.0, 10.0];
+    /// let histogram = Histogram::new(values, 5, None, None, None);
     /// assert!(!histogram.bins.is_empty());
     /// ```
     #[must_use]
-    pub fn new(
-        values: &[f32],
+    pub fn new<I>(
+        values: I,
         num_bins: usize,
         explicit_min: Option<f32>,
         explicit_max: Option<f32>,
         bin_width_unit: Option<f32>,
-    ) -> Self {
-        let mut sorted = values.to_vec();
+    ) -> Self
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        let mut sorted = values.into_iter().collect::<Vec<_>>();
         sorted.sort_by(f32::total_cmp);
         Self::from_sorted(
             &sorted,
@@ -97,7 +100,7 @@ impl Histogram {
     ///
     /// ```
     /// # use oxidris_stats::histogram::Histogram;
-    /// let mut values = vec![5.0, 2.0, 8.0, 1.0, 9.0];
+    /// let mut values = [5.0, 2.0, 8.0, 1.0, 9.0];
     /// values.sort_by(f32::total_cmp);
     /// let histogram = Histogram::from_sorted(&values, 5, None, None, None);
     /// assert!(!histogram.bins.is_empty());

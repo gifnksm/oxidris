@@ -8,8 +8,8 @@
 /// ```
 /// use oxidris_stats::percentiles::Percentiles;
 ///
-/// let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-/// let percentiles = Percentiles::new(&values, &[25.0, 50.0, 75.0]);
+/// let values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+/// let percentiles = Percentiles::new(values, &[25.0, 50.0, 75.0]);
 ///
 /// assert_eq!(percentiles.get(50.0), Some(6.0));
 /// assert_eq!(percentiles.get(25.0), Some(3.0));
@@ -22,6 +22,39 @@ pub struct Percentiles {
 }
 
 impl Percentiles {
+    /// Computes percentiles from unsorted values.
+    ///
+    /// This method will sort the values internally before computing percentiles.
+    ///
+    /// # Arguments
+    ///
+    /// * `values` - The data points to compute percentiles from
+    /// * `percentile_points` - The percentile points to compute (e.g., [25.0, 50.0, 75.0])
+    ///
+    /// # Returns
+    ///
+    /// A `Percentiles` instance with precomputed values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use oxidris_stats::percentiles::Percentiles;
+    ///
+    /// let values = [5.0, 2.0, 8.0, 1.0, 9.0];
+    /// let percentiles = Percentiles::new(values, &[25.0, 50.0, 75.0]);
+    ///
+    /// assert_eq!(percentiles.get(50.0), Some(5.0));
+    /// ```
+    #[must_use]
+    pub fn new<I>(values: I, percentile_points: &[f32]) -> Self
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        let mut sorted = values.into_iter().collect::<Vec<_>>();
+        sorted.sort_by(f32::total_cmp);
+        Self::from_sorted(&sorted, percentile_points)
+    }
+
     /// Computes percentiles from sorted values.
     ///
     /// # Arguments
@@ -42,7 +75,7 @@ impl Percentiles {
     /// ```
     /// use oxidris_stats::percentiles::Percentiles;
     ///
-    /// let mut values = vec![5.0, 2.0, 8.0, 1.0, 9.0];
+    /// let mut values = [5.0, 2.0, 8.0, 1.0, 9.0];
     /// values.sort_by(f32::total_cmp);
     /// let percentiles = Percentiles::from_sorted(&values, &[50.0, 90.0]);
     /// ```
@@ -58,36 +91,6 @@ impl Percentiles {
             .map(|&p| (p, compute_percentile(sorted_values, p)))
             .collect();
         Self { values }
-    }
-
-    /// Computes percentiles from unsorted values.
-    ///
-    /// This method will sort the values internally before computing percentiles.
-    ///
-    /// # Arguments
-    ///
-    /// * `values` - The data points to compute percentiles from
-    /// * `percentile_points` - The percentile points to compute (e.g., [25.0, 50.0, 75.0])
-    ///
-    /// # Returns
-    ///
-    /// A `Percentiles` instance with precomputed values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use oxidris_stats::percentiles::Percentiles;
-    ///
-    /// let values = vec![5.0, 2.0, 8.0, 1.0, 9.0];
-    /// let percentiles = Percentiles::new(&values, &[25.0, 50.0, 75.0]);
-    ///
-    /// assert_eq!(percentiles.get(50.0), Some(5.0));
-    /// ```
-    #[must_use]
-    pub fn new(values: &[f32], percentile_points: &[f32]) -> Self {
-        let mut sorted = values.to_vec();
-        sorted.sort_by(f32::total_cmp);
-        Self::from_sorted(&sorted, percentile_points)
     }
 
     /// Gets the value at a specific percentile.
@@ -107,8 +110,8 @@ impl Percentiles {
     /// ```
     /// use oxidris_stats::percentiles::Percentiles;
     ///
-    /// let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let percentiles = Percentiles::new(&values, &[50.0, 95.0]);
+    /// let values = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let percentiles = Percentiles::new(values, &[50.0, 95.0]);
     ///
     /// assert_eq!(percentiles.get(50.0), Some(3.0));
     /// assert_eq!(percentiles.get(95.0), Some(5.0));
@@ -132,8 +135,8 @@ impl Percentiles {
     /// ```
     /// use oxidris_stats::percentiles::Percentiles;
     ///
-    /// let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let percentiles = Percentiles::new(&values, &[25.0, 50.0, 75.0]);
+    /// let values = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let percentiles = Percentiles::new(values, &[25.0, 50.0, 75.0]);
     ///
     /// for (p, value) in percentiles.iter() {
     ///     println!("P{}: {}", p, value);
@@ -150,8 +153,8 @@ impl Percentiles {
     /// ```
     /// use oxidris_stats::percentiles::Percentiles;
     ///
-    /// let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let percentiles = Percentiles::new(&values, &[50.0]);
+    /// let values = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let percentiles = Percentiles::new(values, &[50.0]);
     ///
     /// assert_eq!(percentiles.as_slice(), &[(50.0, 3.0)]);
     /// ```
@@ -181,7 +184,7 @@ impl Percentiles {
 /// ```
 /// use oxidris_stats::percentiles::compute_percentile;
 ///
-/// let mut values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+/// let mut values = [1.0, 2.0, 3.0, 4.0, 5.0];
 /// values.sort_by(f32::total_cmp);
 ///
 /// let median = compute_percentile(&values, 50.0);

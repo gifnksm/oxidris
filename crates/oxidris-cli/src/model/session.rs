@@ -2,8 +2,6 @@ use std::{fs::File, io::BufReader, path::Path};
 
 use anyhow::{Context, bail};
 use oxidris_engine::{BitBoard, Piece};
-use oxidris_evaluator::board_feature::BoardFeatureValue;
-use oxidris_stats::comprehensive::ComprehensiveStats;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -26,20 +24,6 @@ pub struct BoardAndPlacement {
     pub turn: usize,
     pub board: BitBoard,
     pub placement: Piece,
-}
-
-#[derive(Debug, Clone)]
-pub struct BoardSample {
-    #[expect(unused, reason = "may be used later")] // TODO
-    pub board: BoardAndPlacement,
-    pub feature_vector: Vec<BoardFeatureValue>,
-}
-
-#[derive(Debug, Clone)]
-pub struct BoardFeatureStatistics {
-    pub raw: ComprehensiveStats,
-    pub transformed: ComprehensiveStats,
-    pub normalized: ComprehensiveStats,
 }
 
 impl SessionCollection {

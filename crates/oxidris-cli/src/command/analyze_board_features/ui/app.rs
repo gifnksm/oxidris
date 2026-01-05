@@ -2,10 +2,7 @@ use crossterm::event::{self, Event, KeyEventKind};
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::{
-    command::analyze_board_features::index::BoardIndex,
-    model::session::{BoardFeatureStatistics, BoardSample},
-};
+use crate::analysis::{BoardFeatureStatistics, BoardIndex, BoardSample};
 
 use super::screens::feature_list::FeatureListScreen;
 

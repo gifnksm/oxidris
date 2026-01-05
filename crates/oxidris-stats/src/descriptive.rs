@@ -38,7 +38,7 @@ impl DescriptiveStats {
     ///
     /// ```
     /// # use oxidris_stats::descriptive::DescriptiveStats;
-    /// let values = vec![5.0, 2.0, 4.0, 1.0, 3.0];
+    /// let values = [5.0, 2.0, 4.0, 1.0, 3.0];
     /// let stats = DescriptiveStats::new(values).unwrap();
     /// assert_eq!(stats.min, 1.0);
     /// assert_eq!(stats.max, 5.0);
@@ -46,7 +46,10 @@ impl DescriptiveStats {
     /// assert_eq!(stats.median, 3.0);
     /// ```
     #[must_use]
-    pub fn new(values: impl IntoIterator<Item = f32>) -> Option<Self> {
+    pub fn new<I>(values: I) -> Option<Self>
+    where
+        I: IntoIterator<Item = f32>,
+    {
         let mut values = values.into_iter().collect::<Vec<_>>();
         values.sort_by(f32::total_cmp);
         Self::from_sorted(&values)
@@ -74,7 +77,7 @@ impl DescriptiveStats {
     ///
     /// ```
     /// # use oxidris_stats::descriptive::DescriptiveStats;
-    /// let mut values = vec![5.0, 2.0, 4.0, 1.0, 3.0];
+    /// let mut values = [5.0, 2.0, 4.0, 1.0, 3.0];
     /// values.sort_by(f32::total_cmp);
     /// let stats = DescriptiveStats::from_sorted(&values).unwrap();
     /// assert_eq!(stats.min, 1.0);

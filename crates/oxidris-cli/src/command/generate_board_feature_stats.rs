@@ -9,8 +9,8 @@ use anyhow::Context as _;
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
 
 use crate::{
-    analysis,
-    model::session::{BoardFeatureStatistics, SessionCollection},
+    analysis::{BoardFeatureStatistics, BoardSample},
+    model::session::SessionCollection,
     util::{self, Output},
 };
 
@@ -36,11 +36,11 @@ pub fn run(arg: &GenerateBoardFeatureStatsArg) -> anyhow::Result<()> {
     eprintln!("Loaded {} boards", boards.len());
 
     eprintln!("Computing featuress for all boards...");
-    let board_samples = analysis::extract_all_board_features(&features, &boards);
+    let board_samples = BoardSample::from_sessions(&features, &boards);
     eprintln!("Features computed");
 
     eprintln!("Computing statistics");
-    let statistics = analysis::coimpute_statistics(&features, &board_samples);
+    let statistics = BoardFeatureStatistics::from_samples(&features, &board_samples);
     eprintln!("Statistics computed");
 
     let mut writer = Output::from_output_path(output.clone())?;

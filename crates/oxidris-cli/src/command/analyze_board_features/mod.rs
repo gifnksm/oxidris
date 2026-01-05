@@ -2,9 +2,11 @@ use std::path::PathBuf;
 
 use oxidris_evaluator::board_feature;
 
-use crate::{analysis, model::session::SessionCollection};
+use crate::{
+    analysis::{BoardFeatureStatistics, BoardIndex, BoardSample},
+    model::session::SessionCollection,
+};
 
-mod index;
 mod ui;
 
 #[derive(Default, Debug, Clone, clap::Args)]
@@ -23,15 +25,15 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     eprintln!("Loaded {} sessions", sessions.len());
 
     eprintln!("Computing featuress for all boards...");
-    let board_samples = analysis::extract_all_board_features(&features, &sessions);
+    let board_samples = BoardSample::from_sessions(&features, &sessions);
     eprintln!("Features computed");
 
     eprintln!("Computing statistics");
-    let statistics = analysis::coimpute_statistics(&features, &board_samples);
+    let statistics = BoardFeatureStatistics::from_samples(&features, &board_samples);
     eprintln!("Statistics computed");
 
     eprintln!("Building board index...");
-    let board_index = index::BoardIndex::new(&features, &board_samples);
+    let board_index = BoardIndex::from_samples(&features, &board_samples);
     eprintln!("Board index built");
 
     ui::run_tui(features, board_samples, statistics, board_index)?;
