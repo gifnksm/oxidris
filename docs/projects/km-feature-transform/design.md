@@ -58,7 +58,7 @@ The `BoardFeature` trait provides instance methods for `transform()` and `normal
 
 ```rust
 // KM-based transform would be implemented in LinearNormalized or custom feature
-impl BoardFeature for LinearNormalized<HolesPenalty> {
+impl BoardFeature for LinearNormalized<NumHoles> {
     fn transform(&self, raw: u32) -> f32 {
         // Look up KM median from loaded normalization params
         self.km_params.get(raw).unwrap_or(self.km_min)  // → 177.5 turns
@@ -69,7 +69,7 @@ impl BoardFeature for LinearNormalized<HolesPenalty> {
 **Stage 2: Normalize** (KM median → 0-1)
 
 ```rust
-impl BoardFeature for LinearNormalized<HolesPenalty> {
+impl BoardFeature for LinearNormalized<NumHoles> {
     fn normalize(&self, transformed: f32) -> f32 {
         let span = self.normalize_max - self.normalize_min;
         ((transformed - self.normalize_min) / span).clamp(0.0, 1.0)
@@ -86,7 +86,7 @@ Where `normalize_min` = P95's KM median, `normalize_max` = P05's KM median.
 #### ✅ Proportional to Survival Time
 
 ```text
-Feature: holes_penalty
+FeatureSource: num_holes
   0 holes:  KM=322.8 → norm=1.00
   1 hole:   KM=276.1 → norm=0.85
   5 holes:  KM=120.0 → norm=0.36
@@ -117,17 +117,17 @@ P05/P95 are calculated based on board count, so common feature values determine 
 All features are normalized to 0-1 range, but the `km_range` statistic allows comparing their actual impact:
 
 ```text
-holes_penalty:     km_range = 315.7 turns
-max_height_penalty: km_range = 327.2 turns
-bumpiness_penalty:  km_range = 51.2 turns
+num_holes:     km_range = 315.7 turns
+max_height: km_range = 327.2 turns
+surface_bumpiness:  km_range = 51.2 turns
 
-→ holes and max_height have ~6x more impact than bumpiness
+→ num_holes and max_height have ~6x more impact than bumpiness
 ```
 
 ### Example
 
 ```text
-Feature: holes_penalty
+Feature: num_holes
 Data:
   value=0:  KM=322.8, boards=16,186
   value=1:  KM=276.1, boards=11,213
@@ -164,11 +164,11 @@ Step 4: At evaluation time (2-stage)
 
 This design applies to features that **directly affect game termination**:
 
-- `holes_penalty` - holes prevent piece placement, causing game over
-- `hole_depth_penalty` - deeper holes are harder to clear
-- `max_height_penalty` - height determines remaining vertical space
-- `center_columns_penalty` - center height affects placement options
-- `total_height_penalty` - overall board pressure
+- `num_holes` - holes prevent piece placement, causing game over
+- `sum_of_hole_depth` - deeper holes are harder to clear
+- `max_height` - height determines remaining vertical space
+- `center_column_max_height` - center height affects placement options
+- `total_height` - overall board pressure
 
 **Why these features?**
 
@@ -202,7 +202,7 @@ cargo run --release -- analyze-censoring data/boards.json \
   "max_turns": 500,
   "normalization_method": "robust_km",
   "features": {
-    "holes_penalty": {
+    "num_holes": {
       "transform_mapping": {
         "0": 322.8,
         "1": 276.1,
@@ -354,28 +354,28 @@ fn create_km_features(params: &NormalizationParams) -> Vec<BoxedBoardFeature> {
 }
 ```
 
-### Example: KM-Based HolesPenalty
+### Example: KM-Based Number of Holes Feature
 
 ```rust
 // Feature source remains simple - just extracts raw values
 #[derive(Debug, Clone)]
-pub struct HolesPenalty;
+pub struct NumHoles;
 
-impl BoardFeatureSource for HolesPenalty {
+impl BoardFeatureSource for NumHoles {
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
         analysis.board_analysis().num_holes().into()
     }
 }
 
 // KM-based feature constant (loaded from normalization_params.json)
-pub const KM_HOLES_PENALTY: KMNormalized<HolesPenalty> = KMNormalized {
+pub const KM_HOLES_PENALTY: KmNormalized<NumHoles> = KmNormalized {
     id: Cow::Borrowed("km_holes_penalty"),
     name: Cow::Borrowed("Holes Penalty (KM)"),
     signal: FeatureSignal::Negative,
-    km_transform: load_km_transform("holes_penalty"),  // Loaded at build/startup
+    km_transform: load_km_transform("num_holes"),  // Loaded at build/startup
     normalize_min: 7.1,    // P95's KM median
     normalize_max: 322.8,  // P05's KM median
-    source: HolesPenalty,
+    source: NumHoles,
 };
 
 // Usage
@@ -515,9 +515,9 @@ fn normalize(transformed: f32) -> f32;   // Still: P05-P95 linear scaling (of KM
 
 Current implementation has duplicate features with different normalization ranges:
 
-- `max_height_penalty` (P05-P95 linear) vs `top_out_risk` (P75-P95 threshold)
-- `center_columns_penalty` (P05-P95) vs `center_top_out_risk` (P75-P95)
-- `well_depth_penalty` (P05-P95) vs `deep_well_risk` (P75-P95)
+- `linear_max_height_penalty` (P05-P95 linear) vs `linear_top_out_risk` (P75-P95 threshold)
+- `linear_center_columns_penalty` (P05-P95) vs `linear_center_top_out_risk` (P75-P95)
+- `linear_well_depth_penalty` (P05-P95) vs `linear_deep_well_risk` (P75-P95)
 
 With KM normalization, the transform captures non-linearity:
 

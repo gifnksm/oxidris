@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     io::{self, Write as _},
     iter,
     path::PathBuf,
@@ -76,10 +77,12 @@ fn dump_source(
         writer,
         "// To regenerate, run: make regenerate-board-feature-stats"
     )?;
+    let mut generated_types = HashSet::new();
     for (f, stats) in iter::zip(features, statistics) {
-        let Some(type_name) = f.feature_source_type_name() else {
+        let type_name = f.feature_source().type_name();
+        if !generated_types.insert(type_name) {
             continue;
-        };
+        }
         writeln!(writer)?;
         writeln!(
             writer,

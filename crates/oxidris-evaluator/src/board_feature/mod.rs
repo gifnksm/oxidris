@@ -7,10 +7,10 @@
 //!
 //! Features follow a naming convention based on their behavior:
 //!
-//! - **Risk**: Thresholded danger that escalates rapidly beyond a safe limit (e.g., [`DeepWellRisk`], [`TopOutRisk`])
-//! - **Penalty**: Smooth negative signals (e.g., [`HolesPenalty`], [`HoleDepthPenalty`], [`RowTransitionsPenalty`])
-//! - **Reward**: Smooth positive signals (e.g., [`IWellReward`])
-//! - **Bonus**: Discrete strong rewards (e.g., [`LineClearBonus`])
+//! - **Risk**: Thresholded danger that escalates rapidly beyond a safe limit (e.g., [`LINEAR_DEEP_WELL_RISK`], [`LINEAR_TOP_OUT_RISK`])
+//! - **Penalty**: Smooth negative signals (e.g., [`LINEAR_HOLES_PENALTY`], [`LINEAR_HOLE_DEPTH_PENALTY`], [`LINEAR_ROW_TRANSITIONS_PENALTY`])
+//! - **Reward**: Smooth positive signals (e.g., [`I_WELL_REWARD`])
+//! - **Bonus**: Discrete strong rewards (e.g., [`LINE_CLEAR_BONUS`])
 //!
 //! # Feature Categories
 //!
@@ -20,31 +20,31 @@
 //!
 //! Directly affect game termination (when the game ends):
 //!
-//! - [`HolesPenalty`] - Number of holes (empty cells with blocks above)
-//! - [`HoleDepthPenalty`] - Sum of depths of all holes
-//! - [`MaxHeightPenalty`] - Maximum column height
-//! - [`TotalHeightPenalty`] - Sum of all column heights
-//! - [`CenterColumnsPenalty`] - Sum of center column heights (columns 3-6)
-//! - [`TopOutRisk`] - Risk of topping out (height-based threshold)
-//! - [`CenterTopOutRisk`] - Risk of topping out in center columns
+//! - [`LINEAR_HOLES_PENALTY`] - Number of holes (empty cells with blocks above)
+//! - [`LINEAR_HOLE_DEPTH_PENALTY`] - Sum of depths of all holes
+//! - [`LINEAR_MAX_HEIGHT_PENALTY`] - Maximum column height
+//! - [`LINEAR_TOTAL_HEIGHT_PENALTY`] - Sum of all column heights
+//! - [`LINEAR_CENTER_COLUMNS_PENALTY`] - Sum of center column heights (columns 3-6)
+//! - [`LINEAR_TOP_OUT_RISK`] - Risk of topping out (height-based threshold)
+//! - [`LINEAR_CENTER_TOP_OUT_RISK`] - Risk of topping out in center columns
 //!
 //! ## Structure Features
 //!
 //! Affect placement flexibility and future options:
 //!
-//! - [`SurfaceBumpinessPenalty`] - Sum of absolute height differences between adjacent columns
-//! - [`SurfaceRoughnessPenalty`] - Variance in column heights
-//! - [`RowTransitionsPenalty`] - Number of horizontal empty-to-filled transitions
-//! - [`ColumnTransitionsPenalty`] - Number of vertical empty-to-filled transitions
-//! - [`WellDepthPenalty`] - Depth of deepest well (reduces placement flexibility)
-//! - [`DeepWellRisk`] - Risk from excessively deep wells (reduces recovery options)
+//! - [`LINEAR_SURFACE_BUMPINESS_PENALTY`] - Sum of absolute height differences between adjacent columns
+//! - [`LINEAR_SURFACE_ROUGHNESS_PENALTY`] - Variance in column heights
+//! - [`LINEAR_ROW_TRANSITIONS_PENALTY`] - Number of horizontal empty-to-filled transitions
+//! - [`LINEAR_COLUMN_TRANSITIONS_PENALTY`] - Number of vertical empty-to-filled transitions
+//! - [`LINEAR_WELL_DEPTH_PENALTY`] - Depth of deepest well (reduces placement flexibility)
+//! - [`LINEAR_DEEP_WELL_RISK`] - Risk from excessively deep wells (reduces recovery options)
 //!
 //! ## Score Features
 //!
 //! Directly contribute to game score:
 //!
-//! - [`LineClearBonus`] - Number of lines cleared by this placement
-//! - [`IWellReward`] - Quality of I-piece well setup (depth ~4 is optimal)
+//! - [`LINE_CLEAR_BONUS`] - Number of lines cleared by this placement
+//! - [`I_WELL_REWARD`] - Quality of I-piece well setup (depth ~4 is optimal)
 //!
 //! # Feature Processing Pipeline
 //!
@@ -58,8 +58,8 @@
 //!
 //! Most features use linear transformation (`raw as f32`), but some use custom transformations:
 //!
-//! - [`LineClearBonus`]: Exponential weighting (4-line Tetris gets 6× weight)
-//! - [`IWellReward`]: Triangular peak centered at depth 4 (optimal for I-pieces)
+//! - [`LINE_CLEAR_BONUS`]: Exponential weighting (4-line Tetris gets 6× weight)
+//! - [`I_WELL_REWARD`]: Triangular peak centered at depth 4 (optimal for I-pieces)
 //!
 //! ## Normalization
 //!
@@ -99,18 +99,18 @@
 //!
 //! 1. **Duplicate features with different normalization ranges**:
 //!
-//!    - `TopOutRisk` vs `MaxHeightPenalty` - Both measure maximum height but with different normalization
-//!    - `CenterTopOutRisk` vs `CenterColumnsPenalty` - Both measure center column heights
-//!    - `DeepWellRisk` vs `WellDepthPenalty` - Both measure well depth
+//!    - [`LINEAR_TOP_OUT_RISK`] vs [`LINEAR_MAX_HEIGHT_PENALTY`] - Both measure maximum height but with different normalization
+//!    - [`LINEAR_CENTER_TOP_OUT_RISK`] vs [`LINEAR_CENTER_COLUMNS_PENALTY`] - Both measure center column heights
+//!    - [`LINEAR_DEEP_WELL_RISK`] vs [`LINEAR_WELL_DEPTH_PENALTY`] - Both measure well depth
 //!
 //!    These duplicates exist as an ad-hoc attempt to capture non-linearity through different
 //!    scaling ranges, suggesting a systematic need for non-linear transformations.
 //!
 //! 2. **Similar features measuring overlapping properties**:
 //!
-//!    - `HolesPenalty` vs `HoleDepthPenalty` - Both measure holes (count vs depth)
-//!    - `SurfaceBumpinessPenalty` vs `SurfaceRoughnessPenalty` - Both measure surface irregularity
-//!    - `RowTransitionsPenalty` vs `ColumnTransitionsPenalty` - Both measure board complexity
+//!    - [`NumHoles`] vs [`SumOfHoleDepth`] - Both measure holes (count vs depth)
+//!    - [`SurfaceBumpiness`] vs [`SurfaceRoughness`] - Both measure surface irregularity
+//!    - [`RowTransitions`] vs [`ColumnTransitions`] - Both measure board complexity
 //!
 //!    These similar features may provide different perspectives on the same underlying property,
 //!    but the redundancy creates several issues:
@@ -176,15 +176,24 @@
 //!
 //! - Feature computation: `extract_raw()` method only
 //!
-//! Feature source types (e.g., [`HolesPenalty`]) implement this trait and are wrapped
+//! Feature source types (e.g., [`NumHoles`]) implement this trait and are wrapped
 //! by [`LinearNormalized`] to provide transformation and normalization.
 //!
 //! [`all_board_features()`] provides access to all active features for batch processing.
 
 use std::{borrow::Cow, fmt};
 
-use crate::placement_analysis::PlacementAnalysis;
+use crate::board_feature::source::{EdgeIWellDepth, NumClearedLines};
 
+use crate::{
+    board_feature::source::{
+        CenterColumnMaxHeight, ColumnTransitions, MaxHeight, NumHoles, RowTransitions,
+        SumOfHoleDepth, SumOfWellDepth, SurfaceBumpiness, SurfaceRoughness, TotalHeight,
+    },
+    placement_analysis::PlacementAnalysis,
+};
+
+pub mod source;
 mod stats;
 
 #[must_use]
@@ -194,8 +203,8 @@ pub fn all_board_features() -> Vec<BoxedBoardFeature> {
         Box::new(LINEAR_HOLES_PENALTY),
         Box::new(LINEAR_HOLE_DEPTH_PENALTY),
         Box::new(LINEAR_MAX_HEIGHT_PENALTY),
+        Box::new(LINEAR_CENTER_COLUMNS_PENALTY),
         Box::new(LINEAR_TOTAL_HEIGHT_PENALTY),
-        Box::new(LINEAR_CENTER_COLUMN_PENALTY),
         Box::new(LINEAR_TOP_OUT_RISK),
         Box::new(LINEAR_CENTER_TOP_OUT_RISK),
         // structure features
@@ -206,8 +215,29 @@ pub fn all_board_features() -> Vec<BoxedBoardFeature> {
         Box::new(LINEAR_WELL_DEPTH_PENALTY),
         Box::new(LINEAR_DEEP_WELL_RISK),
         // score features
-        Box::new(LineClearBonus),
-        Box::new(IWellReward),
+        Box::new(LINE_CLEAR_BONUS),
+        Box::new(I_WELL_REWARD),
+    ]
+}
+
+#[must_use]
+pub fn all_board_feature_sources() -> Vec<BoxedBoardFeatureSource> {
+    vec![
+        // survival features
+        Box::new(NumHoles),
+        Box::new(SumOfHoleDepth),
+        Box::new(MaxHeight),
+        Box::new(CenterColumnMaxHeight),
+        Box::new(TotalHeight),
+        // structure features
+        Box::new(SurfaceBumpiness),
+        Box::new(SurfaceRoughness),
+        Box::new(RowTransitions),
+        Box::new(ColumnTransitions),
+        Box::new(SumOfWellDepth),
+        // score features
+        Box::new(NumClearedLines),
+        Box::new(EdgeIWellDepth),
     ]
 }
 
@@ -226,7 +256,25 @@ pub struct BoardFeatureValue {
 
 pub trait BoardFeatureSource {
     #[must_use]
+    fn id(&self) -> &str;
+    #[must_use]
+    fn name(&self) -> &str;
+    #[must_use]
+    fn type_name(&self) -> &str {
+        std::any::type_name::<Self>()
+    }
+    #[must_use]
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource;
+    #[must_use]
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
+}
+
+pub type BoxedBoardFeatureSource = Box<dyn BoardFeatureSource>;
+
+impl Clone for BoxedBoardFeatureSource {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }
 
 fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 {
@@ -241,7 +289,7 @@ fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 
 pub trait BoardFeature: fmt::Debug + Send + Sync {
     fn id(&self) -> &str;
     fn name(&self) -> &str;
-    fn feature_source_type_name(&self) -> Option<&str>;
+    fn feature_source(&self) -> &dyn BoardFeatureSource;
     fn clone_boxed(&self) -> BoxedBoardFeature;
 
     #[must_use]
@@ -316,8 +364,8 @@ where
         &self.name
     }
 
-    fn feature_source_type_name(&self) -> Option<&str> {
-        Some(std::any::type_name::<S>())
+    fn feature_source(&self) -> &dyn BoardFeatureSource {
+        &self.source
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {
@@ -360,23 +408,14 @@ where
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer holes is better).
-pub const LINEAR_HOLES_PENALTY: LinearNormalized<HolesPenalty> = LinearNormalized::new(
+pub const LINEAR_HOLES_PENALTY: LinearNormalized<NumHoles> = LinearNormalized::new(
     Cow::Borrowed("linear_holes_penalty"),
-    Cow::Borrowed("Holes Penalty (Linear)"),
+    Cow::Borrowed("Number of Holes Penalty (Linear)"),
     FeatureSignal::Negative,
-    HolesPenalty::P05,
-    HolesPenalty::P95,
-    HolesPenalty,
+    NumHoles::P05,
+    NumHoles::P95,
+    NumHoles,
 );
-
-#[derive(Debug, Clone)]
-pub struct HolesPenalty;
-
-impl BoardFeatureSource for HolesPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().num_holes().into()
-    }
-}
 
 /// Smooth penalty for cumulative hole depth (weighted by blocks above each hole).
 ///
@@ -386,7 +425,7 @@ impl BoardFeatureSource for HolesPenalty {
 /// - Stacking that traps holes under tall columns
 /// - Mid/late-game instability from unrecoverable cavities
 ///
-/// Complements [`HolesPenalty`], which counts holes uniformly. Here, holes deeper in the stack contribute more
+/// Complements [`LINEAR_HOLES_PENALTY`], which counts holes uniformly. Here, holes deeper in the stack contribute more
 /// based on their depth (number of cells above them, including both occupied and empty cells).
 ///
 /// # Raw measurement
@@ -402,23 +441,14 @@ impl BoardFeatureSource for HolesPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower holes is better).
-pub const LINEAR_HOLE_DEPTH_PENALTY: LinearNormalized<HoleDepthPenalty> = LinearNormalized::new(
+pub const LINEAR_HOLE_DEPTH_PENALTY: LinearNormalized<SumOfHoleDepth> = LinearNormalized::new(
     Cow::Borrowed("linear_hole_depth_penalty"),
-    Cow::Borrowed("Hole Depth Penalty (Linear)"),
+    Cow::Borrowed("Sum of Hole Depth Penalty (Linear)"),
     FeatureSignal::Negative,
-    HoleDepthPenalty::P05,
-    HoleDepthPenalty::P95,
-    HoleDepthPenalty,
+    SumOfHoleDepth::P05,
+    SumOfHoleDepth::P95,
+    SumOfHoleDepth,
 );
-
-#[derive(Debug, Clone)]
-pub struct HoleDepthPenalty;
-
-impl BoardFeatureSource for HoleDepthPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().sum_of_hole_depth()
-    }
-}
 
 /// Smooth penalty for horizontal fragmentation by counting occupancy changes between adjacent cells within each row.
 ///
@@ -441,24 +471,14 @@ impl BoardFeatureSource for HoleDepthPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
-pub const LINEAR_ROW_TRANSITIONS_PENALTY: LinearNormalized<RowTransitionsPenalty> =
-    LinearNormalized::new(
-        Cow::Borrowed("linear_row_transitions_penalty"),
-        Cow::Borrowed("Row Transitions Penalty (Linear)"),
-        FeatureSignal::Negative,
-        RowTransitionsPenalty::P05,
-        RowTransitionsPenalty::P95,
-        RowTransitionsPenalty,
-    );
-
-#[derive(Debug, Clone)]
-pub struct RowTransitionsPenalty;
-
-impl BoardFeatureSource for RowTransitionsPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().row_transitions()
-    }
-}
+pub const LINEAR_ROW_TRANSITIONS_PENALTY: LinearNormalized<RowTransitions> = LinearNormalized::new(
+    Cow::Borrowed("linear_row_transitions_penalty"),
+    Cow::Borrowed("Row Transitions Penalty (Linear)"),
+    FeatureSignal::Negative,
+    RowTransitions::P05,
+    RowTransitions::P95,
+    RowTransitions,
+);
 
 /// Smooth penalty for vertical fragmentation within columns by counting occupancy changes from top to bottom.
 ///
@@ -477,24 +497,15 @@ impl BoardFeatureSource for RowTransitionsPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (fewer transitions is better).
-pub const LINEAR_COLUMN_TRANSITIONS_PENALTY: LinearNormalized<ColumnTransitionsPenalty> =
+pub const LINEAR_COLUMN_TRANSITIONS_PENALTY: LinearNormalized<ColumnTransitions> =
     LinearNormalized::new(
         Cow::Borrowed("linear_column_transitions_penalty"),
         Cow::Borrowed("Column Transitions Penalty (Linear)"),
         FeatureSignal::Negative,
-        ColumnTransitionsPenalty::P05,
-        ColumnTransitionsPenalty::P95,
-        ColumnTransitionsPenalty,
+        ColumnTransitions::P05,
+        ColumnTransitions::P95,
+        ColumnTransitions,
     );
-
-#[derive(Debug, Clone)]
-pub struct ColumnTransitionsPenalty;
-
-impl BoardFeatureSource for ColumnTransitionsPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().column_transitions()
-    }
-}
 
 /// Smooth penalty for surface height variation between adjacent columns.
 ///
@@ -504,7 +515,7 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
 /// - Step-like surface patterns
 /// - Non-flat board surfaces that complicate piece placement
 ///
-/// Differs from [`SurfaceRoughnessPenalty`] which measures curvature (second-order differences);
+/// Differs from [`LINEAR_SURFACE_ROUGHNESS_PENALTY`] which measures curvature (second-order differences);
 /// this feature directly measures first-order height differences, making it more sensitive
 /// to simple step patterns and overall surface flatness.
 ///
@@ -517,24 +528,15 @@ impl BoardFeatureSource for ColumnTransitionsPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (flatter surface is better).
-pub const LINEAR_SURFACE_BUMPINESS_PENALTY: LinearNormalized<SurfaceBumpinessPenalty> =
+pub const LINEAR_SURFACE_BUMPINESS_PENALTY: LinearNormalized<SurfaceBumpiness> =
     LinearNormalized::new(
         Cow::Borrowed("linear_surface_bumpiness_penalty"),
         Cow::Borrowed("Surface Bumpiness Penalty (Linear)"),
         FeatureSignal::Negative,
-        SurfaceBumpinessPenalty::P05,
-        SurfaceBumpinessPenalty::P95,
-        SurfaceBumpinessPenalty,
+        SurfaceBumpiness::P05,
+        SurfaceBumpiness::P95,
+        SurfaceBumpiness,
     );
-
-#[derive(Debug, Clone)]
-pub struct SurfaceBumpinessPenalty;
-
-impl BoardFeatureSource for SurfaceBumpinessPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().surface_bumpiness()
-    }
-}
 
 /// Smooth penalty for local surface curvature using second-order height differences (discrete Laplacian).
 ///
@@ -544,7 +546,7 @@ impl BoardFeatureSource for SurfaceBumpinessPenalty {
 /// - Local height variations that increase future instability
 /// - Shapes that are prone to creating holes
 ///
-/// Differs from [`SurfaceBumpinessPenalty`] which measures first-order height differences;
+/// Differs from [`LINEAR_SURFACE_BUMPINESS_PENALTY`] which measures first-order height differences;
 /// this feature uses second-order differences (curvature) and is more sensitive to local
 /// irregularities while tolerating gradual slopes. Complements row and column transitions
 /// by remaining sensitive even when the overall stack is low.
@@ -558,24 +560,15 @@ impl BoardFeatureSource for SurfaceBumpinessPenalty {
 ///
 /// - Clipped to `[P05, P95]`
 /// - `SIGNAL` = Negative (flatter surface is better).
-pub const LINEAR_SURFACE_ROUGHNESS_PENALTY: LinearNormalized<SurfaceRoughnessPenalty> =
+pub const LINEAR_SURFACE_ROUGHNESS_PENALTY: LinearNormalized<SurfaceRoughness> =
     LinearNormalized::new(
         Cow::Borrowed("linear_surface_roughness_penalty"),
         Cow::Borrowed("Surface Roughness Penalty (Linear)"),
         FeatureSignal::Negative,
-        SurfaceRoughnessPenalty::P05,
-        SurfaceRoughnessPenalty::P95,
-        SurfaceRoughnessPenalty,
+        SurfaceRoughness::P05,
+        SurfaceRoughness::P95,
+        SurfaceRoughness,
     );
-
-#[derive(Debug, Clone)]
-pub struct SurfaceRoughnessPenalty;
-
-impl BoardFeatureSource for SurfaceRoughnessPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().surface_roughness()
-    }
-}
 
 /// Smooth penalty for excessive single-column well depth; thresholds shallow wells.
 ///
@@ -587,7 +580,7 @@ impl BoardFeatureSource for SurfaceRoughnessPenalty {
 ///
 /// Only wells deeper than 1 are considered dangerous. Shallow wells (depth ≤ 1) are allowed to preserve freedom
 /// for controlled I-well construction. This feature is strictly a safety penalty and does NOT reward I-wells;
-/// combine with [`IWellReward`] for balanced evaluation.
+/// combine with [`I_WELL_REWARD`] for balanced evaluation.
 ///
 /// # Raw measurement
 ///
@@ -598,23 +591,14 @@ impl BoardFeatureSource for SurfaceRoughnessPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
-pub const LINEAR_WELL_DEPTH_PENALTY: LinearNormalized<WellDepthPenalty> = LinearNormalized::new(
+pub const LINEAR_WELL_DEPTH_PENALTY: LinearNormalized<SumOfWellDepth> = LinearNormalized::new(
     Cow::Borrowed("linear_well_depth_penalty"),
     Cow::Borrowed("Well Depth Penalty (Linear)"),
     FeatureSignal::Negative,
-    WellDepthPenalty::P05,
-    WellDepthPenalty::P95,
-    WellDepthPenalty,
+    SumOfWellDepth::P05,
+    SumOfWellDepth::P95,
+    SumOfWellDepth,
 );
-
-#[derive(Debug, Clone)]
-pub struct WellDepthPenalty;
-
-impl BoardFeatureSource for WellDepthPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().sum_of_deep_well_depth()
-    }
-}
 
 /// Thresholded risk for dangerously deep wells beyond safe operational limits.
 ///
@@ -624,7 +608,7 @@ impl BoardFeatureSource for WellDepthPenalty {
 /// - Over-commitment to vertical structures
 /// - Reduced board flexibility and recovery options
 ///
-/// Unlike [`WellDepthPenalty`], which applies smooth linear penalties to all wells beyond depth 1,
+/// Unlike [`LINEAR_WELL_DEPTH_PENALTY`], which applies smooth linear penalties to all wells beyond depth 1,
 /// this feature focuses on extreme depth scenarios. Acts as a hard constraint to prevent catastrophic
 /// well over-commitment while allowing controlled I-well construction.
 ///
@@ -637,23 +621,14 @@ impl BoardFeatureSource for WellDepthPenalty {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (shallower wells is better).
-pub const LINEAR_DEEP_WELL_RISK: LinearNormalized<DeepWellRisk> = LinearNormalized::new(
+pub const LINEAR_DEEP_WELL_RISK: LinearNormalized<SumOfWellDepth> = LinearNormalized::new(
     Cow::Borrowed("linear_deep_well_risk"),
     Cow::Borrowed("Deep Well Risk (Linear)"),
     FeatureSignal::Negative,
-    DeepWellRisk::P75,
-    DeepWellRisk::P95,
-    DeepWellRisk,
+    SumOfWellDepth::P75,
+    SumOfWellDepth::P95,
+    SumOfWellDepth,
 );
-
-#[derive(Debug, Clone)]
-pub struct DeepWellRisk;
-
-impl BoardFeatureSource for DeepWellRisk {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().sum_of_deep_well_depth()
-    }
-}
 
 /// Smooth penalty for maximum column height across the board.
 ///
@@ -663,9 +638,9 @@ impl BoardFeatureSource for DeepWellRisk {
 /// - Localized vertical pressure
 /// - Risk of reduced placement options
 ///
-/// Unlike [`TopOutRisk`], which uses a thresholded approach focused on imminent danger,
+/// Unlike [`LINEAR_TOP_OUT_RISK`], which uses a thresholded approach focused on imminent danger,
 /// this feature provides a smooth, continuous penalty throughout the game. It complements
-/// [`TotalHeightPenalty`] by focusing on peak height rather than cumulative pressure.
+/// [`LINEAR_TOTAL_HEIGHT_PENALTY`] by focusing on peak height rather than cumulative pressure.
 ///
 /// # Raw measurement
 ///
@@ -675,23 +650,41 @@ impl BoardFeatureSource for DeepWellRisk {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower maximum height is better).
-pub const LINEAR_MAX_HEIGHT_PENALTY: LinearNormalized<MaxHeightPenalty> = LinearNormalized::new(
+pub const LINEAR_MAX_HEIGHT_PENALTY: LinearNormalized<MaxHeight> = LinearNormalized::new(
     Cow::Borrowed("linear_max_height_penalty"),
     Cow::Borrowed("Max Height Penalty (Linear)"),
     FeatureSignal::Negative,
-    MaxHeightPenalty::P05,
-    MaxHeightPenalty::P95,
-    MaxHeightPenalty,
+    MaxHeight::P05,
+    MaxHeight::P95,
+    MaxHeight,
 );
 
-#[derive(Debug, Clone)]
-pub struct MaxHeightPenalty;
-
-impl BoardFeatureSource for MaxHeightPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().max_height().into()
-    }
-}
+/// Thresholded risk for imminent top-out based on maximum column height.
+///
+/// This feature penalizes:
+///
+/// - Approaching the ceiling (irreversible top-out risk)
+/// - States close to game over
+///
+/// Unlike other features, max height is intentionally ignored for most of the game and only penalized near the ceiling,
+/// reflecting the irreversible nature of top-out. Acts as a hard constraint rather than a general board quality measure.
+///
+/// # Raw measurement
+///
+/// - `raw = max(column_heights)`: the tallest column on the board.
+///
+/// # Normalization
+///
+/// - Clipped to `[P75, P95]`.
+/// - `SIGNAL` = Negative (lower height is better).
+pub const LINEAR_TOP_OUT_RISK: LinearNormalized<MaxHeight> = LinearNormalized::new(
+    Cow::Borrowed("linear_top_out_risk"),
+    Cow::Borrowed("Top-Out Risk (Linear)"),
+    FeatureSignal::Negative,
+    MaxHeight::P75,
+    MaxHeight::P95,
+    MaxHeight,
+);
 
 /// Smooth penalty for maximum height in the center four columns.
 ///
@@ -713,24 +706,15 @@ impl BoardFeatureSource for MaxHeightPenalty {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower center height is better).
-pub const LINEAR_CENTER_COLUMN_PENALTY: LinearNormalized<CenterColumnsPenalty> =
+pub const LINEAR_CENTER_COLUMNS_PENALTY: LinearNormalized<CenterColumnMaxHeight> =
     LinearNormalized::new(
         Cow::Borrowed("linear_center_columns_penalty"),
-        Cow::Borrowed("Center Columns Penalty (Linear)"),
+        Cow::Borrowed("Center Columns Max Height Penalty (Linear)"),
         FeatureSignal::Negative,
-        CenterColumnsPenalty::P05,
-        CenterColumnsPenalty::P95,
-        CenterColumnsPenalty,
+        CenterColumnMaxHeight::P05,
+        CenterColumnMaxHeight::P95,
+        CenterColumnMaxHeight,
     );
-
-#[derive(Debug, Clone)]
-pub struct CenterColumnsPenalty;
-
-impl BoardFeatureSource for CenterColumnsPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().center_column_max_height().into()
-    }
-}
 
 /// Thresholded risk for top-out in the center 4 columns (columns 3-6).
 ///
@@ -745,7 +729,7 @@ impl BoardFeatureSource for CenterColumnsPenalty {
 /// - Most pieces naturally gravitate toward the center
 /// - High center columns severely restrict piece placement options
 ///
-/// This feature uses the same thresholded approach as [`TopOutRisk`] (P75-P95), but focuses
+/// This feature uses the same thresholded approach as [`LINEAR_TOP_OUT_RISK`] (P75-P95), but focuses
 /// specifically on the center 4 columns rather than all columns, allowing the AI to distinguish
 /// between edge height and critical center height issues.
 ///
@@ -757,59 +741,15 @@ impl BoardFeatureSource for CenterColumnsPenalty {
 ///
 /// - Clipped to `[P75, P95]`.
 /// - `SIGNAL` = Negative (lower height is better).
-pub const LINEAR_CENTER_TOP_OUT_RISK: LinearNormalized<CenterTopOutRisk> = LinearNormalized::new(
-    Cow::Borrowed("linear_center_top_out_risk"),
-    Cow::Borrowed("Center Top-Out Risk (Linear)"),
-    FeatureSignal::Negative,
-    CenterTopOutRisk::P75,
-    CenterTopOutRisk::P95,
-    CenterTopOutRisk,
-);
-
-#[derive(Debug, Clone)]
-pub struct CenterTopOutRisk;
-
-impl BoardFeatureSource for CenterTopOutRisk {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().center_column_max_height().into()
-    }
-}
-
-/// Thresholded risk for imminent top-out based on maximum column height.
-///
-/// This feature penalizes:
-///
-/// - Approaching the ceiling (irreversible top-out risk)
-/// - States close to game over
-///
-/// Unlike other features, max height is intentionally ignored for most of the game and only penalized near the ceiling,
-/// reflecting the irreversible nature of top-out. Acts as a hard constraint rather than a general board quality measure.
-///
-/// # Raw measurement
-///
-/// - `raw = max(column_heights)`: the tallest column on the board.
-///
-/// # Normalization
-///
-/// - Clipped to `[P75, P95]`.
-/// - `SIGNAL` = Negative (lower height is better).
-pub const LINEAR_TOP_OUT_RISK: LinearNormalized<TopOutRisk> = LinearNormalized::new(
-    Cow::Borrowed("linear_top_out_risk"),
-    Cow::Borrowed("Top-Out Risk (Linear)"),
-    FeatureSignal::Negative,
-    TopOutRisk::P75,
-    TopOutRisk::P95,
-    TopOutRisk,
-);
-
-#[derive(Debug, Clone)]
-pub struct TopOutRisk;
-
-impl BoardFeatureSource for TopOutRisk {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().max_height().into()
-    }
-}
+pub const LINEAR_CENTER_TOP_OUT_RISK: LinearNormalized<CenterColumnMaxHeight> =
+    LinearNormalized::new(
+        Cow::Borrowed("linear_center_top_out_risk"),
+        Cow::Borrowed("Center Top-Out Risk (Linear)"),
+        FeatureSignal::Negative,
+        CenterColumnMaxHeight::P75,
+        CenterColumnMaxHeight::P95,
+        CenterColumnMaxHeight,
+    );
 
 /// Smooth penalty for global stacking pressure by summing all column heights.
 ///
@@ -819,7 +759,7 @@ impl BoardFeatureSource for TopOutRisk {
 /// - Overall board pressure not captured by local roughness or transitions
 /// - High average stack height
 ///
-/// Unlike [`TopOutRisk`], which focuses on top-out danger from the tallest column, this feature captures
+/// Unlike [`LINEAR_TOP_OUT_RISK`], which focuses on top-out danger from the tallest column, this feature captures
 /// cumulative pressure across all columns. It reflects the total "weight" of the board state.
 ///
 /// # Raw measurement
@@ -831,23 +771,14 @@ impl BoardFeatureSource for TopOutRisk {
 ///
 /// - Clipped to `[P05, P95]`.
 /// - `SIGNAL` = Negative (lower total height is better).
-pub const LINEAR_TOTAL_HEIGHT_PENALTY: LinearNormalized<TotalHeightPenalty> = LinearNormalized::new(
+pub const LINEAR_TOTAL_HEIGHT_PENALTY: LinearNormalized<TotalHeight> = LinearNormalized::new(
     Cow::Borrowed("linear_total_height_penalty"),
     Cow::Borrowed("Total Height Penalty (Linear)"),
     FeatureSignal::Negative,
-    TotalHeightPenalty::P05,
-    TotalHeightPenalty::P95,
-    TotalHeightPenalty,
+    TotalHeight::P05,
+    TotalHeight::P95,
+    TotalHeight,
 );
-
-#[derive(Debug, Clone)]
-pub struct TotalHeightPenalty;
-
-impl BoardFeatureSource for TotalHeightPenalty {
-    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().total_height().into()
-    }
-}
 
 /// Discrete bonus for line clears with strong emphasis on efficient 4-line clears (tetrises).
 ///
@@ -887,8 +818,19 @@ impl BoardFeatureSource for TotalHeightPenalty {
 ///
 /// - Clipped to `[0.0, 6.0]` (transformed range).
 /// - `SIGNAL` = Positive (more lines cleared is better).
+pub const LINE_CLEAR_BONUS: LineClearBonus = LineClearBonus::new(NumClearedLines);
+
 #[derive(Debug, Clone)]
-pub struct LineClearBonus;
+pub struct LineClearBonus {
+    source: NumClearedLines,
+}
+
+impl LineClearBonus {
+    #[must_use]
+    pub const fn new(source: NumClearedLines) -> Self {
+        Self { source }
+    }
+}
 
 impl BoardFeature for LineClearBonus {
     fn id(&self) -> &'static str {
@@ -899,8 +841,8 @@ impl BoardFeature for LineClearBonus {
         "Line Clear Bonus"
     }
 
-    fn feature_source_type_name(&self) -> Option<&str> {
-        None
+    fn feature_source(&self) -> &dyn BoardFeatureSource {
+        &self.source
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {
@@ -908,7 +850,7 @@ impl BoardFeature for LineClearBonus {
     }
 
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        u32::try_from(analysis.cleared_lines()).unwrap()
+        self.source.extract_raw(analysis)
     }
 
     fn transform(&self, raw: u32) -> f32 {
@@ -947,11 +889,22 @@ impl BoardFeature for LineClearBonus {
 ///
 /// # Rationale and interplay
 ///
-/// - Complements [`DeepWellRisk`] by focusing on edge wells suitable for tetrises, while [`DeepWellRisk`] penalizes excessive depths.
-/// - Synergizes with [`LineClearBonus`] to favor consistent tetrises.
+/// - Complements [`LINEAR_DEEP_WELL_RISK`] by focusing on edge wells suitable for tetrises, while [`LINEAR_DEEP_WELL_RISK`] penalizes excessive depths.
+/// - Synergizes with [`LINE_CLEAR_BONUS`] to favor consistent tetrises.
 /// - The triangular transform naturally discourages both shallow wells (not ready) and overly deep wells (risky).
+pub const I_WELL_REWARD: IWellReward = IWellReward::new(EdgeIWellDepth);
+
 #[derive(Debug, Clone)]
-pub struct IWellReward;
+pub struct IWellReward {
+    source: EdgeIWellDepth,
+}
+
+impl IWellReward {
+    #[must_use]
+    pub const fn new(source: EdgeIWellDepth) -> Self {
+        Self { source }
+    }
+}
 
 impl BoardFeature for IWellReward {
     fn id(&self) -> &'static str {
@@ -962,8 +915,8 @@ impl BoardFeature for IWellReward {
         "I-Well Reward"
     }
 
-    fn feature_source_type_name(&self) -> Option<&str> {
-        None
+    fn feature_source(&self) -> &dyn BoardFeatureSource {
+        &self.source
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {
@@ -971,7 +924,7 @@ impl BoardFeature for IWellReward {
     }
 
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
-        analysis.board_analysis().edge_iwell_depth().into()
+        analysis.board_analysis().edge_i_well_depth().into()
     }
 
     #[expect(clippy::cast_precision_loss)]

@@ -152,8 +152,8 @@ This roadmap outlines the development of KM-based normalization for **survival f
   - Load normalization params from generated JSON
 
 - [ ] Implement KM-based survival features
-  - `holes_penalty`, `hole_depth_penalty` (holes directly cause game over)
-  - `max_height_penalty`, `center_columns_penalty`, `total_height_penalty` (height determines available space)
+  - `km_num_holes`, `km_sum_of_hole_depth` (holes directly cause game over)
+  - `km_max_height`, `km_center_column_max_height`, `km_total_height` (height determines available space)
   - Use KM transform to capture non-linear survival relationships
 
 - [ ] Validate survival feature effectiveness

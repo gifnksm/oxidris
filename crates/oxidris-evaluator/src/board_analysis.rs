@@ -26,7 +26,7 @@
 //! - **Holes**: `num_holes`, `sum_of_hole_depth`
 //! - **Transitions**: `row_transitions`, `column_transitions`
 //! - **Surface**: `surface_bumpiness`, `surface_roughness`
-//! - **Wells**: `column_well_depths`, `sum_of_deep_well_depth`, `edge_iwell_depth`
+//! - **Wells**: `column_well_depths`, `sum_of_deep_well_depth`, `edge_i_well_depth`
 //! - **Other**: `column_occupied_cells`
 
 use std::{cell::OnceCell, iter};
@@ -49,7 +49,7 @@ pub struct BoardAnalysis {
     surface_bumpiness: OnceCell<u32>,
     surface_roughness: OnceCell<u32>,
     sum_of_deep_well_depth: OnceCell<u32>,
-    edge_iwell_depth: OnceCell<u8>,
+    edge_i_well_depth: OnceCell<u8>,
 }
 
 impl BoardAnalysis {
@@ -71,7 +71,7 @@ impl BoardAnalysis {
             surface_bumpiness: OnceCell::new(),
             surface_roughness: OnceCell::new(),
             sum_of_deep_well_depth: OnceCell::new(),
-            edge_iwell_depth: OnceCell::new(),
+            edge_i_well_depth: OnceCell::new(),
         }
     }
 
@@ -269,8 +269,8 @@ impl BoardAnalysis {
     }
 
     #[must_use]
-    pub fn edge_iwell_depth(&self) -> u8 {
-        *self.edge_iwell_depth.get_or_init(|| {
+    pub fn edge_i_well_depth(&self) -> u8 {
+        *self.edge_i_well_depth.get_or_init(|| {
             let well_depth = self.column_well_depths();
             let left_well_depth = well_depth[0];
             let right_well_depth = well_depth[BitBoard::PLAYABLE_WIDTH - 1];
@@ -751,7 +751,7 @@ mod tests {
     }
 
     #[test]
-    fn test_edge_iwell_depth() {
+    fn test_edge_i_well_depth() {
         let test_cases = vec![
             ("empty", test_boards::empty(), 0),
             ("flat", test_boards::flat(), 0),
@@ -761,12 +761,12 @@ mod tests {
 
         for (name, board, expected) in test_cases {
             let analysis = BoardAnalysis::from_board(&board);
-            assert_eq!(analysis.edge_iwell_depth(), expected, "{name}");
+            assert_eq!(analysis.edge_i_well_depth(), expected, "{name}");
         }
     }
 
     #[test]
-    fn test_edge_iwell_depth_both_edges() {
+    fn test_edge_i_well_depth_both_edges() {
         let board = BitBoard::from_ascii(
             "
             ..........
@@ -794,7 +794,7 @@ mod tests {
 
         let analysis = BoardAnalysis::from_board(&board);
         // Both edges have depth 4, returns max
-        assert_eq!(analysis.edge_iwell_depth(), 4);
+        assert_eq!(analysis.edge_i_well_depth(), 4);
     }
 
     #[test]
@@ -827,9 +827,9 @@ mod tests {
             let sum_heights: u8 = analysis.column_heights().iter().sum();
             assert_eq!(analysis.total_height(), sum_heights);
 
-            // Invariant: edge_iwell_depth <= max of all well depths
+            // Invariant: edge_i_well_depth <= max of all well depths
             let max_well = *analysis.column_well_depths().iter().max().unwrap();
-            assert!(analysis.edge_iwell_depth() <= max_well);
+            assert!(analysis.edge_i_well_depth() <= max_well);
 
             // Invariant: center_column_max_height <= max_height
             assert!(analysis.center_column_max_height() <= analysis.max_height());

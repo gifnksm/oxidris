@@ -59,9 +59,9 @@ The limited search space may prevent the AI from reaching beneficial board state
 
 **Problem:** Multiple features measure similar things, wasting computation and complicating interpretation:
 
-- `top_out_risk` ≈ `max_height_penalty`
-- `center_top_out_risk` ≈ `center_columns_penalty`
-- `deep_well_risk` ≈ `well_depth_penalty`
+- `linear_top_out_risk` ≈ `linear_max_height_penalty`
+- `linear_center_top_out_risk` ≈ `linear_center_columns_penalty`
+- `linear_deep_well_risk` ≈ `linear_well_depth_penalty`
 
 These duplicates exist because linear normalization couldn't capture non-linearity, so duplicate features with different scaling were added as a workaround. With KM-based transformation, they may no longer be needed.
 

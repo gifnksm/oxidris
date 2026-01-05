@@ -124,7 +124,7 @@ let normalized = (survival - km_min) / (km_max - km_min);  // 0.54
    - Focuses on common gameplay scenarios
 
 5. **Eliminates duplicates**: Non-linear transform removes need for `*_risk` features
-   - Current: `max_height_penalty` and `top_out_risk` both needed (different normalization ranges)
+   - Current: `linear_max_height_penalty` and `linear_top_out_risk` both needed (different normalization ranges)
    - With KM: Single feature with non-linear transform captures both behaviors
 
 ## Project Scope
@@ -133,11 +133,11 @@ let normalized = (survival - km_min) / (km_max - km_min);  // 0.54
 
 Features that directly affect game termination:
 
-- `holes_penalty` - holes prevent piece placement
-- `hole_depth_penalty` - deeper holes are harder to clear
-- `max_height_penalty` - height determines remaining space
-- `center_columns_penalty` - center height affects placement options
-- `total_height_penalty` - overall board pressure
+- `num_holes` - holes prevent piece placement
+- `sum_of_hole_depth` - deeper holes are harder to clear
+- `max_height` - height determines remaining space
+- `center_column_max_height` - center height affects placement options
+- `total_height` - overall board pressure
 
 These features have clear, direct impact on survival time, making KM-based normalization appropriate.
 
@@ -201,7 +201,7 @@ cargo run --release -- analyze-censoring data/boards.json \
     "generated_at": "2024-01-04T12:00:00Z"
   },
   "features": {
-    "holes_penalty": {
+    "linear_holes_penalty": {
       "transform_mapping": {
         "0": 322.8,
         "1": 304.5,

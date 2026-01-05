@@ -9,7 +9,7 @@ use std::{
 use anyhow::Context;
 use clap::Args;
 use oxidris_evaluator::{
-    board_feature::{self, BoxedBoardFeature},
+    board_feature::{self, BoxedBoardFeatureSource},
     placement_analysis::PlacementAnalysis,
 };
 use oxidris_stats::survival::KaplanMeierCurve;
@@ -23,8 +23,8 @@ pub(crate) struct AnalyzeCensoringArg {
     /// Path to the boards JSON file
     pub boards: PathBuf,
 
-    /// Feature IDs to analyze (comma-separated)
-    #[arg(long, value_delimiter = ',', default_values = ["holes_penalty", "max_height_penalty", "hole_depth_penalty"])]
+    /// Feature source IDs to analyze (comma-separated)
+    #[arg(long, value_delimiter = ',', default_values = ["num_holes", "sum_of_hole_depth", "max_height", "center_column_max_height", "total_height"])]
     pub features: Vec<String>,
 
     /// Perform Kaplan-Meier survival analysis
@@ -42,7 +42,7 @@ pub(crate) struct AnalyzeCensoringArg {
 }
 
 pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
-    let all_features = board_feature::all_board_features();
+    let all_features = board_feature::all_board_feature_sources();
     let target_features = arg
         .features
         .iter()
@@ -109,7 +109,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 
 #[expect(clippy::cast_precision_loss)]
 fn generate_normalization_params(
-    normalize_features: &[BoxedBoardFeature],
+    normalize_features: &[BoxedBoardFeatureSource],
     sessions: &[data::SessionData],
     max_turns: usize,
 ) -> anyhow::Result<NormalizationParams> {
@@ -329,7 +329,7 @@ fn analyze_by_capture_phase(sessions: &[crate::data::SessionData], max_turns: us
 
 #[expect(clippy::cast_precision_loss)]
 fn analyze_feature_survival(
-    feature: &BoxedBoardFeature,
+    feature: &BoxedBoardFeatureSource,
     sessions: &[crate::data::SessionData],
     output_dir: Option<&PathBuf>,
 ) -> anyhow::Result<()> {
@@ -493,7 +493,7 @@ fn analyze_by_evaluator(sessions: &[crate::data::SessionData]) {
 
 #[expect(clippy::cast_precision_loss)]
 fn analyze_by_feature(
-    all_features: &[BoxedBoardFeature],
+    all_features: &[BoxedBoardFeatureSource],
     feature_id: &str,
     sessions: &[crate::data::SessionData],
 ) -> anyhow::Result<()> {
