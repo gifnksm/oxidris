@@ -223,7 +223,6 @@ cargo run --release -- generate-boards --output data/boards.json
 
 # Generate KM-based normalization parameters
 cargo run --release -- analyze-censoring data/boards.json \
-    --kaplan-meier \
     --normalization-output data/normalization_params.json
 ```
 

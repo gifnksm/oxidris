@@ -91,15 +91,10 @@ analyze-board-features: $(BOARDS_DATA)
 analyze-censoring: $(BOARDS_DATA)
 	cargo run --release -- analyze-censoring $(BOARDS_DATA)
 
-## Analyze censoring effects with Kaplan-Meier survival analysis
-.PHONY: analyze-censoring-km
-analyze-censoring-km: $(BOARDS_DATA)
-	cargo run --release -- analyze-censoring $(BOARDS_DATA) --kaplan-meier
-
-## Analyze censoring with Kaplan-Meier and export CSV curves
+## Analyze censoring and export CSV curves
 .PHONY: analyze-censoring-km-csv
 analyze-censoring-km-csv:
-	cargo run --release -- analyze-censoring $(BOARDS_DATA) --kaplan-meier --km-output-dir $(DATA_DIR)/km_curves
+	cargo run --release -- analyze-censoring $(BOARDS_DATA) --km-output-dir $(DATA_DIR)/km_curves
 
 ## Generate normalization parameters from KM analysis
 .PHONY: generate-normalization
@@ -172,7 +167,7 @@ $(MODELS_DIR)/ai/%.json: $$(if $$(REGENERATE_AI_MODEL_JSON),FORCE) $(BOARDS_DATA
 
 REGENERATE_NORMALIZATION_PARAMS=
 $(NORMALIZATION_PARAMS): $$(if $$(REGENERATE_NORMALIZATION_PARAMS),FORCE) | $(DATA_DIR)/
-	cargo run --release -- analyze-censoring $(BOARDS_DATA) --kaplan-meier --normalization-output $@
+	cargo run --release -- analyze-censoring $(BOARDS_DATA) --normalization-output $@
 
 # Pattern rule to create directories as needed
 %/:

@@ -30,10 +30,6 @@ pub(crate) struct AnalyzeCensoringArg {
     #[arg(long, value_delimiter = ',', default_values = ["num_holes", "sum_of_hole_depth", "max_height", "center_column_max_height", "total_height"])]
     pub features: Vec<String>,
 
-    /// Perform Kaplan-Meier survival analysis
-    #[arg(long)]
-    pub kaplan_meier: bool,
-
     /// Output directory for KM curve CSV files
     #[arg(long)]
     pub km_output_dir: Option<PathBuf>,
@@ -78,15 +74,13 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
         println!();
     }
 
-    if arg.kaplan_meier {
-        println!("========================================");
-        println!("Kaplan-Meier Survival Analysis");
-        println!("========================================\n");
+    println!("========================================");
+    println!("Kaplan-Meier Survival Analysis");
+    println!("========================================\n");
 
-        for feature in &target_features {
-            analyze_feature_survival(feature, sessions, arg.km_output_dir.as_ref())?;
-            println!();
-        }
+    for feature in &target_features {
+        analyze_feature_survival(feature, sessions, arg.km_output_dir.as_ref())?;
+        println!();
     }
 
     if let Some(output_path) = &arg.normalization_output {

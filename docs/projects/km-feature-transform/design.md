@@ -179,7 +179,6 @@ make generate-normalization
 
 # Or manually:
 cargo run --release -- analyze-censoring data/boards.json \
-    --kaplan-meier \
     --normalization-output data/normalization_params.json
 ```
 
