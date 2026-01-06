@@ -138,7 +138,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         }
     }
 
-    print_best_indivisuals(&population);
+    print_best_individuals(&population);
     eprintln!("{ai:?} AI learning completed.");
 
     let model_name = match ai {
@@ -195,7 +195,7 @@ fn print_generation_summary(population: &Population) {
     eprintln!("    Mean: {:.3}", fitness_stats.mean);
 }
 
-fn print_best_indivisuals(population: &Population) {
+fn print_best_individuals(population: &Population) {
     eprintln!("Best Individuals:");
     for (i, ind) in population.individuals().iter().take(5).enumerate() {
         eprintln!("  {i:2}: {:?} => {}", ind.weights(), ind.fitness());
