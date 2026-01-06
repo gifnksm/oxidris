@@ -165,6 +165,14 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
   - Group large changes into phases
   - Fix minor issues silently, ask about medium issues, stop for major issues
 
+### Checkpoint Management
+
+- **Checkpoints**: See [Checkpoint Management](docs/ai/checkpoint-management.md)
+  - **Always use the exact template** - Do not improvise
+  - Create for long-running or interruptible work
+  - Save to `.checkpoints/YYYY-MM-DD-description-checkpoint.md`
+  - Delete after work completion
+
 ### When to Ask
 
 - **Before making changes**: See [When to Ask](docs/ai/when-to-ask.md)

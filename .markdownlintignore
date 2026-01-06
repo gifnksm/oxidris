@@ -4,5 +4,5 @@ target/
 # Dependencies
 node_modules/
 
-# Review checkpoints (generated during review sessions)
-.review-checkpoints/
+# Checkpoints (temporary working files for AI-assisted work sessions)
+.checkpoints/

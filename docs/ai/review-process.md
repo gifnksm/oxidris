@@ -271,109 +271,21 @@ Should we continue in a new conversation?
 
 ## Checkpoint Management
 
-### Checkpoint File Location
+For detailed checkpoint management guidelines, see [Checkpoint Management](checkpoint-management.md).
 
-Review checkpoint files should be saved to:
+**Quick reference for reviews:**
 
-```text
-.review-checkpoints/
-```
+- **When to checkpoint**: Multi-session reviews, before risky changes, when interruption expected
+- **Template**: Always use the exact template from [checkpoint-management.md](checkpoint-management.md#checkpoint-file-template)
+- **Location**: `.checkpoints/YYYY-MM-DD-description-checkpoint.md`
+- **Cleanup**: Delete after review completion and changes are committed
 
-This is a project-root directory (not under `docs/`) because checkpoints may cover:
+**Review-specific checkpoint tips:**
 
-- Documentation reviews
-- Code reviews
-- Configuration file reviews
-- Cross-system reviews
-
-### Checkpoint File Naming
-
-Use descriptive names with dates:
-
-```text
-YYYY-MM-description-checkpoint.md
-```
-
-**Examples:**
-
-- `.review-checkpoints/2025-01-evaluator-rustdoc-checkpoint.md`
-- `.review-checkpoints/2025-01-review-complete-checkpoint.md`
-- `.review-checkpoints/2025-01-training-system-checkpoint.md`
-
-### Checkpoint File Content
-
-Include in checkpoint files:
-
-1. **Date and Status** - When created, current state
-2. **Summary** - What was reviewed/changed
-3. **Completed Work** - Detailed list of completed items
-4. **Pending Work** - What remains to be done
-5. **Next Steps** - How to resume
-
-**Template:**
-
-```markdown
-# [Review Name] Checkpoint
-
-**Date**: YYYY-MM-DD
-**Status**: [In Progress / Complete / Paused]
-
-## Summary
-
-[Brief description of review scope and progress]
-
-## Completed Work
-
-- ✅ Item 1 - Description
-- ✅ Item 2 - Description
-
-## Pending Work
-
-- ⬜ Item 3 - Description
-- ⬜ Item 4 - Description
-
-## Next Steps
-
-[Instructions for resuming the review]
-```
-
-### Version Control
-
-Checkpoint files should be:
-
-- ✅ **Included in `.markdownlintignore`** (already configured)
-- ✅ **Included in `.gitignore`** (already configured)
-
-Checkpoint files are temporary working files for AI-assisted review sessions and should not be committed to version control. They represent personal work-in-progress state, similar to editor-specific files like `.vscode/` or `.idea/`.
-
-**Final review outcomes** should be documented through:
-
-- Commit messages describing the changes
-- Updated project documentation
-- Pull request descriptions (if applicable)
-
-### Checkpoint Cleanup
-
-**When to delete checkpoint files:**
-
-1. **After review completion** - When all changes are committed and the review is fully complete
-2. **Session concluded** - When the AI-assisted work session has ended and won't be resumed
-3. **Regular cleanup** - Periodically remove old checkpoints (e.g., older than 1 week)
-
-**How to clean up:**
-
-```bash
-# Remove specific checkpoint
-rm .review-checkpoints/2025-01-specific-checkpoint.md
-
-# Remove all checkpoints (when all work is complete)
-rm -rf .review-checkpoints/
-
-# Remove old checkpoints (Unix/Linux/macOS)
-find .review-checkpoints -name "*.md" -mtime +7 -delete
-```
-
-**Best practice:** Delete checkpoint files as soon as the review work is committed to version control. They serve no purpose after the final changes are applied and documented.
+- List files/modules reviewed in "Completed Work"
+- Note discovered issues and their severity in "Notes"
+- Reference review process steps in "Next Steps"
+- Include cross-file impacts if found
 
 ### Cross-File Impact Tracking
 
