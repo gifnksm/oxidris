@@ -177,25 +177,8 @@ run_docs_checks() {
 # Rust Code Checks
 # ============================================================================
 
-check_rust_fmt() {
-    echo "1. Format Check"
-
-    if [ "$MODE" = "fix" ]; then
-        cargo fmt >/dev/null 2>&1
-        print_success "Code formatted"
-    else
-        if cargo fmt --check >/dev/null 2>&1; then
-            print_success "Code properly formatted"
-        else
-            print_error "Code formatting issues found (run with --fix to auto-fix)"
-        fi
-    fi
-
-    echo ""
-}
-
 check_rust_clippy() {
-    echo "2. Clippy Check"
+    echo "1. Clippy Check"
 
     if [ "$MODE" = "fix" ]; then
         # Try to auto-fix, and check exit code to detect unfixable warnings
@@ -210,6 +193,23 @@ check_rust_clippy() {
             print_success "No clippy warnings"
         else
             print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+check_rust_fmt() {
+    echo "2. Format Check"
+
+    if [ "$MODE" = "fix" ]; then
+        cargo fmt >/dev/null 2>&1
+        print_success "Code formatted"
+    else
+        if cargo fmt --check >/dev/null 2>&1; then
+            print_success "Code properly formatted"
+        else
+            print_error "Code formatting issues found (run with --fix to auto-fix)"
         fi
     fi
 
@@ -253,8 +253,8 @@ run_rust_checks() {
     echo ""
 
     check_typos
-    check_rust_fmt
     check_rust_clippy
+    check_rust_fmt
     check_rust_tests
     check_rust_doc
 }
