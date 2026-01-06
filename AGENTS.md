@@ -148,6 +148,14 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
   - If clippy warnings remain that couldn't be auto-fixed, address them manually
   - For quick checks without auto-fix (fast, uses cache): `./scripts/lint rust`
 
+### Shell Script Changes
+
+- **Linting**: **Always run `./scripts/lint shell --fix` after changing shell scripts**
+  - Checks scripts with shellcheck (cannot auto-fix, fix manually)
+  - Formats scripts with shfmt (with --fix flag)
+  - Review changes with `git diff` after running
+  - For quick checks without auto-fix: `./scripts/lint shell`
+
 ### Review Process
 
 - **Review process**: See [Review Process](docs/ai/review-process.md)

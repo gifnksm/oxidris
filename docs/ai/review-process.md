@@ -579,6 +579,8 @@ This checks:
 
 | Tool       | When                                 | Command                                  |
 |------------|--------------------------------------|------------------------------------------|
+| shellcheck | After shell script changes           | `./scripts/lint shell`                   |
+| shfmt      | After shell script changes           | `./scripts/lint shell --fix`             |
 | cargo test | After doc changes with code examples | `cargo test --doc`                       |
 | cargo doc  | After rustdoc changes                | `cargo doc --no-deps`                    |
 | grep       | Custom cross-document searches       | `grep -r "pattern" --include="*.md"`     |
@@ -591,6 +593,13 @@ markdownlint .
 
 # Fix auto-fixable markdown issues
 markdownlint . --fix
+
+# Check shell scripts with shellcheck
+shellcheck scripts/*
+
+# Format shell scripts with shfmt
+shfmt -d scripts/  # check only
+shfmt -w scripts/  # write changes
 
 # Verify doctests compile
 cargo test --doc --package oxidris-evaluator

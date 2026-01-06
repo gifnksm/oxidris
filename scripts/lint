@@ -75,11 +75,11 @@ cleanup_temp() {
 }
 
 # ============================================================================
-# Documentation Checks
+# Common Checks
 # ============================================================================
 
-check_docs_typos() {
-    echo "1. Documentation Typos"
+check_typos() {
+    echo "Typos Check"
 
     if ! command -v typos &>/dev/null; then
         print_warning "typos not installed (install with: cargo install typos-cli)"
@@ -87,13 +87,13 @@ check_docs_typos() {
     fi
 
     if [ "$MODE" = "fix" ]; then
-        if typos docs/ *.md --write-changes 2>&1 >/dev/null; then
+        if typos --write-changes >/dev/null 2>&1; then
             print_success "No typos found"
         else
             print_success "Typos fixed automatically"
         fi
     else
-        if typos docs/ *.md 2>&1 >/dev/null; then
+        if typos >/dev/null 2>&1; then
             print_success "No typos found"
         else
             print_error "Typos found (run with --fix to auto-fix)"
@@ -103,8 +103,12 @@ check_docs_typos() {
     echo ""
 }
 
+# ============================================================================
+# Documentation Checks
+# ============================================================================
+
 check_docs_markdown() {
-    echo "2. Markdown Lint"
+    echo "1. Markdown Lint"
 
     if ! command -v markdownlint &>/dev/null; then
         print_warning "markdownlint not installed (install with: npm install -g markdownlint-cli)"
@@ -112,13 +116,13 @@ check_docs_markdown() {
     fi
 
     if [ "$MODE" = "fix" ]; then
-        if markdownlint --fix --ignore node_modules --ignore target docs/ *.md 2>&1 >/dev/null; then
+        if markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md >/dev/null 2>&1; then
             print_success "No markdown issues found"
         else
             print_success "Markdown issues fixed automatically"
         fi
     else
-        if markdownlint --ignore node_modules --ignore target docs/ *.md 2>&1 >/dev/null; then
+        if markdownlint --ignore node_modules --ignore target docs/ -- *.md >/dev/null 2>&1; then
             print_success "No markdown issues found"
         else
             print_error "Markdown issues found (run with --fix to auto-fix)"
@@ -129,7 +133,7 @@ check_docs_markdown() {
 }
 
 check_docs_codeblocks() {
-    echo "3. Code Block Syntax"
+    echo "2. Code Block Syntax"
 
     local errors_found=0
     local files_with_errors=()
@@ -164,7 +168,7 @@ run_docs_checks() {
     fi
     echo ""
 
-    check_docs_typos
+    check_typos
     check_docs_markdown
     check_docs_codeblocks
 }
@@ -173,39 +177,14 @@ run_docs_checks() {
 # Rust Code Checks
 # ============================================================================
 
-check_rust_typos() {
-    echo "1. Code Typos"
-
-    if ! command -v typos &>/dev/null; then
-        print_warning "typos not installed (install with: cargo install typos-cli)"
-        return
-    fi
-
-    if [ "$MODE" = "fix" ]; then
-        if typos --write-changes 2>&1 >/dev/null; then
-            print_success "No typos found"
-        else
-            print_success "Typos fixed automatically"
-        fi
-    else
-        if typos 2>&1 >/dev/null; then
-            print_success "No typos found"
-        else
-            print_error "Typos found (run with --fix to auto-fix)"
-        fi
-    fi
-
-    echo ""
-}
-
 check_rust_fmt() {
-    echo "2. Format Check"
+    echo "1. Format Check"
 
     if [ "$MODE" = "fix" ]; then
-        cargo fmt 2>&1 >/dev/null
+        cargo fmt >/dev/null 2>&1
         print_success "Code formatted"
     else
-        if cargo fmt --check 2>&1 >/dev/null; then
+        if cargo fmt --check >/dev/null 2>&1; then
             print_success "Code properly formatted"
         else
             print_error "Code formatting issues found (run with --fix to auto-fix)"
@@ -216,18 +195,18 @@ check_rust_fmt() {
 }
 
 check_rust_clippy() {
-    echo "3. Clippy Check"
+    echo "2. Clippy Check"
 
     if [ "$MODE" = "fix" ]; then
         # Try to auto-fix, and check exit code to detect unfixable warnings
-        if cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1 >/dev/null; then
+        if cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings >/dev/null 2>&1; then
             print_success "No clippy warnings"
         else
             print_error "Clippy warnings found (some could not be auto-fixed)"
         fi
     else
         # Check only, no auto-fix (fast, uses cache)
-        if cargo clippy --all-targets --all-features -- -D warnings 2>&1 >/dev/null; then
+        if cargo clippy --all-targets --all-features -- -D warnings >/dev/null 2>&1; then
             print_success "No clippy warnings"
         else
             print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
@@ -238,9 +217,9 @@ check_rust_clippy() {
 }
 
 check_rust_tests() {
-    echo "4. Test Check"
+    echo "3. Test Check"
 
-    if cargo test --all-features 2>&1 >/dev/null; then
+    if cargo test --all-features >/dev/null 2>&1; then
         print_success "All tests pass"
     else
         print_error "Test failures found"
@@ -250,10 +229,10 @@ check_rust_tests() {
 }
 
 check_rust_doc() {
-    echo "5. Rustdoc Check"
+    echo "4. Rustdoc Check"
 
     # Check rustdoc warnings (can't be auto-fixed, so run in both modes)
-    if RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features 2>&1 >/dev/null; then
+    if RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features >/dev/null 2>&1; then
         print_success "No rustdoc warnings"
     else
         print_error "Rustdoc warnings found (fix manually)"
@@ -273,11 +252,117 @@ run_rust_checks() {
     fi
     echo ""
 
-    check_rust_typos
+    check_typos
     check_rust_fmt
     check_rust_clippy
     check_rust_tests
     check_rust_doc
+}
+
+# ============================================================================
+# Shell Script Checks
+# ============================================================================
+
+find_shell_scripts() {
+    {
+        # Tracked files
+        git ls-files 'scripts/*' '*.sh' '*.bash' 2>/dev/null
+
+        # Untracked but not ignored files
+        git ls-files --others --exclude-standard 'scripts/*' '*.sh' '*.bash' 2>/dev/null
+    } | sort -u | while IFS= read -r file; do
+        if [ -f "$file" ] && [ -r "$file" ]; then
+            case "$file" in
+            # .sh, .bash extensions are unconditionally shell scripts
+            *.sh | *.bash)
+                echo "$file"
+                ;;
+            *)
+                # For extension-less files in scripts/, check shebang
+                if head -n1 "$file" 2>/dev/null | grep -qE '^#!.*/(bash|sh|env (bash|sh))'; then
+                    echo "$file"
+                fi
+                ;;
+            esac
+        fi
+    done
+}
+
+check_shell_shellcheck() {
+    echo "1. Shellcheck"
+
+    local files
+    files=$(find_shell_scripts)
+
+    if [ -z "$files" ]; then
+        print_warning "No shell scripts found"
+        return
+    fi
+
+    if ! command -v shellcheck &>/dev/null; then
+        print_warning "shellcheck not installed (install with: apt/brew install shellcheck)"
+        return
+    fi
+
+    # Shellcheck cannot auto-fix, runs in both modes
+    if echo "$files" | xargs shellcheck >/dev/null 2>&1; then
+        print_success "No shellcheck issues"
+    else
+        print_error "Shellcheck issues found (cannot auto-fix, fix manually)"
+    fi
+
+    echo ""
+}
+
+check_shell_shfmt() {
+    echo "2. Shell Format (shfmt)"
+
+    local files
+    files=$(find_shell_scripts)
+
+    if [ -z "$files" ]; then
+        print_warning "No shell scripts found"
+        return
+    fi
+
+    if ! command -v shfmt &>/dev/null; then
+        print_warning "shfmt not installed (install with: go install mvdan.cc/sh/v3/cmd/shfmt@latest)"
+        return
+    fi
+
+    if [ "$MODE" = "fix" ]; then
+        # Apply formatting (shfmt reads .editorconfig automatically)
+        if echo "$files" | xargs shfmt -w >/dev/null 2>&1; then
+            print_success "Shell scripts formatted"
+        else
+            print_error "Shell formatting failed"
+        fi
+    else
+        # Check differences
+        if echo "$files" | xargs shfmt -d >/dev/null 2>&1; then
+            print_success "Shell scripts properly formatted"
+        else
+            print_error "Shell formatting issues found (run with --fix to auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+run_shell_checks() {
+    echo "=== Shell Script Linter ==="
+    echo ""
+
+    if [ "$MODE" = "check" ]; then
+        print_info "Mode: check only (no auto-fix)"
+    else
+        print_info "Mode: fix (auto-fix enabled for shfmt)"
+    fi
+    echo ""
+
+    check_typos
+    check_shell_shellcheck
+    check_shell_shfmt
 }
 
 # ============================================================================
@@ -337,6 +422,7 @@ show_usage() {
     echo "  (none)    Run all checks"
     echo "  docs      Check documentation only"
     echo "  rust      Check Rust code only"
+    echo "  shell     Check shell scripts only"
     echo ""
     echo "Options:"
     echo "  --fix     Auto-fix issues (default: check only)"
@@ -348,13 +434,15 @@ show_usage() {
     echo "  ./scripts/lint docs --fix   # Check and fix docs"
     echo "  ./scripts/lint rust         # Check Rust only (no auto-fix, fast)"
     echo "  ./scripts/lint rust --fix   # Check and fix Rust code"
+    echo "  ./scripts/lint shell        # Check shell scripts only (no auto-fix)"
+    echo "  ./scripts/lint shell --fix  # Check and fix shell scripts"
     exit 0
 }
 
 parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
-        docs | rust)
+        docs | rust | shell)
             if [ -n "$TARGET" ]; then
                 echo "Error: Multiple targets specified"
                 echo ""
@@ -393,11 +481,16 @@ main() {
     rust)
         run_rust_checks
         ;;
+    shell)
+        run_shell_checks
+        ;;
     *)
         # Run all checks
         run_docs_checks
         echo ""
         run_rust_checks
+        echo ""
+        run_shell_checks
         ;;
     esac
 

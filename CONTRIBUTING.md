@@ -103,6 +103,11 @@ For non-trivial changes:
 - Implementation, rustdoc comments, tests
 - Lint with: `./scripts/lint rust --fix`
 
+**Shell scripts** (`scripts/` directory, `*.sh`, `*.bash` files):
+
+- Build scripts, linting tools, automation
+- Lint with: `./scripts/lint shell --fix`
+
 #### Development Workflow
 
 1. **Fork and branch**
@@ -124,6 +129,9 @@ For non-trivial changes:
    
    # Or just check without auto-fix (faster, uses cache)
    ./scripts/lint rust
+   
+   # Lint shell scripts
+   ./scripts/lint shell --fix
    
    # Or run individual checks manually
    cargo test
@@ -216,6 +224,22 @@ Before committing changes, run the appropriate linting script:
 - Reports any changes made
 
 **Note:** Rustdoc comments are in `.rs` files, so updating them requires running the code linter, not the docs linter.
+
+**Shell script changes** (`scripts/` directory, `*.sh`, `*.bash` files):
+
+```bash
+# Check and auto-fix shell scripts
+./scripts/lint shell --fix
+
+# Or just check without auto-fix
+./scripts/lint shell
+```
+
+**What it does:**
+
+- Checks with shellcheck (warnings/errors, cannot auto-fix)
+- Formats with shfmt (with auto-fix when using --fix)
+- Reports any changes made
 
 **Check all:**
 

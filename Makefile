@@ -140,6 +140,16 @@ lint-rust:
 lint-rust-fix:
 	./scripts/lint rust --fix
 
+## Lint shell scripts (check only, no auto-fix)
+.PHONY: lint-shell
+lint-shell:
+	./scripts/lint shell
+
+## Lint shell scripts with auto-fix
+.PHONY: lint-shell-fix
+lint-shell-fix:
+	./scripts/lint shell --fix
+
 ## Clean build artifacts
 .PHONY: clean
 clean:
