@@ -70,6 +70,35 @@ check_changes() {
     fi
 }
 
+take_snapshot() {
+    # Create a git stash snapshot without modifying worktree
+    # Returns the stash hash (or empty if no changes to snapshot)
+    # The created object is not added to stash list and will be
+    # cleaned up by git gc eventually.
+    git stash create 2>/dev/null || true
+}
+
+show_step_changes() {
+    # Show what changed since the snapshot
+    # Args:
+    #   $1: step name (e.g., "typos", "markdownlint")
+    #   $2: snapshot hash from take_snapshot
+    local step_name="$1"
+    local snapshot_hash="$2"
+
+    # No snapshot means nothing was staged/changed before the step
+    [ -z "$snapshot_hash" ] && return
+
+    # Check if anything changed since snapshot
+    if git diff --quiet "$snapshot_hash" 2>/dev/null; then
+        return # No changes
+    fi
+
+    # Show the changes
+    echo -e "  ${BLUE}Changed by $step_name:${NC}"
+    git --no-pager diff "$snapshot_hash" --color=always | sed 's/^/    /'
+}
+
 cleanup_temp() {
     rm -rf "$TEMP_DIR"
 }
@@ -88,11 +117,15 @@ check_typos() {
 
     local output
     if [ "$MODE" = "fix" ]; then
+        local snapshot
+        snapshot=$(take_snapshot)
+
         if output=$(typos --color=always --write-changes 2>&1); then
             print_success "No typos found"
         else
             print_success "Typos fixed automatically"
             [ -n "$output" ] && echo "$output"
+            show_step_changes "typos" "$snapshot"
         fi
     else
         if output=$(typos --color=always 2>&1); then
@@ -120,11 +153,15 @@ check_docs_markdown() {
 
     local output
     if [ "$MODE" = "fix" ]; then
+        local snapshot
+        snapshot=$(take_snapshot)
+
         if output=$(markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
             print_success "No markdown issues found"
         else
             print_success "Markdown issues fixed automatically"
             [ -n "$output" ] && echo "$output"
+            show_step_changes "markdownlint" "$snapshot"
         fi
     else
         if output=$(markdownlint --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
@@ -188,6 +225,9 @@ check_rust_clippy() {
 
     local output
     if [ "$MODE" = "fix" ]; then
+        local snapshot
+        snapshot=$(take_snapshot)
+
         # First, try to auto-fix what's possible
         if output=$(cargo --color=always clippy --color=always --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1); then
             # Auto-fix succeeded, but `cargo clippy --fix` doesn't show all warnings in its output.
@@ -198,15 +238,18 @@ check_rust_clippy() {
             local check_output
             if check_output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
                 print_success "No clippy warnings"
+                show_step_changes "clippy" "$snapshot"
             else
                 print_warning "Clippy auto-fixed some issues, but warnings remain:"
                 echo "$check_output"
+                show_step_changes "clippy" "$snapshot"
                 WARNINGS=$((WARNINGS + 1))
             fi
         else
             # Auto-fix failed, show the error
             print_error "Clippy warnings found (some could not be auto-fixed)"
             echo "$output"
+            show_step_changes "clippy" "$snapshot"
             ERRORS=$((ERRORS + 1))
         fi
     else
@@ -228,8 +271,12 @@ check_rust_fmt() {
 
     local output
     if [ "$MODE" = "fix" ]; then
+        local snapshot
+        snapshot=$(take_snapshot)
+
         cargo fmt >/dev/null 2>&1
         print_success "Code formatted"
+        show_step_changes "cargo fmt" "$snapshot"
     else
         if output=$(cargo --color=always fmt --check 2>&1); then
             print_success "Code properly formatted"
@@ -364,12 +411,17 @@ check_shell_shfmt() {
 
     local output
     if [ "$MODE" = "fix" ]; then
+        local snapshot
+        snapshot=$(take_snapshot)
+
         # Apply formatting (shfmt reads .editorconfig automatically)
         if output=$(echo "$files" | xargs shfmt -w 2>&1); then
             print_success "Shell scripts formatted"
+            show_step_changes "shfmt" "$snapshot"
         else
             print_error "Shell formatting failed"
             echo "$output"
+            show_step_changes "shfmt" "$snapshot"
         fi
     else
         # Check differences
