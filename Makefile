@@ -110,6 +110,36 @@ generate-normalization: $(NORMALIZATION_PARAMS)
 regenerate-normalization: REGENERATE_NORMALIZATION_PARAMS=1
 regenerate-normalization: $(NORMALIZATION_PARAMS)
 
+## Lint all (check only, no auto-fix)
+.PHONY: lint
+lint:
+	./scripts/lint
+
+## Lint all with auto-fix
+.PHONY: lint-fix
+lint-fix:
+	./scripts/lint --fix
+
+## Lint documentation (check only, no auto-fix)
+.PHONY: lint-docs
+lint-docs:
+	./scripts/lint docs
+
+## Lint documentation with auto-fix
+.PHONY: lint-docs-fix
+lint-docs-fix:
+	./scripts/lint docs --fix
+
+## Lint Rust code (check only, no auto-fix, fast)
+.PHONY: lint-rust
+lint-rust:
+	./scripts/lint rust
+
+## Lint Rust code with auto-fix (slower)
+.PHONY: lint-rust-fix
+lint-rust-fix:
+	./scripts/lint rust --fix
+
 ## Clean build artifacts
 .PHONY: clean
 clean:

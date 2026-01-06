@@ -1,0 +1,415 @@
+#!/bin/bash
+# Unified Linter
+# Checks and optionally auto-fixes code and documentation issues
+#
+# Usage:
+#   ./scripts/lint                # Check all (no auto-fix)
+#   ./scripts/lint --fix          # Check all and auto-fix
+#   ./scripts/lint docs           # Check docs only (no auto-fix)
+#   ./scripts/lint docs --fix     # Check docs and auto-fix
+#   ./scripts/lint rust           # Check Rust only (no auto-fix)
+#   ./scripts/lint rust --fix     # Check Rust and auto-fix
+
+set -e
+
+# ============================================================================
+# Colors
+# ============================================================================
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# ============================================================================
+# State
+# ============================================================================
+
+ERRORS=0
+WARNINGS=0
+TEMP_DIR=$(mktemp -d -t oxidris-lint-XXXXXX)
+MODE="check" # Default mode: check (no auto-fix)
+TARGET=""    # Empty = all targets
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+print_success() {
+    echo -e "   ${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "   ${RED}✗${NC} $1"
+    ERRORS=$((ERRORS + 1))
+}
+
+print_warning() {
+    echo -e "   ${YELLOW}⚠${NC} $1"
+    WARNINGS=$((WARNINGS + 1))
+}
+
+print_info() {
+    echo -e "   ${BLUE}ℹ${NC} $1"
+}
+
+save_git_state() {
+    # Save current git diff state for later comparison
+    git diff >"$TEMP_DIR/before.diff" 2>/dev/null || true
+}
+
+check_changes() {
+    # Compare current git diff with saved state
+    git diff >"$TEMP_DIR/after.diff" 2>/dev/null || true
+
+    if diff "$TEMP_DIR/before.diff" "$TEMP_DIR/after.diff" >/dev/null 2>&1; then
+        return 1 # No changes
+    else
+        return 0 # Changes detected
+    fi
+}
+
+cleanup_temp() {
+    rm -rf "$TEMP_DIR"
+}
+
+# ============================================================================
+# Documentation Checks
+# ============================================================================
+
+check_docs_typos() {
+    echo "1. Documentation Typos"
+
+    if ! command -v typos &>/dev/null; then
+        print_warning "typos not installed (install with: cargo install typos-cli)"
+        return
+    fi
+
+    if [ "$MODE" = "fix" ]; then
+        if typos docs/ *.md --write-changes 2>&1 >/dev/null; then
+            print_success "No typos found"
+        else
+            print_success "Typos fixed automatically"
+        fi
+    else
+        if typos docs/ *.md 2>&1 >/dev/null; then
+            print_success "No typos found"
+        else
+            print_error "Typos found (run with --fix to auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+check_docs_markdown() {
+    echo "2. Markdown Lint"
+
+    if ! command -v markdownlint &>/dev/null; then
+        print_warning "markdownlint not installed (install with: npm install -g markdownlint-cli)"
+        return
+    fi
+
+    if [ "$MODE" = "fix" ]; then
+        if markdownlint --fix --ignore node_modules --ignore target docs/ *.md 2>&1 >/dev/null; then
+            print_success "No markdown issues found"
+        else
+            print_success "Markdown issues fixed automatically"
+        fi
+    else
+        if markdownlint --ignore node_modules --ignore target docs/ *.md 2>&1 >/dev/null; then
+            print_success "No markdown issues found"
+        else
+            print_error "Markdown issues found (run with --fix to auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+check_docs_codeblocks() {
+    echo "3. Code Block Syntax"
+
+    local errors_found=0
+    local files_with_errors=()
+
+    while IFS= read -r file; do
+        if grep -n '```[a-z]' "$file" >/dev/null 2>&1; then
+            files_with_errors+=("$file")
+            errors_found=1
+        fi
+    done < <(find docs/ -name "*.md" -o -name "*.md" -maxdepth 1 -type f 2>/dev/null)
+
+    if [ $errors_found -eq 0 ]; then
+        print_success "All code blocks use path syntax"
+    else
+        print_error "Code blocks with language syntax found (use path syntax):"
+        for file in "${files_with_errors[@]}"; do
+            echo "      $file"
+        done
+    fi
+
+    echo ""
+}
+
+run_docs_checks() {
+    echo "=== Documentation Linter ==="
+    echo ""
+
+    if [ "$MODE" = "check" ]; then
+        print_info "Mode: check only (no auto-fix)"
+    else
+        print_info "Mode: fix (auto-fix enabled)"
+    fi
+    echo ""
+
+    check_docs_typos
+    check_docs_markdown
+    check_docs_codeblocks
+}
+
+# ============================================================================
+# Rust Code Checks
+# ============================================================================
+
+check_rust_typos() {
+    echo "1. Code Typos"
+
+    if ! command -v typos &>/dev/null; then
+        print_warning "typos not installed (install with: cargo install typos-cli)"
+        return
+    fi
+
+    if [ "$MODE" = "fix" ]; then
+        if typos --write-changes 2>&1 >/dev/null; then
+            print_success "No typos found"
+        else
+            print_success "Typos fixed automatically"
+        fi
+    else
+        if typos 2>&1 >/dev/null; then
+            print_success "No typos found"
+        else
+            print_error "Typos found (run with --fix to auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+check_rust_fmt() {
+    echo "2. Format Check"
+
+    if [ "$MODE" = "fix" ]; then
+        cargo fmt 2>&1 >/dev/null
+        print_success "Code formatted"
+    else
+        if cargo fmt --check 2>&1 >/dev/null; then
+            print_success "Code properly formatted"
+        else
+            print_error "Code formatting issues found (run with --fix to auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+check_rust_clippy() {
+    echo "3. Clippy Check"
+
+    if [ "$MODE" = "fix" ]; then
+        # Try to auto-fix, and check exit code to detect unfixable warnings
+        if cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1 >/dev/null; then
+            print_success "No clippy warnings"
+        else
+            print_error "Clippy warnings found (some could not be auto-fixed)"
+        fi
+    else
+        # Check only, no auto-fix (fast, uses cache)
+        if cargo clippy --all-targets --all-features -- -D warnings 2>&1 >/dev/null; then
+            print_success "No clippy warnings"
+        else
+            print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
+        fi
+    fi
+
+    echo ""
+}
+
+check_rust_tests() {
+    echo "4. Test Check"
+
+    if cargo test --all-features 2>&1 >/dev/null; then
+        print_success "All tests pass"
+    else
+        print_error "Test failures found"
+    fi
+
+    echo ""
+}
+
+check_rust_doc() {
+    echo "5. Rustdoc Check"
+
+    # Check rustdoc warnings (can't be auto-fixed, so run in both modes)
+    if RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features 2>&1 >/dev/null; then
+        print_success "No rustdoc warnings"
+    else
+        print_error "Rustdoc warnings found (fix manually)"
+    fi
+
+    echo ""
+}
+
+run_rust_checks() {
+    echo "=== Rust Code Linter ==="
+    echo ""
+
+    if [ "$MODE" = "check" ]; then
+        print_info "Mode: check only (no auto-fix, fast with cache)"
+    else
+        print_info "Mode: fix (auto-fix enabled, slower)"
+    fi
+    echo ""
+
+    check_rust_typos
+    check_rust_fmt
+    check_rust_clippy
+    check_rust_tests
+    check_rust_doc
+}
+
+# ============================================================================
+# Summary and Exit
+# ============================================================================
+
+check_script_changes() {
+    echo "=== Changes Summary ==="
+    echo ""
+
+    if check_changes; then
+        print_warning "Linter made changes to the following files:"
+        echo ""
+        git diff --name-only | while IFS= read -r file; do
+            echo -e "      ${YELLOW}${file}${NC}"
+        done
+        echo ""
+        echo -e "Review changes with: ${GREEN}git diff${NC}"
+    else
+        print_success "No changes made by linter"
+    fi
+
+    echo ""
+}
+
+print_summary() {
+    echo "==================================="
+
+    if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
+        if [ "$MODE" = "fix" ] && check_changes; then
+            echo -e "${GREEN}✓ All checks passed (with auto-fixes applied)${NC}"
+            echo -e "   Review changes with: ${GREEN}git diff${NC}"
+        else
+            echo -e "${GREEN}✓ All checks passed${NC}"
+        fi
+        cleanup_temp
+        exit 0
+    elif [ "$ERRORS" -eq 0 ]; then
+        echo -e "${YELLOW}⚠ $WARNINGS warning(s)${NC}"
+        cleanup_temp
+        exit 0
+    else
+        echo -e "${RED}✗ $ERRORS error(s), $WARNINGS warning(s)${NC}"
+        cleanup_temp
+        exit 1
+    fi
+}
+
+# ============================================================================
+# Main
+# ============================================================================
+
+show_usage() {
+    echo "Usage: ./scripts/lint [TARGET] [--fix]"
+    echo ""
+    echo "Targets:"
+    echo "  (none)    Run all checks"
+    echo "  docs      Check documentation only"
+    echo "  rust      Check Rust code only"
+    echo ""
+    echo "Options:"
+    echo "  --fix     Auto-fix issues (default: check only)"
+    echo ""
+    echo "Examples:"
+    echo "  ./scripts/lint              # Check all (no auto-fix)"
+    echo "  ./scripts/lint --fix        # Check and fix all"
+    echo "  ./scripts/lint docs         # Check docs only (no auto-fix)"
+    echo "  ./scripts/lint docs --fix   # Check and fix docs"
+    echo "  ./scripts/lint rust         # Check Rust only (no auto-fix, fast)"
+    echo "  ./scripts/lint rust --fix   # Check and fix Rust code"
+    exit 0
+}
+
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+        docs | rust)
+            if [ -n "$TARGET" ]; then
+                echo "Error: Multiple targets specified"
+                echo ""
+                show_usage
+            fi
+            TARGET="$1"
+            shift
+            ;;
+        --fix)
+            MODE="fix"
+            shift
+            ;;
+        -h | --help | help)
+            show_usage
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            echo ""
+            show_usage
+            ;;
+        esac
+    done
+}
+
+main() {
+    parse_args "$@"
+
+    # Save git state before making any changes
+    save_git_state
+
+    # Run appropriate checks
+    case "$TARGET" in
+    docs)
+        run_docs_checks
+        ;;
+    rust)
+        run_rust_checks
+        ;;
+    *)
+        # Run all checks
+        run_docs_checks
+        echo ""
+        run_rust_checks
+        ;;
+    esac
+
+    # Show changes summary (only if in fix mode)
+    if [ "$MODE" = "fix" ]; then
+        check_script_changes
+    fi
+
+    print_summary
+}
+
+# Trap to ensure cleanup happens even on errors
+trap cleanup_temp EXIT INT TERM
+
+main "$@"

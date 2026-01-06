@@ -120,20 +120,33 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
 
 ### Documentation
 
-- **Validation**: **Always run `./scripts/validate-docs.sh` after documentation changes**
-  - Fix all markdownlint errors before finalizing
-  - Verify internal links are not broken
-  - See [Documentation Guidelines](docs/ai/documentation-guidelines.md) for error fixing examples
 - **Distribution**: Rustdoc vs Markdown (source of truth for implementation)
-  - **Rustdoc**: Current implementation, design decisions, API usage, trade-offs (single crate/module scope)
-  - **Markdown (docs/)**: System-wide architecture (across crates), project context, navigation, future work
+  - **Rustdoc** (in `.rs` files): Current implementation, design decisions, API usage, trade-offs (single crate/module scope)
+  - **Markdown** (`docs/` directory): System-wide architecture (across crates), project context, navigation, future work
   - **Rule**: Implementation details and "why" go in rustdoc; system architecture and navigation go in Markdown
   - **No duplication**: Markdown should link to rustdoc, not duplicate implementation details
+- **Linting Markdown docs**: **Always run `./scripts/lint docs --fix` after changing files in `docs/` directory**
+  - Script automatically fixes typos, markdown style issues where possible
+  - Review changes with `git diff` after running
+  - If errors remain that couldn't be auto-fixed, see [Documentation Guidelines](docs/ai/documentation-guidelines.md) for examples
+- **Linting Rustdoc**: Rustdoc is checked as part of code linting (see Code Changes section below)
+  - Rustdoc comments are in `.rs` files, so they're part of code changes
+  - Run `./scripts/lint rust --fix` after changing rustdoc comments
+
 - **Organization**: See [Documentation Guidelines](docs/ai/documentation-guidelines.md)
   - Follow the documented structure strictly
   - Don't mix concerns (evaluator/training/engine)
   - Avoid duplication between Markdown and rustdoc
 - **Maintenance**: Keep docs synchronized with code changes in the same commit
+
+### Code Changes
+
+- **Linting**: **Always run `./scripts/lint rust --fix` after code changes (including rustdoc comments in `.rs` files)**
+  - Script automatically fixes typos, formatting, and auto-fixable clippy warnings
+  - Runs tests to verify correctness (including doctests)
+  - Review changes with `git diff` after running
+  - If clippy warnings remain that couldn't be auto-fixed, address them manually
+  - For quick checks without auto-fix (fast, uses cache): `./scripts/lint rust`
 
 ### Review Process
 

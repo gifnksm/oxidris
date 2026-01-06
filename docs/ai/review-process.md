@@ -560,16 +560,20 @@ Use automated tools to catch issues early.
 **Primary tool:**
 
 ```bash
-# Run all documentation checks (recommended)
-./scripts/validate-docs.sh
+# Check all documentation (recommended)
+./scripts/lint docs
+
+# Check and auto-fix documentation issues
+./scripts/lint docs --fix
 ```
 
 This checks:
 
-1. **Markdown style** - markdownlint compliance
-2. **Metadata blocks** - All docs have required metadata
-3. **Document types** - Types match official taxonomy (Reference, How-to guide, Tutorial, Explanation)
-4. **Internal links** - No broken links between markdown files
+1. **Typos** - Detects and fixes typos (with --fix)
+2. **Markdown style** - markdownlint compliance (with auto-fix using --fix)
+3. **Metadata blocks** - All docs have required metadata
+4. **Document types** - Types match official taxonomy (Reference, How-to guide, Tutorial, Explanation)
+5. **Internal links** - No broken links between markdown files
 
 **Additional tools:**
 
@@ -582,7 +586,7 @@ This checks:
 **Individual checks (if needed):**
 
 ```bash
-# Run only markdownlint (included in validate-docs.sh)
+# Run only markdownlint (included in lint script)
 markdownlint .
 
 # Fix auto-fixable markdown issues

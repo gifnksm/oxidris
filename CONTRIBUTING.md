@@ -91,6 +91,18 @@ For non-trivial changes:
 2. Understand which system you're modifying
 3. Read relevant architecture documentation
 
+#### Types of Changes
+
+**Markdown documentation** (`docs/` directory):
+
+- Architecture documents, guides, project docs
+- Lint with: `./scripts/lint docs --fix`
+
+**Code changes** (`.rs` files, including rustdoc comments):
+
+- Implementation, rustdoc comments, tests
+- Lint with: `./scripts/lint rust --fix`
+
 #### Development Workflow
 
 1. **Fork and branch**
@@ -104,11 +116,19 @@ For non-trivial changes:
    - Add tests for new functionality
    - Update documentation
 
-3. **Test locally**
+3. **Lint locally**
 
    ```bash
+   # Lint and auto-fix Rust code issues
+   ./scripts/lint rust --fix
+   
+   # Or just check without auto-fix (faster, uses cache)
+   ./scripts/lint rust
+   
+   # Or run individual checks manually
    cargo test
-   cargo clippy
+   cargo clippy --fix --allow-dirty
+   cargo fmt
    ```
 
 4. **Commit**
@@ -147,32 +167,72 @@ Contributions related to this project are especially welcome!
 
 ## Code Style
 
-- Follow Rust conventions (rustfmt, clippy)
+- Follow Rust conventions (use validation script or run rustfmt/clippy manually)
 - Prefer clarity over cleverness
 - Add comments for non-obvious logic
 - Keep functions focused and small
 
 ## Documentation Style
 
-### Documentation Validation
+### Linting Scripts
 
-Before committing documentation changes, run the validation script:
+Before committing changes, run the appropriate linting script:
+
+**Markdown documentation changes** (`docs/` directory, `*.md` files):
 
 ```bash
-./scripts/validate-docs.sh
+# Check and auto-fix markdown documentation
+./scripts/lint docs --fix
+
+# Or just check without auto-fix
+./scripts/lint docs
 ```
 
-**What it checks:**
+**What it does:**
 
-1. **Markdown style** - Enforces [markdownlint](https://github.com/DavidAnson/markdownlint) rules (headings, lists, code blocks, spacing)
-2. **Metadata blocks** - Verifies all documentation files have required metadata
-3. **Document types** - Confirms types match official taxonomy (Reference, How-to guide, Tutorial, Explanation)
-4. **Internal links** - Detects broken links between markdown files
+- Checks for typos (with auto-fix when using --fix)
+- Validates markdown style (with auto-fix when using --fix)
+- Verifies metadata blocks
+- Confirms document types
+- Checks internal links
+- Reports any changes made
+
+**Code changes** (`.rs` files, including rustdoc comments):
+
+```bash
+# Check and auto-fix Rust code
+./scripts/lint rust --fix
+
+# Or just check without auto-fix (faster, uses cache)
+./scripts/lint rust
+```
+
+**What it does:**
+
+- Checks for typos (with auto-fix when using --fix)
+- Formats code with `cargo fmt` (when using --fix)
+- Runs `cargo clippy --fix` for auto-fixable lints (when using --fix)
+- Runs tests with `cargo test` (includes doctests)
+- Reports any changes made
+
+**Note:** Rustdoc comments are in `.rs` files, so updating them requires running the code linter, not the docs linter.
+
+**Check all:**
+
+```bash
+# Check everything (docs + rust)
+./scripts/lint
+
+# Check and fix everything
+./scripts/lint --fix
+```
+
+The `--fix` flag enables automatic fixes. Without it, the script only checks and reports issues (faster for Rust code due to caching). Review changes with `git diff` before committing.
 
 **Exit codes:**
 
-- `0` - All checks passed (or only warnings)
-- `1` - One or more errors found
+- `0` - All checks passed (changes may have been made)
+- `1` - Errors found that could not be auto-fixed
 
 **When checks fail:**
 

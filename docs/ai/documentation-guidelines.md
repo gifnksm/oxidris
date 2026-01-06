@@ -179,20 +179,30 @@ Each file has a specific purpose. Update the right file based on what changed:
 - Update relevant docs in the same commit as code changes
 - Add new issues to appropriate documentation when discovered
 
-### Validate Before Committing
+### Lint Before Committing
 
-**Always run the validation script after documentation changes:**
+**Always run the linting script after markdown documentation changes (files in `docs/` directory):**
 
 ```bash
-./scripts/validate-docs.sh
+# Check and auto-fix markdown documentation
+./scripts/lint docs --fix
+
+# Or just check without auto-fix
+./scripts/lint docs
 ```
 
-This checks:
+**What it does:**
 
-- **Markdownlint**: Markdown style compliance (MD rules)
-- **Metadata blocks**: All docs have required metadata
-- **Document types**: Valid document type values
-- **Internal links**: No broken links between docs
+- **Typos**: Detects and automatically fixes typos in markdown files (with --fix)
+- **Markdownlint**: Validates markdown style and auto-fixes issues where possible (with --fix)
+- **Metadata blocks**: Verifies all docs have required metadata
+- **Document types**: Confirms valid document type values
+- **Internal links**: Checks for broken links between docs
+- **Git changes**: Reports any modifications made by the linter (only in fix mode)
+
+The `--fix` flag enables automatic fixes. Without it, the script only checks and reports issues. Always review changes with `git diff` before committing.
+
+**Important:** This linter is for **markdown files** in the `docs/` directory. If you're updating **rustdoc comments** in `.rs` files, use `./scripts/lint rust --fix` instead (rustdoc is part of code, not separate documentation).
 
 **Common Errors and Fixes:**
 
@@ -220,9 +230,9 @@ This checks:
 
    Good: Add blank lines before and after code blocks
 
-**All errors must be fixed before finalizing documentation changes.**
+**Most errors are automatically fixed by the linting script.** If errors remain that couldn't be auto-fixed, address them manually using the guidance above.
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md#documentation-validation) for details.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#linting-scripts) for details.
 
 ## Redundancy Check
 
