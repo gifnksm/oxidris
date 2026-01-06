@@ -188,20 +188,35 @@ check_rust_clippy() {
 
     local output
     if [ "$MODE" = "fix" ]; then
-        # Try to auto-fix, and check exit code to detect unfixable warnings
-        if output=$(cargo --color=always clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1); then
-            print_success "No clippy warnings"
+        # First, try to auto-fix what's possible
+        if output=$(cargo --color=always clippy --color=always --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1); then
+            # Auto-fix succeeded, but `cargo clippy --fix` doesn't show all warnings in its output.
+            # Some non-fixable warnings (like type-complexity) aren't displayed during the --fix run,
+            # even when they cause compilation to succeed (they're treated as warnings, not errors).
+            # This is different from rust-lang/cargo#13527 (which was about target selection).
+            # Run check mode (without --fix) to ensure all warnings are visible to the user.
+            local check_output
+            if check_output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
+                print_success "No clippy warnings"
+            else
+                print_warning "Clippy auto-fixed some issues, but warnings remain:"
+                echo "$check_output"
+                WARNINGS=$((WARNINGS + 1))
+            fi
         else
+            # Auto-fix failed, show the error
             print_error "Clippy warnings found (some could not be auto-fixed)"
             echo "$output"
+            ERRORS=$((ERRORS + 1))
         fi
     else
         # Check only, no auto-fix (fast, uses cache)
-        if output=$(cargo --color=always clippy --all-targets --all-features -- -D warnings 2>&1); then
+        if output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
             print_success "No clippy warnings"
         else
             print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
             echo "$output"
+            ERRORS=$((ERRORS + 1))
         fi
     fi
 
@@ -231,7 +246,7 @@ check_rust_tests() {
     echo "3. Test Check"
 
     local output
-    if output=$(cargo --color=always test --all-features 2>&1); then
+    if output=$(cargo --color=always test --color=always --all-features 2>&1); then
         print_success "All tests pass"
     else
         print_error "Test failures found"
@@ -246,7 +261,7 @@ check_rust_doc() {
 
     # Check rustdoc warnings (can't be auto-fixed, so run in both modes)
     local output
-    if output=$(RUSTDOCFLAGS="-D warnings" cargo --color=always doc --no-deps --all-features 2>&1); then
+    if output=$(RUSTDOCFLAGS="-D warnings" cargo --color=always doc --color=always --no-deps --all-features 2>&1); then
         print_success "No rustdoc warnings"
     else
         print_error "Rustdoc warnings found (fix manually)"
