@@ -86,17 +86,20 @@ check_typos() {
         return
     fi
 
+    local output
     if [ "$MODE" = "fix" ]; then
-        if typos --write-changes >/dev/null 2>&1; then
+        if output=$(typos --color=always --write-changes 2>&1); then
             print_success "No typos found"
         else
             print_success "Typos fixed automatically"
+            [ -n "$output" ] && echo "$output"
         fi
     else
-        if typos >/dev/null 2>&1; then
+        if output=$(typos --color=always 2>&1); then
             print_success "No typos found"
         else
             print_error "Typos found (run with --fix to auto-fix)"
+            echo "$output"
         fi
     fi
 
@@ -115,17 +118,20 @@ check_docs_markdown() {
         return
     fi
 
+    local output
     if [ "$MODE" = "fix" ]; then
-        if markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md >/dev/null 2>&1; then
+        if output=$(markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
             print_success "No markdown issues found"
         else
             print_success "Markdown issues fixed automatically"
+            [ -n "$output" ] && echo "$output"
         fi
     else
-        if markdownlint --ignore node_modules --ignore target docs/ -- *.md >/dev/null 2>&1; then
+        if output=$(markdownlint --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
             print_success "No markdown issues found"
         else
             print_error "Markdown issues found (run with --fix to auto-fix)"
+            echo "$output"
         fi
     fi
 
@@ -180,19 +186,22 @@ run_docs_checks() {
 check_rust_clippy() {
     echo "1. Clippy Check"
 
+    local output
     if [ "$MODE" = "fix" ]; then
         # Try to auto-fix, and check exit code to detect unfixable warnings
-        if cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings >/dev/null 2>&1; then
+        if output=$(cargo --color=always clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1); then
             print_success "No clippy warnings"
         else
             print_error "Clippy warnings found (some could not be auto-fixed)"
+            echo "$output"
         fi
     else
         # Check only, no auto-fix (fast, uses cache)
-        if cargo clippy --all-targets --all-features -- -D warnings >/dev/null 2>&1; then
+        if output=$(cargo --color=always clippy --all-targets --all-features -- -D warnings 2>&1); then
             print_success "No clippy warnings"
         else
             print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
+            echo "$output"
         fi
     fi
 
@@ -202,14 +211,16 @@ check_rust_clippy() {
 check_rust_fmt() {
     echo "2. Format Check"
 
+    local output
     if [ "$MODE" = "fix" ]; then
         cargo fmt >/dev/null 2>&1
         print_success "Code formatted"
     else
-        if cargo fmt --check >/dev/null 2>&1; then
+        if output=$(cargo --color=always fmt --check 2>&1); then
             print_success "Code properly formatted"
         else
             print_error "Code formatting issues found (run with --fix to auto-fix)"
+            echo "$output"
         fi
     fi
 
@@ -219,10 +230,12 @@ check_rust_fmt() {
 check_rust_tests() {
     echo "3. Test Check"
 
-    if cargo test --all-features >/dev/null 2>&1; then
+    local output
+    if output=$(cargo --color=always test --all-features 2>&1); then
         print_success "All tests pass"
     else
         print_error "Test failures found"
+        echo "$output"
     fi
 
     echo ""
@@ -232,10 +245,12 @@ check_rust_doc() {
     echo "4. Rustdoc Check"
 
     # Check rustdoc warnings (can't be auto-fixed, so run in both modes)
-    if RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features >/dev/null 2>&1; then
+    local output
+    if output=$(RUSTDOCFLAGS="-D warnings" cargo --color=always doc --no-deps --all-features 2>&1); then
         print_success "No rustdoc warnings"
     else
         print_error "Rustdoc warnings found (fix manually)"
+        echo "$output"
     fi
 
     echo ""
@@ -305,10 +320,12 @@ check_shell_shellcheck() {
     fi
 
     # Shellcheck cannot auto-fix, runs in both modes
-    if echo "$files" | xargs shellcheck >/dev/null 2>&1; then
+    local output
+    if output=$(echo "$files" | xargs shellcheck --color=always 2>&1); then
         print_success "No shellcheck issues"
     else
         print_error "Shellcheck issues found (cannot auto-fix, fix manually)"
+        echo "$output"
     fi
 
     echo ""
@@ -330,19 +347,22 @@ check_shell_shfmt() {
         return
     fi
 
+    local output
     if [ "$MODE" = "fix" ]; then
         # Apply formatting (shfmt reads .editorconfig automatically)
-        if echo "$files" | xargs shfmt -w >/dev/null 2>&1; then
+        if output=$(echo "$files" | xargs shfmt -w 2>&1); then
             print_success "Shell scripts formatted"
         else
             print_error "Shell formatting failed"
+            echo "$output"
         fi
     else
         # Check differences
-        if echo "$files" | xargs shfmt -d >/dev/null 2>&1; then
+        if output=$(echo "$files" | xargs shfmt -d 2>&1); then
             print_success "Shell scripts properly formatted"
         else
             print_error "Shell formatting issues found (run with --fix to auto-fix)"
+            echo "$output"
         fi
     fi
 
