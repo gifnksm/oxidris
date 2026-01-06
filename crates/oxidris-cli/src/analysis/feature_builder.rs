@@ -219,7 +219,7 @@ impl FeatureBuilder {
 
     /// Build smooth penalty for cumulative hole depth (weighted by blocks above).
     ///
-    /// Penalizes deeply buried holes that are costly to clear. Unlike [`build_num_holes_linear_penalty`],
+    /// Penalizes deeply buried holes that are costly to clear. Unlike [`Self::build_num_holes_linear_penalty`],
     /// this weights holes by their depth, making deeply buried holes contribute more to the penalty.
     /// Uses P05-P95 normalization for continuous feedback.
     ///
@@ -233,7 +233,7 @@ impl FeatureBuilder {
     /// Build smooth penalty for maximum column height.
     ///
     /// Penalizes the tallest column throughout the game, providing continuous feedback on
-    /// localized vertical pressure. Complements [`build_max_height_linear_risk`] which focuses
+    /// localized vertical pressure. Complements [`Self::build_max_height_linear_risk`] which focuses
     /// on imminent top-out danger. Uses P05-P95 normalization.
     ///
     /// # Feature ID
@@ -245,7 +245,7 @@ impl FeatureBuilder {
 
     /// Build thresholded risk for imminent top-out based on maximum height.
     ///
-    /// Focuses on dangerous states close to the ceiling. Unlike [`build_max_height_linear_penalty`],
+    /// Focuses on dangerous states close to the ceiling. Unlike [`Self::build_max_height_linear_penalty`],
     /// this ignores most of the game (below P75) and only penalizes approaching the ceiling,
     /// reflecting the irreversible nature of top-out. Uses P75-P95 normalization.
     ///
@@ -272,7 +272,7 @@ impl FeatureBuilder {
     /// Build thresholded risk for center column top-out.
     ///
     /// Focuses on dangerous center column height that threatens early top-out. Uses the same
-    /// thresholded approach as [`build_max_height_linear_risk`] but specifically for the center
+    /// thresholded approach as [`Self::build_max_height_linear_risk`] but specifically for the center
     /// 4 columns. Uses P75-P95 normalization.
     ///
     /// # Feature ID
@@ -334,7 +334,7 @@ impl FeatureBuilder {
     /// Build smooth penalty for local surface curvature (second-order differences).
     ///
     /// Penalizes small-scale surface unevenness using discrete Laplacian (second-order differences).
-    /// More sensitive to local irregularities than [`build_surface_bumpiness_linear_penalty`]
+    /// More sensitive to local irregularities than [`Self::build_surface_bumpiness_linear_penalty`]
     /// while tolerating gradual slopes. Uses P05-P95 normalization.
     ///
     /// # Feature ID
@@ -348,7 +348,7 @@ impl FeatureBuilder {
     ///
     /// Penalizes over-committed vertical wells throughout the game. Only wells deeper than 1
     /// are considered (shallow wells are allowed for controlled play). Complements
-    /// [`build_well_depth_linear_risk`] which focuses on extreme well depth. Uses P05-P95
+    /// [`Self::build_well_depth_linear_risk`] which focuses on extreme well depth. Uses P05-P95
     /// normalization.
     ///
     /// # Feature ID
@@ -361,7 +361,7 @@ impl FeatureBuilder {
     /// Build thresholded risk for dangerously deep wells.
     ///
     /// Focuses on extreme well depth that threatens board flexibility. Unlike
-    /// [`build_well_depth_linear_penalty`], this ignores moderate wells and only penalizes
+    /// [`Self::build_well_depth_linear_penalty`], this ignores moderate wells and only penalizes
     /// wells beyond safe operational limits. Uses P75-P95 normalization.
     ///
     /// # Feature ID
