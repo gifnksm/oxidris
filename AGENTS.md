@@ -120,6 +120,10 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
 
 ### Documentation
 
+- **Validation**: **Always run `./scripts/validate-docs.sh` after documentation changes**
+  - Fix all markdownlint errors before finalizing
+  - Verify internal links are not broken
+  - See [Documentation Guidelines](docs/ai/documentation-guidelines.md) for error fixing examples
 - **Distribution**: Rustdoc vs Markdown (source of truth for implementation)
   - **Rustdoc**: Current implementation, design decisions, API usage, trade-offs (single crate/module scope)
   - **Markdown (docs/)**: System-wide architecture (across crates), project context, navigation, future work

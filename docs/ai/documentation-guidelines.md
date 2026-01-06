@@ -181,7 +181,7 @@ Each file has a specific purpose. Update the right file based on what changed:
 
 ### Validate Before Committing
 
-Run the validation script to catch common documentation issues:
+**Always run the validation script after documentation changes:**
 
 ```bash
 ./scripts/validate-docs.sh
@@ -189,10 +189,38 @@ Run the validation script to catch common documentation issues:
 
 This checks:
 
-- Markdown style compliance
-- Metadata blocks presence
-- Document type validity
-- Broken internal links
+- **Markdownlint**: Markdown style compliance (MD rules)
+- **Metadata blocks**: All docs have required metadata
+- **Document types**: Valid document type values
+- **Internal links**: No broken links between docs
+
+**Common Errors and Fixes:**
+
+1. **MD032: Lists should be surrounded by blank lines**
+
+   Bad: List without blank lines before/after
+
+   Good: Add blank line before list
+
+2. **MD040: Fenced code blocks should have a language**
+
+   Bad: Three backticks without language
+
+   Good: Use three backticks with language (rust, bash, text, etc)
+
+3. **MD036: Emphasis used instead of a heading**
+
+   Bad: Using bold text as section title
+
+   Good: Use proper heading levels (####)
+
+4. **MD031: Fenced code blocks should be surrounded by blank lines**
+
+   Bad: Code block immediately after text without blank line
+
+   Good: Add blank lines before and after code blocks
+
+**All errors must be fixed before finalizing documentation changes.**
 
 See [CONTRIBUTING.md](../../CONTRIBUTING.md#documentation-validation) for details.
 
