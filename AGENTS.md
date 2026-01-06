@@ -99,11 +99,11 @@ See [Design Principles in README](README.md#design-principles) for the project p
 
 ## Current Focus
 
-**Active Project:** KM-Based Survival Feature Normalization (Phase 3)
+**Active Project:** KM-Based Survival Feature Normalization (Phase 4)
 
 - ✅ Phase 1-2: Data generation and KM survival analysis (completed)
-- 🔄 Phase 3: Infrastructure and trait integration (in progress)
-- 📋 Phase 4: Implementation and validation (not started)
+- ✅ Phase 3: Infrastructure and trait integration (completed 2026-01-06)
+- 📋 Phase 4: Implementation and validation (next)
 
 **Scope:** Survival features (holes, height) only. Other improvements are separate future projects.
 
@@ -190,7 +190,9 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
 
 ### Current Project Status
 
-- **Active:** KM-Based Survival Feature Normalization (Phase 3)
+- **Active:** KM-Based Survival Feature Normalization (Phase 4)
+- **Phase 3:** Design complete (2026-01-06) - `MappedNormalized<S>` type, feature naming, coexistence strategy
+- **Phase 4:** Implementation - type, FeatureBuilder integration, training tools
 - **Focus:** Survival features (holes, height) only
 - See [KM Project Docs](docs/projects/km-feature-transform/) for details
 

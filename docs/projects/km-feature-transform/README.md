@@ -157,7 +157,11 @@ These features have clear, direct impact on survival time, making KM-based norma
 
 ## Current Status
 
-### ✅ Completed (Phase 1-2)
+**Last Updated:** 2026-01-06
+
+### ✅ Completed (Phase 1-3)
+
+#### Phase 1-2: Data & Analysis
 
 - Data generation with diverse evaluators
 - KM survival analysis implementation
@@ -166,17 +170,48 @@ These features have clear, direct impact on survival time, making KM-based norma
 - Two-stage design (transform → normalize)
 - CLI tools and documentation
 
-### 🔄 In Progress (Phase 3)
+#### Phase 3: Infrastructure (2026-01-06) - Design Complete
 
-- Design `BoardFeature` trait integration
+- `MappedNormalized<S>` type design
+  - Separate type from `LinearNormalized<S>` with `BTreeMap<u32, f32>` mapping
+  - Clipping logic for out-of-range values (clip to min/max key)
+- `FeatureProcessing` integration design
+  - `MappedNormalized` variant for serialization
+- Feature naming convention
+  - Linear: `*_linear_penalty`, `*_linear_risk`
+  - Mapped (KM): `*_km_penalty`
+  - Feature set coexistence strategy
+- Model selection mechanism
+  - Model name determines feature set (`aggro_linear` vs `aggro_km`)
+- Follows `FeatureBuilder` pattern (dynamic runtime construction)
 
 ### 📋 Not Started (Phase 4)
 
-- Remove duplicate `*_risk` features
-- Integrate KM normalization into `BoardFeature` trait architecture
+- Implement `MappedNormalized<S>` type
+  - Type with `BTreeMap<u32, f32>` mapping field
+  - `transform()` with clipping logic
+  - `BoardFeature` trait implementation
+- Add `MappedNormalized` variant to `FeatureProcessing` enum
+- Extend `FeatureBuilder` for mapped features
+  - Construct both linear and mapped feature sets
+  - Feature set selection logic
 - Implement KM-based survival features
-- Train and benchmark survival-focused evaluator
+  - `num_holes_km_penalty`, `sum_of_hole_depth_km_penalty`
+  - `max_height_km_penalty`, `center_column_max_height_km_penalty`, `total_height_km_penalty`
+- Update training tools for model name-based feature set selection
+- Update `analyze-board-features` to display both feature sets
+- Train and benchmark KM-based evaluator
 - Validate improvements over linear normalization
+
+## Recent Changes (2026-01-06)
+
+The evaluator system underwent major refactoring:
+
+- **Static → Dynamic**: Removed static feature constants, moved to runtime construction via `FeatureBuilder`
+- **Instance-based traits**: `BoardFeature` now uses instance methods for `transform()` and `normalize()`
+- **Data-driven normalization**: All normalization parameters computed from session data at runtime
+
+The KM feature design follows this new architecture pattern.
 
 ## Usage
 
@@ -222,30 +257,52 @@ cargo run --release -- analyze-censoring data/boards.json \
 }
 ```
 
-### Load and Use (Planned)
+### Train AI Models (Planned)
 
-```rust
-let params = NormalizationParams::load("data/normalization_params.json")?;
-let evaluator = KMBasedEvaluator::new(params);
-let score = evaluator.evaluate(&board, piece);
+```bash
+# Train with linear features (existing approach)
+cargo run --release -- train-ai \
+    --model-name aggro_linear \
+    --sessions data/boards.json
+
+# Train with KM-based features (new approach)
+cargo run --release -- train-ai \
+    --model-name aggro_km \
+    --sessions data/boards.json \
+    --normalization-params data/normalization_params.json
 ```
+
+### Analyze Features (Planned)
+
+```bash
+# View both linear and KM features side-by-side
+cargo run --release -- analyze-board-features \
+    --sessions data/boards.json \
+    --normalization-params data/normalization_params.json \
+    --show-both-feature-sets
+```
+
+**Feature Set Coexistence:**
+
+- Linear features (`*_linear_penalty`, `*_linear_risk`) remain available for backward compatibility
+- KM features (`*_km_penalty`) are added as a new feature set
+- Model name determines which feature set is used during training
+- Analysis tools can display both for comparison
 
 ## Next Steps
 
 See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
-### Phase 3: Complete Infrastructure
-
-- Design `BoardFeature` trait integration
-- Remove incorrect helper methods
-
 ### Phase 4: Implement Survival Features
 
-1. Clean up feature set (remove duplicate `*_risk` features)
-2. Integrate KM normalization into `BoardFeature` trait architecture
-3. Implement KM-based survival features
-4. Train survival-focused evaluator
-5. Benchmark vs. linear normalization
+1. Implement `MappedNormalized<S>` type with clipping logic
+2. Add `MappedNormalized` variant to `FeatureProcessing` enum
+3. Extend `FeatureBuilder` to construct mapped features
+4. Implement KM-based survival features (`*_km_penalty`)
+5. Update training tools for model name-based feature set selection
+6. Update `analyze-board-features` to display both linear and KM features
+7. Train KM-based evaluator and compare with linear baseline
+8. Validate KM transform improvement over linear transform
 
 ### Success Criteria
 

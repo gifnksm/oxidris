@@ -100,15 +100,15 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 ---
 
-## Phase 3: KM-Based Normalization Infrastructure 🔄
+## Phase 3: KM-Based Normalization Infrastructure ✅
 
-**Status:** In Progress
+**Status:** Completed (2026-01-06)
 
 **Objectives:**
 
 1. Implement Kaplan-Meier survival analysis for feature normalization
 2. Generate normalization parameters from gameplay data
-3. Design integration approach for `BoardFeatureSource` trait
+3. Design integration approach for `BoardFeature` trait
 
 **Completed:**
 
@@ -117,18 +117,31 @@ This roadmap outlines the development of KM-based normalization for **survival f
 - [x] Implement data structures for normalization parameters
 - [x] Implement normalization parameter generation from gameplay data
 - [x] Create tools to generate `data/normalization_params.json`
+- [x] Design `MappedNormalized<S>` type
+  - Separate type from `LinearNormalized<S>` with mapping-based transform
+  - Uses `BTreeMap<u32, f32>` for raw → transformed value lookup
+  - Clipping behavior for out-of-range values (clip to min/max key)
+  - Follows `FeatureBuilder` construction pattern (established 2026-01-06)
+- [x] Design `FeatureProcessing` integration
+  - Add `MappedNormalized` variant to enum for serialization
+- [x] Define feature naming convention
+  - Linear features: `*_linear_penalty`, `*_linear_risk`
+  - Mapped (KM) features: `*_km_penalty`
+  - Feature set selection via model name (`aggro_linear` vs `aggro_km`)
 
-**In Progress:**
+**Key Decisions:**
 
-- [ ] Design `BoardFeatureSource` trait integration
-  - How to load KM normalization parameters
-  - How to implement KM-based `transform()` method
-  - Maintain compatibility with existing analysis tools
+- **Type Structure**: `MappedNormalized<S>` as separate type (not extension of `LinearNormalized<S>`)
+- **Lookup Table**: `BTreeMap<u32, f32>` for flexibility with sparse mappings
+- **Clipping**: Out-of-range values clip to nearest boundary (min/max key in mapping)
+- **Feature Coexistence**: Keep linear features, add KM features as new set
+- **Model Selection**: Model name determines feature set (`aggro_linear` vs `aggro_km`)
 
 **Deliverables:**
 
 - Normalization parameter generation pipeline
-- Design document for trait integration
+- Complete design document with type structure, clipping logic, and naming conventions
+- Infrastructure ready for Phase 4 implementation
 
 ---
 
@@ -144,17 +157,35 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 **Tasks:**
 
-- [ ] Clean up feature set
-  - Remove duplicate `*_risk` features (use `*_penalty` equivalents)
+- [ ] Implement `MappedNormalized<S>` type
+  - Implement type with `BTreeMap<u32, f32>` mapping field
+  - Implement `transform()` with clipping logic for out-of-range values
+  - Implement `BoardFeature` trait
 
-- [ ] Integrate KM normalization into `BoardFeatureSource` trait
-  - Implement trait extension designed in Phase 3
-  - Load normalization params from generated JSON
+- [ ] Add `MappedNormalized` variant to `FeatureProcessing` enum
+  - Add variant with mapping, signal, and normalization range fields
+  - Update serialization/deserialization
+  - Update `apply()` method for feature reconstruction
+
+- [ ] Extend `FeatureBuilder` for mapped features
+  - Add method to construct `MappedNormalized<S>` from KM normalization parameters
+  - Support building both linear and mapped feature sets
+  - Implement feature set selection logic
 
 - [ ] Implement KM-based survival features
-  - `km_num_holes`, `km_sum_of_hole_depth` (holes directly cause game over)
-  - `km_max_height`, `km_center_column_max_height`, `km_total_height` (height determines available space)
+  - `num_holes_km_penalty`, `sum_of_hole_depth_km_penalty` (holes directly cause game over)
+  - `max_height_km_penalty`, `center_column_max_height_km_penalty`, `total_height_km_penalty` (height determines available space)
   - Use KM transform to capture non-linear survival relationships
+
+- [ ] Update training tools for feature set selection
+  - Support model name-based feature set selection (`aggro_linear` vs `aggro_km`)
+  - Keep linear features for backward compatibility
+  - Add KM features as new feature set
+
+- [ ] Update `analyze-board-features` for dual feature sets
+  - Display both linear and KM features
+  - Enable side-by-side comparison
+  - Show transformation differences
 
 - [ ] Validate survival feature effectiveness
   - Analyze KM curves for each feature
@@ -162,26 +193,32 @@ This roadmap outlines the development of KM-based normalization for **survival f
   - Compare KM transform vs. linear transform
 
 - [ ] Train and benchmark evaluator
-  - Train using survival features with KM normalization
-  - Compare performance vs. current evaluator (linear normalization)
+  - Train using KM-based survival features
+  - Compare performance vs. linear normalization
   - Analyze learned weights and interpretability
+
+- [ ] Consider feature set cleanup (optional, after validation)
+  - Evaluate removing duplicate `*_risk` features if KM approach is validated
+  - Keep both linear and KM sets for comparison initially
 
 **Deliverables:**
 
-- Clean feature set without duplicates
+- `MappedNormalized<S>` type implementation
 - KM-based survival features integrated with trait system
-- Trained survival-focused evaluator
+- Trained KM-based evaluator
+- Both linear and KM feature sets available for comparison
 - Validation analysis showing improvement over linear normalization
 
 ---
 
 ## Success Metrics
 
-### Phase 3: Infrastructure
+### Phase 3: Infrastructure ✅
 
-- Normalization parameters successfully generated from gameplay data
-- Infrastructure ready for `BoardFeatureSource` trait integration
-- KM curves show clear non-linear relationships for survival features
+- ✅ Normalization parameters successfully generated from gameplay data
+- ✅ Infrastructure ready for `BoardFeature` trait integration
+- ✅ KM curves show clear non-linear relationships for survival features
+- ✅ Design approach finalized (mapping-based transform)
 
 ### Phase 4: Survival Features (Project Goal)
 
@@ -202,7 +239,7 @@ Phase 1 → Phase 2 → Phase 3 → Phase 4 (Complete)
 ```
 
 - Phase 1-2: Data generation and KM survival analysis (completed)
-- Phase 3: Infrastructure for KM normalization (in progress)
+- Phase 3: Infrastructure for KM normalization (completed 2026-01-06)
 - Phase 4: Survival features with KM normalization (project goal)
 - Future Work: Structure features, score optimization, advanced techniques (out of scope)
 
