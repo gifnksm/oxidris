@@ -27,11 +27,112 @@ use super::{
 /// let moved = piece.right().unwrap();
 /// let rotated = moved.rotated_right();
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
     position: PiecePosition,
     rotation: PieceRotation,
     kind: PieceKind,
+}
+
+impl Serialize for Piece {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Format: "kind#rotation@x,y" (e.g., "S#1@4,18")
+        let s = format!(
+            "{}#{}@{},{}",
+            self.kind.as_char(),
+            self.rotation.0,
+            self.position.x,
+            self.position.y
+        );
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Piece {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        // Parse format: "kind#rotation@x,y" (e.g., "S#1@4,18")
+        // First split by '#' to get kind and rest
+        let mut parts = s.splitn(2, '#');
+        let kind_str = parts.next().ok_or_else(|| {
+            serde::de::Error::custom(format!("expected format 'kind#rotation@x,y', got '{s}'"))
+        })?;
+        let rest = parts.next().ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "missing '#' in format 'kind#rotation@x,y', got '{s}'"
+            ))
+        })?;
+
+        // Parse kind
+        let kind_char = kind_str
+            .chars()
+            .next()
+            .ok_or_else(|| serde::de::Error::custom("missing piece kind"))?;
+        if kind_str.len() != 1 {
+            return Err(serde::de::Error::custom(format!(
+                "piece kind must be single character, got '{kind_str}'"
+            )));
+        }
+        let kind = PieceKind::from_char(kind_char)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid piece kind: {kind_char}")))?;
+
+        // Split by '@' to get rotation and position
+        let mut parts = rest.splitn(2, '@');
+        let rotation_str = parts.next().ok_or_else(|| {
+            serde::de::Error::custom(format!("missing rotation after '#', got '{s}'"))
+        })?;
+        let position_str = parts.next().ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "missing '@' in format 'kind#rotation@x,y', got '{s}'"
+            ))
+        })?;
+
+        // Parse rotation
+        let rotation_num = rotation_str.parse::<u8>().map_err(|e| {
+            serde::de::Error::custom(format!("invalid rotation: {rotation_str} ({e})"))
+        })?;
+        if rotation_num > 3 {
+            return Err(serde::de::Error::custom(format!(
+                "rotation must be 0-3, got {rotation_num}"
+            )));
+        }
+        let rotation = PieceRotation(rotation_num);
+
+        // Split position by ',' to get x and y
+        let mut parts = position_str.splitn(2, ',');
+        let x_str = parts.next().ok_or_else(|| {
+            serde::de::Error::custom(format!("missing x coordinate after '@', got '{s}'"))
+        })?;
+        let y_str = parts.next().ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "missing ',' in format 'kind#rotation@x,y', got '{s}'"
+            ))
+        })?;
+
+        // Parse x and y
+        let x = x_str
+            .parse::<u8>()
+            .map_err(|e| serde::de::Error::custom(format!("invalid x position: {x_str} ({e})")))?;
+
+        let y = y_str
+            .parse::<u8>()
+            .map_err(|e| serde::de::Error::custom(format!("invalid y position: {y_str} ({e})")))?;
+
+        let position = PiecePosition::new(x, y);
+
+        Ok(Piece {
+            position,
+            rotation,
+            kind,
+        })
+    }
 }
 
 impl Piece {
@@ -290,7 +391,7 @@ impl PiecePosition {
 /// - `3`: 270° clockwise (90° counterclockwise)
 ///
 /// Rotation operations wrap around modulo 4.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct PieceRotation(u8);
 
 impl PieceRotation {
@@ -368,6 +469,54 @@ impl PieceKind {
                     }
                 })
             })
+    }
+
+    /// Returns the single character representation of this piece kind.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use oxidris_engine::PieceKind;
+    ///
+    /// assert_eq!(PieceKind::I.as_char(), 'I');
+    /// assert_eq!(PieceKind::T.as_char(), 'T');
+    /// ```
+    #[must_use]
+    pub const fn as_char(self) -> char {
+        match self {
+            PieceKind::I => 'I',
+            PieceKind::O => 'O',
+            PieceKind::S => 'S',
+            PieceKind::Z => 'Z',
+            PieceKind::J => 'J',
+            PieceKind::L => 'L',
+            PieceKind::T => 'T',
+        }
+    }
+
+    /// Parses a piece kind from a single character.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use oxidris_engine::PieceKind;
+    ///
+    /// assert_eq!(PieceKind::from_char('I'), Some(PieceKind::I));
+    /// assert_eq!(PieceKind::from_char('T'), Some(PieceKind::T));
+    /// assert_eq!(PieceKind::from_char('X'), None);
+    /// ```
+    #[must_use]
+    pub const fn from_char(c: char) -> Option<Self> {
+        match c {
+            'I' => Some(PieceKind::I),
+            'O' => Some(PieceKind::O),
+            'S' => Some(PieceKind::S),
+            'Z' => Some(PieceKind::Z),
+            'J' => Some(PieceKind::J),
+            'L' => Some(PieceKind::L),
+            'T' => Some(PieceKind::T),
+            _ => None,
+        }
     }
 }
 
@@ -499,3 +648,110 @@ const PIECE_SHAPES: [[PieceShape; 4]; PieceKind::LEN] = {
         shape_rotations(3, &[[E, T, E, E], [T, T, T, E], EEEE, EEEE]),
     ]
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_piece_serialization() {
+        // Test basic serialization format: "kind#rotation@x,y"
+        let piece = Piece {
+            position: PiecePosition::new(4, 18),
+            rotation: PieceRotation(1),
+            kind: PieceKind::S,
+        };
+
+        let serialized = serde_json::to_string(&piece).unwrap();
+        println!("Piece serialized format: {serialized}");
+
+        assert_eq!(serialized, "\"S#1@4,18\"");
+
+        let deserialized: Piece = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, piece);
+    }
+
+    #[test]
+    fn test_piece_serialization_all_kinds() {
+        let kinds = [
+            PieceKind::I,
+            PieceKind::O,
+            PieceKind::S,
+            PieceKind::Z,
+            PieceKind::J,
+            PieceKind::L,
+            PieceKind::T,
+        ];
+
+        for kind in kinds {
+            let piece = Piece {
+                position: PiecePosition::new(5, 10),
+                rotation: PieceRotation(2),
+                kind,
+            };
+
+            let serialized = serde_json::to_string(&piece).unwrap();
+            let deserialized: Piece = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, piece);
+        }
+    }
+
+    #[test]
+    fn test_piece_serialization_all_rotations() {
+        for rotation_num in 0..4 {
+            let piece = Piece {
+                position: PiecePosition::new(3, 7),
+                rotation: PieceRotation(rotation_num),
+                kind: PieceKind::T,
+            };
+
+            let serialized = serde_json::to_string(&piece).unwrap();
+            let expected = format!("\"T#{rotation_num}@3,7\"");
+            assert_eq!(serialized, expected);
+
+            let deserialized: Piece = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, piece);
+        }
+    }
+
+    #[test]
+    fn test_piece_deserialization_error_cases() {
+        // Invalid format
+        assert!(serde_json::from_str::<Piece>("\"S1@4,18\"").is_err());
+        assert!(serde_json::from_str::<Piece>("\"S#1#4,18\"").is_err());
+        assert!(serde_json::from_str::<Piece>("\"S#1@4\"").is_err());
+
+        // Invalid piece kind
+        assert!(serde_json::from_str::<Piece>("\"X#1@4,18\"").is_err());
+
+        // Invalid rotation (must be 0-3)
+        assert!(serde_json::from_str::<Piece>("\"S#4@4,18\"").is_err());
+        assert!(serde_json::from_str::<Piece>("\"S#-1@4,18\"").is_err());
+
+        // Invalid coordinates
+        assert!(serde_json::from_str::<Piece>("\"S#1@abc,18\"").is_err());
+        assert!(serde_json::from_str::<Piece>("\"S#1@4,xyz\"").is_err());
+    }
+
+    #[test]
+    fn test_piece_kind_char_conversion() {
+        assert_eq!(PieceKind::I.as_char(), 'I');
+        assert_eq!(PieceKind::O.as_char(), 'O');
+        assert_eq!(PieceKind::S.as_char(), 'S');
+        assert_eq!(PieceKind::Z.as_char(), 'Z');
+        assert_eq!(PieceKind::J.as_char(), 'J');
+        assert_eq!(PieceKind::L.as_char(), 'L');
+        assert_eq!(PieceKind::T.as_char(), 'T');
+
+        assert_eq!(PieceKind::from_char('I'), Some(PieceKind::I));
+        assert_eq!(PieceKind::from_char('O'), Some(PieceKind::O));
+        assert_eq!(PieceKind::from_char('S'), Some(PieceKind::S));
+        assert_eq!(PieceKind::from_char('Z'), Some(PieceKind::Z));
+        assert_eq!(PieceKind::from_char('J'), Some(PieceKind::J));
+        assert_eq!(PieceKind::from_char('L'), Some(PieceKind::L));
+        assert_eq!(PieceKind::from_char('T'), Some(PieceKind::T));
+
+        assert_eq!(PieceKind::from_char('X'), None);
+        assert_eq!(PieceKind::from_char('x'), None);
+    }
+}

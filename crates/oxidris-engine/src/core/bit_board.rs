@@ -148,8 +148,12 @@ impl Serialize for BitBoard {
     where
         S: serde::Serializer,
     {
-        let mut hex_string = String::with_capacity(TOTAL_HEIGHT * 4);
-        for row in &self.rows {
+        // Format: "3003,3003,3003,..." (comma-separated hex values)
+        let mut hex_string = String::with_capacity(TOTAL_HEIGHT * 5); // 4 chars + comma
+        for (i, row) in self.rows.iter().enumerate() {
+            if i > 0 {
+                hex_string.push(',');
+            }
             write!(&mut hex_string, "{:04x}", row.bits).unwrap();
         }
         serializer.serialize_str(&hex_string)
@@ -163,24 +167,22 @@ impl<'de> Deserialize<'de> for BitBoard {
     {
         let s = String::deserialize(deserializer)?;
 
-        // Expected length: TOTAL_HEIGHT * 4 characters
-        let expected_len = TOTAL_HEIGHT * 4;
-        if s.len() != expected_len {
+        // Parse comma-separated hex values: "3003,3003,3003,..."
+        let parts: Vec<&str> = s.split(',').collect();
+        if parts.len() != TOTAL_HEIGHT {
             return Err(serde::de::Error::custom(format!(
-                "expected {} characters (4 per row * {} rows), got {}",
-                expected_len,
+                "expected {} comma-separated hex values, got {}",
                 TOTAL_HEIGHT,
-                s.len()
+                parts.len()
             )));
         }
 
         let mut rows = [BitRow::EMPTY; TOTAL_HEIGHT];
-        for (i, row) in rows.iter_mut().enumerate() {
-            let start = i * 4;
-            let end = start + 4;
-            let hex_str = &s[start..end];
-            let bits = u16::from_str_radix(hex_str, 16).map_err(serde::de::Error::custom)?;
-            *row = BitRow { bits };
+        for (i, hex_str) in parts.iter().enumerate() {
+            let bits = u16::from_str_radix(hex_str, 16).map_err(|e| {
+                serde::de::Error::custom(format!("invalid hex at row {i}: {hex_str} ({e})"))
+            })?;
+            rows[i] = BitRow { bits };
         }
 
         Ok(BitBoard { rows })
@@ -502,8 +504,8 @@ mod tests {
         assert!(serialized.contains("3003")); // EMPTY rows
         assert!(serialized.contains("3fff")); // FULL_SENTINEL rows
 
-        // Should be 24 rows * 4 chars = 96 chars, plus 2 for quotes
-        assert_eq!(serialized.len(), TOTAL_HEIGHT * 4 + 2);
+        // Should be 24 rows * 4 chars + 23 commas = 119 chars, plus 2 for quotes
+        assert_eq!(serialized.len(), TOTAL_HEIGHT * 4 + (TOTAL_HEIGHT - 1) + 2);
 
         let deserialized: BitBoard = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, board);
