@@ -7,24 +7,21 @@ mod feature;
 mod stats;
 mod table;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs::File,
-    io::Write,
-    ops::Range,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fs::File, io::Write, ops::Range, path::PathBuf};
 
 use anyhow::Context;
 use clap::Args;
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
 
 use self::stats::SurvivalStats;
-use crate::model::{
-    km_normalization::{
-        FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
+use crate::{
+    command::analyze_censoring::table::SurvivalTableRow,
+    model::{
+        km_normalization::{
+            FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
+        },
+        session::{SessionCollection, SessionData},
     },
-    session::{SessionCollection, SessionData},
 };
 
 #[derive(Debug, Clone, Args)]
@@ -241,41 +238,64 @@ fn analyze_overall_censoring(sessions: &[SessionData]) {
     println!("  Total boards captured: {total_boards}");
 }
 
-/// Phase information: `(name, turn_range)`
-type PhaseInfo = (&'static str, Range<usize>);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Phase {
+    Early,
+    Mid,
+    Late,
+    VeryLate,
+}
+
+impl Phase {
+    fn to_str(self) -> &'static str {
+        match self {
+            Phase::Early => "Early",
+            Phase::Mid => "Mid",
+            Phase::Late => "Late",
+            Phase::VeryLate => "Very Late",
+        }
+    }
+
+    fn range(self, max_turns: usize) -> Range<usize> {
+        match self {
+            Phase::Early => 0..max_turns / 4,
+            Phase::Mid => max_turns / 4..2 * max_turns / 4,
+            Phase::Late => 2 * max_turns / 4..3 * max_turns / 4,
+            Phase::VeryLate => 3 * max_turns / 4..max_turns,
+        }
+    }
+
+    fn from_turn(turn: usize, max_turns: usize) -> Self {
+        if turn < max_turns / 4 {
+            Phase::Early
+        } else if turn < 2 * max_turns / 4 {
+            Phase::Mid
+        } else if turn < 3 * max_turns / 4 {
+            Phase::Late
+        } else {
+            Phase::VeryLate
+        }
+    }
+}
 
 /// Collect survival data grouped by capture phase
 fn collect_phase_data(
     sessions: &[SessionData],
     max_turns: usize,
-) -> Vec<(PhaseInfo, Vec<(usize, bool)>)> {
-    let phases = [
-        ("Early", 0..max_turns / 4),
-        ("Mid", max_turns / 4..2 * max_turns / 4),
-        ("Late", 2 * max_turns / 4..3 * max_turns / 4),
-        ("Very Late", 3 * max_turns / 4..max_turns),
-    ];
+) -> BTreeMap<Phase, Vec<(usize, bool)>> {
+    let mut phase_data = BTreeMap::<Phase, Vec<(usize, bool)>>::new();
 
-    let mut phase_data = Vec::new();
+    for session in sessions {
+        let is_censored = !session.is_game_over;
+        let game_end = session.survived_turns;
 
-    for phase in phases {
-        let (_phase_name, range) = &phase;
-        let mut phase_boards = vec![];
-
-        for session in sessions {
-            let is_censored = !session.is_game_over;
-            let game_end = session.survived_turns;
-
-            for board in &session.boards {
-                if range.contains(&board.turn) {
-                    let remaining = game_end - board.turn;
-                    phase_boards.push((remaining, is_censored));
-                }
-            }
-        }
-
-        if !phase_boards.is_empty() {
-            phase_data.push((phase, phase_boards));
+        for board in &session.boards {
+            let phase = Phase::from_turn(board.turn, max_turns);
+            let remaining = game_end - board.turn;
+            phase_data
+                .entry(phase)
+                .or_default()
+                .push((remaining, is_censored));
         }
     }
 
@@ -286,19 +306,16 @@ fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
     let phase_data = collect_phase_data(sessions, max_turns);
 
     let stats_vec: Vec<_> = phase_data
-        .iter()
-        .map(|(_, data)| SurvivalStats::from_data(data))
+        .values()
+        .map(|data| SurvivalStats::from_data(data))
         .collect();
 
     let rows: Vec<_> = phase_data
         .iter()
         .zip(stats_vec.iter())
-        .map(|((phase, _), stats)| {
-            let (phase_name, phase_range) = phase;
-            table::SurvivalTableRow {
-                label: format!("{phase_name:9} {phase_range:4?}"),
-                stats,
-            }
+        .map(|((phase, _), stats)| SurvivalTableRow {
+            label: format!("{:9} {:4?}", phase.to_str(), phase.range(max_turns)),
+            stats,
         })
         .collect();
 
@@ -314,8 +331,8 @@ fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
 }
 
 /// Collect survival data grouped by evaluator
-fn collect_evaluator_data(sessions: &[SessionData]) -> Vec<(String, Vec<(usize, bool)>)> {
-    let mut evaluator_data: HashMap<String, Vec<(usize, bool)>> = HashMap::new();
+fn collect_evaluator_data(sessions: &[SessionData]) -> BTreeMap<String, Vec<(usize, bool)>> {
+    let mut evaluator_data: BTreeMap<String, Vec<(usize, bool)>> = BTreeMap::new();
 
     for session in sessions {
         let is_censored = !session.is_game_over;
@@ -327,23 +344,21 @@ fn collect_evaluator_data(sessions: &[SessionData]) -> Vec<(String, Vec<(usize, 
             .push((game_end, is_censored));
     }
 
-    let mut evaluators: Vec<_> = evaluator_data.into_iter().collect();
-    evaluators.sort_by(|a, b| a.0.cmp(&b.0));
-    evaluators
+    evaluator_data
 }
 
 fn analyze_by_evaluator(sessions: &[SessionData]) {
     let evaluator_data = collect_evaluator_data(sessions);
 
     let stats_vec: Vec<_> = evaluator_data
-        .iter()
-        .map(|(_, data)| SurvivalStats::from_data(data))
+        .values()
+        .map(|data| SurvivalStats::from_data(data))
         .collect();
 
     let rows: Vec<_> = evaluator_data
         .iter()
         .zip(stats_vec.iter())
-        .map(|((evaluator, _), stats)| table::SurvivalTableRow {
+        .map(|((evaluator, _), stats)| SurvivalTableRow {
             label: evaluator.clone(),
             stats,
         })
