@@ -201,7 +201,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
                 session_data.is_game_over = true;
                 break;
             }
-            session_data.survived_turns = turn;
+            session_data.survived_turns = turn + 1;
 
             if capture_interval == 0 {
                 if adaptive_sampler.should_capture(&analysis, &stats, &mut rng) {
@@ -219,7 +219,8 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             } else {
                 capture_interval -= 1;
             }
-            if stats.completed_pieces() > MAX_TURNS {
+            let next_turn = stats.completed_pieces();
+            if next_turn >= MAX_TURNS {
                 break;
             }
         }
