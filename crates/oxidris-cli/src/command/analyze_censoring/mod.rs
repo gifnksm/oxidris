@@ -7,7 +7,13 @@ mod feature;
 mod stats;
 mod table;
 
-use std::{collections::BTreeMap, collections::HashMap, fs::File, io::Write, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::File,
+    io::Write,
+    ops::Range,
+    path::PathBuf,
+};
 
 use anyhow::Context;
 use clap::Args;
@@ -235,26 +241,25 @@ fn analyze_overall_censoring(sessions: &[SessionData]) {
     println!("  Total boards captured: {total_boards}");
 }
 
-/// Phase information: (name, `start_turn`, `end_turn`)
-type PhaseInfo = (&'static str, usize, usize);
+/// Phase information: `(name, turn_range)`
+type PhaseInfo = (&'static str, Range<usize>);
 
 /// Collect survival data grouped by capture phase
 fn collect_phase_data(
     sessions: &[SessionData],
     max_turns: usize,
 ) -> Vec<(PhaseInfo, Vec<(usize, bool)>)> {
-    let phase_size = max_turns / 4;
     let phases = [
-        ("Early", 0, phase_size),
-        ("Mid", phase_size, phase_size * 2),
-        ("Late", phase_size * 2, phase_size * 3),
-        ("Very Late", phase_size * 3, max_turns),
+        ("Early", 0..max_turns / 4),
+        ("Mid", max_turns / 4..2 * max_turns / 4),
+        ("Late", 2 * max_turns / 4..3 * max_turns / 4),
+        ("Very Late", 3 * max_turns / 4..max_turns),
     ];
 
     let mut phase_data = Vec::new();
 
     for phase in phases {
-        let (_phase_name, start, end) = phase;
+        let (_phase_name, range) = &phase;
         let mut phase_boards = vec![];
 
         for session in sessions {
@@ -262,7 +267,7 @@ fn collect_phase_data(
             let game_end = session.survived_turns;
 
             for board in &session.boards {
-                if board.turn >= start && board.turn < end {
+                if range.contains(&board.turn) {
                     let remaining = game_end - board.turn;
                     phase_boards.push((remaining, is_censored));
                 }
@@ -289,9 +294,9 @@ fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
         .iter()
         .zip(stats_vec.iter())
         .map(|((phase, _), stats)| {
-            let (phase_name, start, end) = phase;
+            let (phase_name, phase_range) = phase;
             table::SurvivalTableRow {
-                label: format!("{phase_name} ({start}-{end})"),
+                label: format!("{phase_name:9} {phase_range:4?}"),
                 stats,
             }
         })
