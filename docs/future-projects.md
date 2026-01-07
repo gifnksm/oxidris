@@ -53,6 +53,43 @@ The limited search space may prevent the AI from reaching beneficial board state
 
 ---
 
+## UI Improvements
+
+### Migration to Ratatui
+
+**Problem:** Current UI implementation for `play` and `auto-play` subcommands uses custom crossterm-based rendering (`crates/oxidris-cli/src/ui/`), which has several issues:
+
+- Screen rendering corruption after terminal resize
+- Fixed numeric layout positions with low flexibility
+- Layout changes require manual coordinate recalculation
+- Maintenance burden of custom terminal handling code
+- Inconsistent with `analyze-board-features` which already uses ratatui
+
+The project already depends on ratatui for the analysis TUI, so using it for game rendering would unify the UI stack and eliminate custom terminal code.
+
+**Improvement:** Migrate `play` and `auto-play` subcommands to use ratatui for rendering:
+
+- Replace custom `ui/terminal.rs` and `ui/renderer.rs` with ratatui widgets
+- Use ratatui's layout system for flexible, responsive layouts
+- Proper handling of terminal resize events
+- Maintain existing gameplay functionality (manual play, auto-play, pause, controls)
+- Keep same visual appearance where possible (game board, next pieces, hold, score, controls)
+
+**Out of Scope:** Training and data generation CLIs don't need UI changes. Future projects could enhance them with TUI if needed.
+
+**Benefits:**
+
+- Eliminates screen corruption bugs
+- Easier layout modifications and improvements
+- Reduced maintenance (no custom terminal code)
+- Consistent UI stack across the project
+
+**Dependencies:** None (ratatui already in dependencies)
+
+**Effort:** Medium (UI reimplementation + testing both play modes)
+
+---
+
 ## Evaluator / AI Improvements
 
 ### Feature Redundancy Analysis and Cleanup

@@ -1,0 +1,6 @@
+# Typos configuration
+# https://github.com/crate-ci/typos
+
+[default.extend-words]
+# ratatui is a TUI library, not a typo of "ratatouille"
+ratatui = "ratatui"
