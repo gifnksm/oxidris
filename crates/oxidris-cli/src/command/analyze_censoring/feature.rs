@@ -3,14 +3,21 @@
 //! This module provides functions for analyzing individual features,
 //! including data collection, KM curve calculation, display, and CSV export.
 
-use std::{collections::BTreeMap, fmt::Write as _, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write as _,
+    path::Path,
+};
 
 use anyhow::Context;
 use oxidris_evaluator::{
     board_feature::BoxedBoardFeatureSource, placement_analysis::PlacementAnalysis,
 };
 
-use super::{stats::SurvivalStats, table};
+use super::{
+    stats::{self, SurvivalStats},
+    table,
+};
 use crate::model::session::SessionData;
 
 /// Compute survival statistics for all values of a feature
@@ -25,19 +32,15 @@ use crate::model::session::SessionData;
 ///
 /// # Returns
 /// Vector of (`feature_value`, `SurvivalStats`) sorted by feature value
-pub(super) fn compute_feature_statistics(
+pub(super) fn collect_feature_survival_stats(
     feature: &BoxedBoardFeatureSource,
     sessions: &[SessionData],
-) -> Vec<(u32, SurvivalStats)> {
-    let feature_data = collect_feature_data(feature, sessions);
-
-    let mut stats_with_km = Vec::new();
-    for (value, data) in feature_data {
-        let stats = SurvivalStats::from_data_with_km(&data);
-        stats_with_km.push((value, stats));
-    }
-
-    stats_with_km
+    include_km: bool,
+) -> BTreeMap<u32, SurvivalStats> {
+    stats::collect_survival_stats_by_group(sessions, include_km, |_session, board| {
+        let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
+        feature.extract_raw(&analysis)
+    })
 }
 
 /// Display feature statistics with representative percentile values
@@ -50,100 +53,59 @@ pub(super) fn compute_feature_statistics(
 /// * `all_stats` - Pre-computed statistics for all feature values
 pub(super) fn display_feature_statistics(
     feature: &BoxedBoardFeatureSource,
-    all_stats: &[(u32, SurvivalStats)],
+    all_stats: &BTreeMap<u32, SurvivalStats>,
+    include_km: bool,
 ) {
     let total_values = all_stats.len();
 
     // Select percentile values to display
-    let percentile_indices = select_percentile_indices(all_stats);
+    let percentile_values = select_percentile_values(all_stats);
 
     // Display table with representative values
-    let rows: Vec<_> = percentile_indices
+    let rows: Vec<_> = percentile_values
         .iter()
-        .filter_map(|&idx| all_stats.get(idx))
+        .filter_map(|value| all_stats.get_key_value(value))
         .map(|(value, stats)| table::SurvivalTableRow {
             label: value.to_string(),
             stats,
         })
         .collect();
 
-    let footer =
-        format!("(Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
-
-    table::print_survival_table(
-        &format!("{} ({})", feature.name(), feature.id()),
-        "Value",
-        8,
-        "Boards",
-        rows,
-        true,
-        Some(&footer),
-    );
-}
-
-/// Collect feature data from all sessions
-///
-/// Returns a map of `feature_value` -> [(`remaining_turns`, `is_censored`)]
-fn collect_feature_data(
-    feature: &BoxedBoardFeatureSource,
-    sessions: &[SessionData],
-) -> BTreeMap<u32, Vec<(usize, bool)>> {
-    let mut feature_data: BTreeMap<u32, Vec<(usize, bool)>> = BTreeMap::new();
-
-    for session in sessions {
-        let is_censored = !session.is_game_over;
-        let game_end = session.survived_turns;
-
-        for board in &session.boards {
-            let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
-            let raw_value = feature.extract_raw(&analysis);
-            let remaining = game_end - board.turn;
-            feature_data
-                .entry(raw_value)
-                .or_default()
-                .push((remaining, is_censored));
-        }
-    }
-
-    feature_data
+    println!("{} ({})", feature.name(), feature.id());
+    table::print_survival_table("Value", rows, include_km);
+    println!("  (Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
 }
 
 /// Select percentile indices based on cumulative board counts
 ///
 /// Returns indices for P0, P25, P50, P75, P100 percentiles.
 #[expect(clippy::cast_precision_loss)]
-fn select_percentile_indices(all_stats: &[(u32, SurvivalStats)]) -> Vec<usize> {
-    let total_boards: usize = all_stats.iter().map(|(_, stats)| stats.count).sum();
+fn select_percentile_values(all_stats: &BTreeMap<u32, SurvivalStats>) -> BTreeSet<u32> {
+    let total_boards: usize = all_stats.values().map(|stats| stats.boards_count).sum();
 
     let mut cumulative_boards = 0;
-    let mut percentile_indices = Vec::new();
+    let mut percentile_values = BTreeSet::new();
     let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
     let mut percentile_idx = 0;
 
-    for (idx, (_, stats)) in all_stats.iter().enumerate() {
-        cumulative_boards += stats.count;
+    for (value, stats) in all_stats {
+        cumulative_boards += stats.boards_count;
         let current_percentile = cumulative_boards as f64 / total_boards as f64;
 
         while percentile_idx < percentiles.len()
             && current_percentile >= percentiles[percentile_idx]
         {
-            percentile_indices.push(idx);
+            percentile_values.insert(*value);
             percentile_idx += 1;
         }
     }
 
     // Ensure we always have the last value
-    if (percentile_indices.is_empty() || *percentile_indices.last().unwrap() != all_stats.len() - 1)
-        && !percentile_indices.contains(&(all_stats.len() - 1))
-    {
-        percentile_indices.push(all_stats.len() - 1);
+    if let Some((max_value, _)) = all_stats.last_key_value() {
+        percentile_values.insert(*max_value);
     }
 
-    // Deduplicate indices
-    percentile_indices.sort_unstable();
-    percentile_indices.dedup();
-
-    percentile_indices
+    percentile_values
 }
 
 /// Save KM curves to CSV file for all feature values
@@ -155,7 +117,7 @@ fn select_percentile_indices(all_stats: &[(u32, SurvivalStats)]) -> Vec<usize> {
 pub(super) fn save_feature_km_curves(
     dir: &Path,
     feature_id: &str,
-    all_stats: &[(u32, SurvivalStats)],
+    all_stats: &BTreeMap<u32, SurvivalStats>,
 ) -> anyhow::Result<()> {
     std::fs::create_dir_all(dir)?;
     let csv_path = dir.join(format!("{feature_id}_km.csv"));

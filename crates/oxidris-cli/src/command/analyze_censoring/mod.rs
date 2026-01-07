@@ -78,8 +78,9 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
     // Compute statistics for all features (reused for display, CSV, and normalization)
     let mut feature_stats = Vec::new();
     for feature in &target_features {
-        let stats = feature::compute_feature_statistics(feature, sessions);
-        feature::display_feature_statistics(feature, &stats);
+        let include_km = true;
+        let stats = feature::collect_feature_survival_stats(feature, sessions, include_km);
+        feature::display_feature_statistics(feature, &stats, include_km);
 
         // Save CSV files if output directory specified
         if let Some(dir) = &arg.km_output_dir {
@@ -115,7 +116,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 /// Reuses the already-computed KM statistics to avoid redundant calculation.
 #[expect(clippy::cast_precision_loss)]
 fn generate_normalization_params(
-    feature_stats: &[(BoxedBoardFeatureSource, Vec<(u32, SurvivalStats)>)],
+    feature_stats: &[(BoxedBoardFeatureSource, BTreeMap<u32, SurvivalStats>)],
     max_turns: usize,
 ) -> anyhow::Result<NormalizationParams> {
     let mut feature_normalizations = BTreeMap::<String, FeatureNormalization>::new();
@@ -132,7 +133,7 @@ fn generate_normalization_params(
 
         for (value, stats) in all_stats {
             if let Some(median) = stats.median_km {
-                value_km_data.push((*value, median, stats.count));
+                value_km_data.push((*value, median, stats.boards_count));
             }
         }
 
@@ -278,99 +279,40 @@ impl Phase {
     }
 }
 
-/// Collect survival data grouped by capture phase
-fn collect_phase_data(
-    sessions: &[SessionData],
-    max_turns: usize,
-) -> BTreeMap<Phase, Vec<(usize, bool)>> {
-    let mut phase_data = BTreeMap::<Phase, Vec<(usize, bool)>>::new();
-
-    for session in sessions {
-        let is_censored = !session.is_game_over;
-        let game_end = session.survived_turns;
-
-        for board in &session.boards {
-            let phase = Phase::from_turn(board.turn, max_turns);
-            let remaining = game_end - board.turn;
-            phase_data
-                .entry(phase)
-                .or_default()
-                .push((remaining, is_censored));
-        }
-    }
-
-    phase_data
-}
-
 fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
-    let phase_data = collect_phase_data(sessions, max_turns);
+    let include_km = false;
+    let phase_stats =
+        stats::collect_survival_stats_by_group(sessions, include_km, |_session, board| {
+            Phase::from_turn(board.turn, max_turns)
+        });
 
-    let stats_vec: Vec<_> = phase_data
-        .values()
-        .map(|data| SurvivalStats::from_data(data))
-        .collect();
-
-    let rows: Vec<_> = phase_data
+    let rows: Vec<_> = phase_stats
         .iter()
-        .zip(stats_vec.iter())
-        .map(|((phase, _), stats)| SurvivalTableRow {
+        .map(|(phase, stats)| SurvivalTableRow {
             label: format!("{:9} {:4?}", phase.to_str(), phase.range(max_turns)),
             stats,
         })
         .collect();
 
-    table::print_survival_table(
-        "Censoring by Capture Phase",
-        "Phase",
-        20,
-        "Boards",
-        rows,
-        false,
-        None,
-    );
-}
-
-/// Collect survival data grouped by evaluator
-fn collect_evaluator_data(sessions: &[SessionData]) -> BTreeMap<String, Vec<(usize, bool)>> {
-    let mut evaluator_data: BTreeMap<String, Vec<(usize, bool)>> = BTreeMap::new();
-
-    for session in sessions {
-        let is_censored = !session.is_game_over;
-        let game_end = session.survived_turns;
-
-        evaluator_data
-            .entry(session.placement_evaluator.clone())
-            .or_default()
-            .push((game_end, is_censored));
-    }
-
-    evaluator_data
+    println!("Censoring by Capture Phase");
+    table::print_survival_table("Phase", rows, include_km);
 }
 
 fn analyze_by_evaluator(sessions: &[SessionData]) {
-    let evaluator_data = collect_evaluator_data(sessions);
+    let include_km = false;
+    let evaluator_stats =
+        stats::collect_survival_stats_by_group(sessions, include_km, |session, _board| {
+            session.placement_evaluator.clone()
+        });
 
-    let stats_vec: Vec<_> = evaluator_data
-        .values()
-        .map(|data| SurvivalStats::from_data(data))
-        .collect();
-
-    let rows: Vec<_> = evaluator_data
+    let rows: Vec<_> = evaluator_stats
         .iter()
-        .zip(stats_vec.iter())
-        .map(|((evaluator, _), stats)| SurvivalTableRow {
+        .map(|(evaluator, stats)| SurvivalTableRow {
             label: evaluator.clone(),
             stats,
         })
         .collect();
 
-    table::print_survival_table(
-        "Censoring by Evaluator",
-        "Evaluator",
-        20,
-        "Sessions",
-        rows,
-        false,
-        None,
-    );
+    println!("Censoring by Evaluator");
+    table::print_survival_table("Evaluator", rows, include_km);
 }
