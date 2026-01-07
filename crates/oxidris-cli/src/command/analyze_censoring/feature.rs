@@ -3,11 +3,7 @@
 //! This module provides functions for analyzing individual features,
 //! including data collection, KM curve calculation, display, and CSV export.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt::Write as _,
-    path::Path,
-};
+use std::{collections::BTreeMap, fmt::Write as _, path::Path};
 
 use anyhow::Context;
 use oxidris_evaluator::{
@@ -59,12 +55,11 @@ pub(super) fn display_feature_statistics(
     let total_values = all_stats.len();
 
     // Select percentile values to display
-    let percentile_values = select_percentile_values(all_stats);
+    let percentile_values = filter_by_percentiles(all_stats);
 
     // Display table with representative values
     let rows: Vec<_> = percentile_values
         .iter()
-        .filter_map(|value| all_stats.get_key_value(value))
         .map(|(value, stats)| table::SurvivalTableRow {
             label: value.to_string(),
             stats,
@@ -76,15 +71,21 @@ pub(super) fn display_feature_statistics(
     println!("  (Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
 }
 
-/// Select percentile indices based on cumulative board counts
+/// Filter survival statistics to only include percentile values
 ///
-/// Returns indices for P0, P25, P50, P75, P100 percentiles.
+/// Returns a map of feature values to their corresponding survival statistics
+/// for P0, P25, P50, P75, and P100 percentiles
 #[expect(clippy::cast_precision_loss)]
-fn select_percentile_values(all_stats: &BTreeMap<u32, SurvivalStats>) -> BTreeSet<u32> {
-    let total_boards: usize = all_stats.values().map(|stats| stats.boards_count).sum();
+fn filter_by_percentiles(
+    all_stats: &BTreeMap<u32, SurvivalStats>,
+) -> BTreeMap<u32, &SurvivalStats> {
+    let total_boards = all_stats
+        .values()
+        .map(|stats| stats.boards_count)
+        .sum::<usize>();
 
     let mut cumulative_boards = 0;
-    let mut percentile_values = BTreeSet::new();
+    let mut percentile_values = BTreeMap::new();
     let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
     let mut percentile_idx = 0;
 
@@ -95,14 +96,14 @@ fn select_percentile_values(all_stats: &BTreeMap<u32, SurvivalStats>) -> BTreeSe
         while percentile_idx < percentiles.len()
             && current_percentile >= percentiles[percentile_idx]
         {
-            percentile_values.insert(*value);
+            percentile_values.insert(*value, stats);
             percentile_idx += 1;
         }
     }
 
     // Ensure we always have the last value
-    if let Some((max_value, _)) = all_stats.last_key_value() {
-        percentile_values.insert(*max_value);
+    if let Some((max_value, max_stats)) = all_stats.last_key_value() {
+        percentile_values.insert(*max_value, max_stats);
     }
 
     percentile_values
