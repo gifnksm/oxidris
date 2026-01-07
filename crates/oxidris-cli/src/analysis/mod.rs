@@ -17,7 +17,7 @@
 //! # Typical Workflow
 //!
 //! ```no_run
-//! use oxidris_cli::analysis::{BoardSample, BoardFeatureStatistics, BoardIndex};
+//! use oxidris_cli::analysis::{BoardFeatureStatistics, BoardIndex, BoardSample};
 //! # let features = todo!();
 //! # let sessions = todo!();
 //!

@@ -184,8 +184,8 @@ impl KaplanMeierCurve {
     /// let data = vec![(10, false), (20, false)];
     /// let curve = KaplanMeierCurve::from_data(data);
     ///
-    /// assert_eq!(curve.survival_at(5), 1.0);  // Before first event
-    /// assert!(curve.survival_at(15) < 1.0);   // After first event
+    /// assert_eq!(curve.survival_at(5), 1.0); // Before first event
+    /// assert!(curve.survival_at(15) < 1.0); // After first event
     /// ```
     #[must_use]
     pub fn survival_at(&self, time: usize) -> f64 {

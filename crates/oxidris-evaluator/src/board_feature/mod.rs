@@ -268,16 +268,16 @@ impl BoardFeature for BoxedBoardFeature {
 /// # Example
 ///
 /// ```rust,no_run
-/// use oxidris_evaluator::board_feature::{LinearNormalized, FeatureSignal, source::NumHoles};
+/// use oxidris_evaluator::board_feature::{FeatureSignal, LinearNormalized, source::NumHoles};
 /// use std::borrow::Cow;
 ///
 /// // Create a penalty feature for holes with P05-P95 normalization
 /// let feature = LinearNormalized::new(
 ///     Cow::Borrowed("holes_penalty"),
 ///     Cow::Borrowed("Holes Penalty"),
-///     FeatureSignal::Negative,  // Lower holes is better
-///     2.0,   // P05 (min)
-///     15.0,  // P95 (max)
+///     FeatureSignal::Negative, // Lower holes is better
+///     2.0,                     // P05 (min)
+///     15.0,                    // P95 (max)
 ///     NumHoles,
 /// );
 /// ```

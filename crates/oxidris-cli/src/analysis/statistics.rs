@@ -88,7 +88,10 @@ impl RawFeatureStatistics {
 ///
 /// // Analyze a specific feature
 /// println!("Raw mean: {}", stats[0].raw.mean);
-/// println!("Normalized P95: {}", stats[0].normalized.percentiles.get(95.0).unwrap());
+/// println!(
+///     "Normalized P95: {}",
+///     stats[0].normalized.percentiles.get(95.0).unwrap()
+/// );
 /// ```
 #[derive(Debug, Clone)]
 pub struct BoardFeatureStatistics {
@@ -116,7 +119,10 @@ impl BoardFeatureStatistics {
     /// use oxidris_cli::analysis::BoardFeatureStatistics;
     /// # let samples = todo!();
     /// # let feature_idx = 0;
-    /// let values = samples.iter().map(|s| s.feature_vector[feature_idx]).collect::<Vec<_>>();
+    /// let values = samples
+    ///     .iter()
+    ///     .map(|s| s.feature_vector[feature_idx])
+    ///     .collect::<Vec<_>>();
     /// let stats = BoardFeatureStatistics::from_feature_values(&values);
     /// ```
     #[expect(clippy::cast_precision_loss)]

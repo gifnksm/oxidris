@@ -15,12 +15,13 @@ use crate::{descriptive::DescriptiveStats, histogram::Histogram, percentiles::Pe
 /// let values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
 /// let stats = ComprehensiveStats::new(
 ///     values,
-///     &[25.0, 50.0, 75.0],  // Percentiles to compute
-///     5,                     // Number of histogram bins
-///     None,                  // Auto-detect min
-///     None,                  // Auto-detect max
-///     None,                  // No bin width unit
-/// ).unwrap();
+///     &[25.0, 50.0, 75.0], // Percentiles to compute
+///     5,                   // Number of histogram bins
+///     None,                // Auto-detect min
+///     None,                // Auto-detect max
+///     None,                // No bin width unit
+/// )
+/// .unwrap();
 ///
 /// assert_eq!(stats.stats.mean, 5.5);
 /// assert_eq!(stats.percentiles.get(50.0), Some(6.0));
@@ -60,14 +61,7 @@ impl ComprehensiveStats {
     /// use oxidris_stats::comprehensive::ComprehensiveStats;
     ///
     /// let values = [5.0, 2.0, 8.0, 1.0, 9.0, 3.0];
-    /// let stats = ComprehensiveStats::new(
-    ///     values,
-    ///     &[50.0, 95.0],
-    ///     10,
-    ///     None,
-    ///     None,
-    ///     None,
-    /// ).unwrap();
+    /// let stats = ComprehensiveStats::new(values, &[50.0, 95.0], 10, None, None, None).unwrap();
     ///
     /// assert!(stats.stats.min <= stats.stats.max);
     /// ```
@@ -126,14 +120,8 @@ impl ComprehensiveStats {
     /// let mut values = [5.0, 2.0, 8.0, 1.0, 9.0];
     /// values.sort_by(f32::total_cmp);
     ///
-    /// let stats = ComprehensiveStats::from_sorted(
-    ///     &values,
-    ///     &[25.0, 50.0, 75.0],
-    ///     5,
-    ///     None,
-    ///     None,
-    ///     None,
-    /// ).unwrap();
+    /// let stats =
+    ///     ComprehensiveStats::from_sorted(&values, &[25.0, 50.0, 75.0], 5, None, None, None).unwrap();
     ///
     /// assert_eq!(stats.stats.min, 1.0);
     /// assert_eq!(stats.stats.max, 9.0);

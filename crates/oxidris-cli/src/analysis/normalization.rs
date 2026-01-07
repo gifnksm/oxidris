@@ -15,8 +15,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use oxidris_cli::analysis::{RawBoardSample, RawFeatureStatistics};
 //! use oxidris_cli::analysis::BoardFeatureNormalizationParamCollection;
+//! use oxidris_cli::analysis::{RawBoardSample, RawFeatureStatistics};
 //! use oxidris_evaluator::board_feature;
 //! # let sessions = todo!();
 //!
@@ -29,7 +29,10 @@
 //!
 //! // Access percentiles for a specific source
 //! if let Some(param) = norm_params.get("num_holes") {
-//!     println!("P05: {}, P95: {}", param.value_percentiles.p05, param.value_percentiles.p95);
+//!     println!(
+//!         "P05: {}, P95: {}",
+//!         param.value_percentiles.p05, param.value_percentiles.p95
+//!     );
 //! }
 //! ```
 

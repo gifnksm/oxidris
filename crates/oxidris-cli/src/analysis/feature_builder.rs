@@ -77,8 +77,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use oxidris_cli::analysis::{RawBoardSample, RawFeatureStatistics};
 //! use oxidris_cli::analysis::{BoardFeatureNormalizationParamCollection, FeatureBuilder};
+//! use oxidris_cli::analysis::{RawBoardSample, RawFeatureStatistics};
 //! use oxidris_evaluator::board_feature;
 //! # let sessions = todo!();
 //!

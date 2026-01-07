@@ -91,7 +91,7 @@
 //!
 //! ```rust,no_run
 //! use oxidris_evaluator::{
-//!     session_evaluator::{DefaultSessionEvaluator, AggroSessionEvaluator},
+//!     session_evaluator::{AggroSessionEvaluator, DefaultSessionEvaluator},
 //!     turn_evaluator::TurnEvaluator,
 //! };
 //!

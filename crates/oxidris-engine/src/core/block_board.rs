@@ -165,7 +165,7 @@ impl BlockBoard {
     /// # Example
     ///
     /// ```
-    /// use oxidris_engine::{BlockBoard, Piece, PieceKind, Block};
+    /// use oxidris_engine::{Block, BlockBoard, Piece, PieceKind};
     ///
     /// let mut board = BlockBoard::INITIAL;
     /// let piece = Piece::new(PieceKind::T);

@@ -44,14 +44,7 @@
 //! use oxidris_stats::comprehensive::ComprehensiveStats;
 //!
 //! let values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-//! let stats = ComprehensiveStats::new(
-//!     values,
-//!     &[25.0, 50.0, 75.0],
-//!     5,
-//!     None,
-//!     None,
-//!     None,
-//! ).unwrap();
+//! let stats = ComprehensiveStats::new(values, &[25.0, 50.0, 75.0], 5, None, None, None).unwrap();
 //! assert_eq!(stats.percentiles.get(50.0), Some(6.0));
 //! ```
 //!

@@ -54,7 +54,7 @@
 //!
 //! ```rust,no_run
 //! use oxidris_evaluator::{
-//!     placement_evaluator::{PlacementEvaluator, FeatureBasedPlacementEvaluator},
+//!     placement_evaluator::{FeatureBasedPlacementEvaluator, PlacementEvaluator},
 //!     turn_evaluator::TurnEvaluator,
 //! };
 //! # let features = todo!(); // Build features with normalization parameters

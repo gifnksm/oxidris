@@ -41,7 +41,9 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! use oxidris_evaluator::placement_evaluator::{PlacementEvaluator, FeatureBasedPlacementEvaluator};
+//! use oxidris_evaluator::placement_evaluator::{
+//!     FeatureBasedPlacementEvaluator, PlacementEvaluator,
+//! };
 //! # let features = todo!(); // Build features with normalization parameters
 //! # let weights = todo!(); // Load trained weights
 //!

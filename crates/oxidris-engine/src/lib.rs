@@ -51,8 +51,11 @@
 //!     field.set_falling_piece(piece).ok();
 //! }
 //!
-//! if let Some(piece) = field.falling_piece().rotated_right()
-//!     .super_rotated_right(field.board()) {
+//! if let Some(piece) = field
+//!     .falling_piece()
+//!     .rotated_right()
+//!     .super_rotated_right(field.board())
+//! {
 //!     field.set_falling_piece(piece).ok();
 //! }
 //!

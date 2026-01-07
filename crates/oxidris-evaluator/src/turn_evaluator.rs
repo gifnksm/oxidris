@@ -42,8 +42,7 @@
 //!
 //! ```rust,no_run
 //! use oxidris_evaluator::{
-//!     placement_evaluator::FeatureBasedPlacementEvaluator,
-//!     turn_evaluator::TurnEvaluator,
+//!     placement_evaluator::FeatureBasedPlacementEvaluator, turn_evaluator::TurnEvaluator,
 //! };
 //! # let features = todo!(); // Build features with normalization parameters
 //! # let weights = todo!(); // Load trained weights
