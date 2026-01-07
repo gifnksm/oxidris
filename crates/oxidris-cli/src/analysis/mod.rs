@@ -49,3 +49,4 @@ mod index;
 mod normalization;
 mod sample;
 mod statistics;
+pub mod survival;

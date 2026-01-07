@@ -4,7 +4,7 @@
 //! survival analysis to handle censored observations properly.
 
 mod feature;
-mod stats;
+//mod stats;
 mod table;
 
 use std::{collections::BTreeMap, fs::File, io::Write, ops::Range, path::PathBuf};
@@ -13,8 +13,8 @@ use anyhow::Context;
 use clap::Args;
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
 
-use self::stats::SurvivalStats;
 use crate::{
+    analysis::survival::SurvivalStatsMap,
     command::analyze_censoring::table::SurvivalTableRow,
     model::{
         km_normalization::{
@@ -78,9 +78,8 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
     // Compute statistics for all features (reused for display, CSV, and normalization)
     let mut feature_stats = Vec::new();
     for feature in &target_features {
-        let include_km = true;
-        let stats = feature::collect_feature_survival_stats(feature, sessions, include_km);
-        feature::display_feature_statistics(feature, &stats, include_km);
+        let stats = feature::collect_feature_survival_stats(feature, sessions);
+        feature::display_feature_statistics(feature, &stats);
 
         // Save CSV files if output directory specified
         if let Some(dir) = &arg.km_output_dir {
@@ -115,7 +114,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 ///
 /// Reuses the already-computed KM statistics to avoid redundant calculation.
 fn generate_normalization_params(
-    feature_stats: &[(BoxedBoardFeatureSource, BTreeMap<u32, SurvivalStats>)],
+    feature_stats: &[(BoxedBoardFeatureSource, SurvivalStatsMap<u32>)],
     max_turns: usize,
 ) -> anyhow::Result<NormalizationParams> {
     let mut feature_normalizations = BTreeMap::<String, FeatureNormalization>::new();
@@ -123,12 +122,12 @@ fn generate_normalization_params(
     for (feature, all_stats) in feature_stats {
         println!("  Processing: {} ({})", feature.name(), feature.id());
 
-        if all_stats.is_empty() {
+        if all_stats.map.is_empty() {
             anyhow::bail!("No data for feature {}", feature.id());
         }
 
-        let total_unique_values = all_stats.len();
-        let percentile_values = stats::filter_by_percentiles(all_stats, &[0.05, 0.95]);
+        let total_unique_values = all_stats.map.len();
+        let percentile_values = all_stats.filter_by_percentiles(&[0.05, 0.95]);
 
         let (&&p05_value, (_, p05_stats)) = percentile_values.first_key_value().unwrap();
         let (&&p95_value, (_, p95_stats)) = percentile_values.last_key_value().unwrap();
@@ -136,6 +135,7 @@ fn generate_normalization_params(
         let p95_km = p95_stats.median_km.unwrap();
 
         let transform_mapping = all_stats
+            .map
             .iter()
             .filter_map(|(value, stats)| stats.median_km.map(|km| (*value, km)))
             .collect::<BTreeMap<u32, f64>>();
@@ -242,13 +242,12 @@ impl Phase {
 }
 
 fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
-    let include_km = false;
-    let phase_stats =
-        stats::collect_survival_stats_by_group(sessions, include_km, |_session, board| {
-            Phase::from_turn(board.turn, max_turns)
-        });
+    let phase_stats = SurvivalStatsMap::collect_by_group(sessions, |_session, board| {
+        Phase::from_turn(board.turn, max_turns)
+    });
 
     let rows: Vec<_> = phase_stats
+        .map
         .iter()
         .map(|(phase, stats)| SurvivalTableRow {
             label: format!(
@@ -261,21 +260,16 @@ fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
         .collect();
 
     println!("Censoring by Capture Phase");
-    table::print_survival_table(
-        &format!("{:<10} {:<10}", "Phase", "Range"),
-        rows,
-        include_km,
-    );
+    table::print_survival_table(&format!("{:<10} {:<10}", "Phase", "Range"), rows, false);
 }
 
 fn analyze_by_evaluator(sessions: &[SessionData]) {
-    let include_km = false;
-    let evaluator_stats =
-        stats::collect_survival_stats_by_group(sessions, include_km, |session, _board| {
-            session.placement_evaluator.clone()
-        });
+    let evaluator_stats = SurvivalStatsMap::collect_by_group(sessions, |session, _board| {
+        session.placement_evaluator.clone()
+    });
 
     let rows: Vec<_> = evaluator_stats
+        .map
         .iter()
         .map(|(evaluator, stats)| SurvivalTableRow {
             label: evaluator.clone(),
@@ -284,5 +278,5 @@ fn analyze_by_evaluator(sessions: &[SessionData]) {
         .collect();
 
     println!("Censoring by Evaluator");
-    table::print_survival_table("Evaluator", rows, include_km);
+    table::print_survival_table("Evaluator", rows, true);
 }

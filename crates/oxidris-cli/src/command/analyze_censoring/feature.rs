@@ -3,18 +3,15 @@
 //! This module provides functions for analyzing individual features,
 //! including data collection, KM curve calculation, display, and CSV export.
 
-use std::{collections::BTreeMap, fmt::Write as _, path::Path};
+use std::{fmt::Write as _, path::Path};
 
 use anyhow::Context;
 use oxidris_evaluator::{
     board_feature::BoxedBoardFeatureSource, placement_analysis::PlacementAnalysis,
 };
 
-use super::{
-    stats::{self, SurvivalStats},
-    table,
-};
-use crate::model::session::SessionData;
+use super::table;
+use crate::{analysis::survival::SurvivalStatsMap, model::session::SessionData};
 
 /// Compute survival statistics for all values of a feature
 ///
@@ -31,9 +28,8 @@ use crate::model::session::SessionData;
 pub(super) fn collect_feature_survival_stats(
     feature: &BoxedBoardFeatureSource,
     sessions: &[SessionData],
-    include_km: bool,
-) -> BTreeMap<u32, SurvivalStats> {
-    stats::collect_survival_stats_by_group(sessions, include_km, |_session, board| {
+) -> SurvivalStatsMap<u32> {
+    SurvivalStatsMap::collect_by_group(sessions, |_session, board| {
         let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
         feature.extract_raw(&analysis)
     })
@@ -49,14 +45,13 @@ pub(super) fn collect_feature_survival_stats(
 /// * `all_stats` - Pre-computed statistics for all feature values
 pub(super) fn display_feature_statistics(
     feature: &BoxedBoardFeatureSource,
-    all_stats: &BTreeMap<u32, SurvivalStats>,
-    include_km: bool,
+    all_stats: &SurvivalStatsMap<u32>,
 ) {
-    let total_values = all_stats.len();
+    let total_values = all_stats.map.len();
 
     // Select percentile values to display
     let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
-    let percentile_values = stats::filter_by_percentiles(all_stats, &percentiles);
+    let percentile_values = all_stats.filter_by_percentiles(&percentiles);
 
     // Display table with representative values
     let rows: Vec<_> = percentile_values
@@ -71,7 +66,7 @@ pub(super) fn display_feature_statistics(
     table::print_survival_table(
         &format!("{:<10} {:>10}", "Percentile", "Raw Value"),
         rows,
-        include_km,
+        true,
     );
     println!("  (Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
 }
@@ -85,22 +80,21 @@ pub(super) fn display_feature_statistics(
 pub(super) fn save_feature_km_curves(
     dir: &Path,
     feature_id: &str,
-    all_stats: &BTreeMap<u32, SurvivalStats>,
+    all_stats: &SurvivalStatsMap<u32>,
 ) -> anyhow::Result<()> {
     std::fs::create_dir_all(dir)?;
     let csv_path = dir.join(format!("{feature_id}_km.csv"));
     let mut csv_content = String::from("value,time,survival_prob,at_risk,events\n");
 
-    for (value, stat) in all_stats {
-        if let Some(km) = &stat.km_curve {
-            for i in 0..km.times.len() {
-                writeln!(
-                    &mut csv_content,
-                    "{},{},{},{},{}",
-                    value, km.times[i], km.survival_prob[i], km.at_risk[i], km.events[i]
-                )
-                .with_context(|| format!("Failed to write CSV data for value {value}"))?;
-            }
+    for (value, stats) in &all_stats.map {
+        let km = &stats.km_curve;
+        for i in 0..km.times.len() {
+            writeln!(
+                &mut csv_content,
+                "{},{},{},{},{}",
+                value, km.times[i], km.survival_prob[i], km.at_risk[i], km.events[i]
+            )
+            .with_context(|| format!("Failed to write CSV data for value {value}"))?;
         }
     }
 
