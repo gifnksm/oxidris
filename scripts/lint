@@ -54,22 +54,6 @@ print_info() {
     echo -e "   ${BLUE}ℹ${NC} $1"
 }
 
-save_git_state() {
-    # Save current git diff state for later comparison
-    git diff >"$TEMP_DIR/before.diff" 2>/dev/null || true
-}
-
-check_changes() {
-    # Compare current git diff with saved state
-    git diff >"$TEMP_DIR/after.diff" 2>/dev/null || true
-
-    if diff "$TEMP_DIR/before.diff" "$TEMP_DIR/after.diff" >/dev/null 2>&1; then
-        return 1 # No changes
-    else
-        return 0 # Changes detected
-    fi
-}
-
 take_snapshot() {
     # Create a git stash snapshot without modifying worktree
     # Returns the stash hash (or empty if no changes to snapshot)
@@ -78,25 +62,28 @@ take_snapshot() {
     git stash create 2>/dev/null || true
 }
 
-show_step_changes() {
-    # Show what changed since the snapshot
+show_step_changes_if_updated() {
+    # Show what changed since the snapshot, only if there are actual changes
     # Args:
     #   $1: step name (e.g., "typos", "markdownlint")
     #   $2: snapshot hash from take_snapshot
+    # Returns:
+    #   0 if no changes, 1 if changes were made
     local step_name="$1"
     local snapshot_hash="$2"
 
     # No snapshot means nothing was staged/changed before the step
-    [ -z "$snapshot_hash" ] && return
+    [ -z "$snapshot_hash" ] && return 1
 
     # Check if anything changed since snapshot
     if git diff --quiet "$snapshot_hash" 2>/dev/null; then
-        return # No changes
+        return 0
     fi
 
     # Show the changes
     echo -e "  ${BLUE}Changed by $step_name:${NC}"
     git --no-pager diff "$snapshot_hash" --color=always | sed 's/^/    /'
+    return 1
 }
 
 cleanup_temp() {
@@ -120,12 +107,18 @@ check_typos() {
         local snapshot
         snapshot=$(take_snapshot)
 
-        if output=$(typos --color=always --write-changes 2>&1); then
-            print_success "No typos found"
+        if typos --color=always --write-changes >/dev/null 2>&1; then
+            if show_step_changes_if_updated "typos" "$snapshot"; then
+                print_success "No typos found"
+            else
+                print_warning "Typos fixed automatically"
+            fi
         else
-            print_success "Typos fixed automatically"
-            [ -n "$output" ] && echo "$output"
-            show_step_changes "typos" "$snapshot"
+            if show_step_changes_if_updated "typos" "$snapshot"; then
+                print_error "Typos check failed"
+            else
+                print_error "Typos check failed (some fixes applied)"
+            fi
         fi
     else
         if output=$(typos --color=always 2>&1); then
@@ -156,12 +149,18 @@ check_docs_markdown() {
         local snapshot
         snapshot=$(take_snapshot)
 
-        if output=$(markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
-            print_success "No markdown issues found"
+        if markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md >/dev/null 2>&1; then
+            if show_step_changes_if_updated "markdownlint" "$snapshot"; then
+                print_success "No markdown issues found"
+            else
+                print_warning "Markdown issues fixed automatically"
+            fi
         else
-            print_success "Markdown issues fixed automatically"
-            [ -n "$output" ] && echo "$output"
-            show_step_changes "markdownlint" "$snapshot"
+            if show_step_changes_if_updated "markdownlint" "$snapshot"; then
+                print_error "Markdown check failed"
+            else
+                print_error "Markdown check failed (some fixes applied)"
+            fi
         fi
     else
         if output=$(markdownlint --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
@@ -228,29 +227,27 @@ check_rust_clippy() {
         local snapshot
         snapshot=$(take_snapshot)
 
-        # First, try to auto-fix what's possible
-        if output=$(cargo --color=always clippy --color=always --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings 2>&1); then
-            # Auto-fix succeeded, but `cargo clippy --fix` doesn't show all warnings in its output.
-            # Some non-fixable warnings (like type-complexity) aren't displayed during the --fix run,
-            # even when they cause compilation to succeed (they're treated as warnings, not errors).
-            # This is different from rust-lang/cargo#13527 (which was about target selection).
-            # Run check mode (without --fix) to ensure all warnings are visible to the user.
-            local check_output
-            if check_output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
+        # Try to auto-fix what's possible (ignore output and exit code)
+        cargo --color=always clippy --color=always --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings >/dev/null 2>&1 || true
+
+        # Check final state without --fix to see what remains
+        # Note: `cargo clippy --fix` doesn't show all warnings in its output.
+        # Some non-fixable warnings (like type-complexity) aren't displayed during the --fix run,
+        # even when they cause compilation to succeed (they're treated as warnings, not errors).
+        # Run check mode (without --fix) to ensure all warnings are visible to the user.
+        if output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
+            if show_step_changes_if_updated "clippy" "$snapshot"; then
                 print_success "No clippy warnings"
-                show_step_changes "clippy" "$snapshot"
             else
-                print_warning "Clippy auto-fixed some issues, but warnings remain:"
-                echo "$check_output"
-                show_step_changes "clippy" "$snapshot"
-                WARNINGS=$((WARNINGS + 1))
+                print_warning "Clippy issues fixed automatically"
             fi
         else
-            # Auto-fix failed, show the error
-            print_error "Clippy warnings found (some could not be auto-fixed)"
+            if show_step_changes_if_updated "clippy" "$snapshot"; then
+                print_error "Clippy warnings remain:"
+            else
+                print_error "Clippy auto-fixed some issues, but warnings remain:"
+            fi
             echo "$output"
-            show_step_changes "clippy" "$snapshot"
-            ERRORS=$((ERRORS + 1))
         fi
     else
         # Check only, no auto-fix (fast, uses cache)
@@ -259,7 +256,6 @@ check_rust_clippy() {
         else
             print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
             echo "$output"
-            ERRORS=$((ERRORS + 1))
         fi
     fi
 
@@ -274,9 +270,19 @@ check_rust_fmt() {
         local snapshot
         snapshot=$(take_snapshot)
 
-        cargo fmt >/dev/null 2>&1
-        print_success "Code formatted"
-        show_step_changes "cargo fmt" "$snapshot"
+        if cargo fmt >/dev/null 2>&1; then
+            if show_step_changes_if_updated "cargo fmt" "$snapshot"; then
+                print_success "Code properly formatted"
+            else
+                print_warning "Code formatting issues fixed automatically"
+            fi
+        else
+            if show_step_changes_if_updated "cargo fmt" "$snapshot"; then
+                print_error "Code formatting failed"
+            else
+                print_error "Code formatting failed (some fixes applied)"
+            fi
+        fi
     else
         if output=$(cargo --color=always fmt --check 2>&1); then
             print_success "Code properly formatted"
@@ -415,13 +421,18 @@ check_shell_shfmt() {
         snapshot=$(take_snapshot)
 
         # Apply formatting (shfmt reads .editorconfig automatically)
-        if output=$(echo "$files" | xargs shfmt -w 2>&1); then
-            print_success "Shell scripts formatted"
-            show_step_changes "shfmt" "$snapshot"
+        if echo "$files" | xargs shfmt -w >/dev/null 2>&1; then
+            if show_step_changes_if_updated "shfmt" "$snapshot"; then
+                print_success "Shell scripts properly formatted"
+            else
+                print_warning "Shell formatting issues fixed automatically"
+            fi
         else
-            print_error "Shell formatting failed"
-            echo "$output"
-            show_step_changes "shfmt" "$snapshot"
+            if show_step_changes_if_updated "shfmt" "$snapshot"; then
+                print_error "Shell formatting failed"
+            else
+                print_error "Shell formatting failed (some fixes applied)"
+            fi
         fi
     else
         # Check differences
@@ -460,16 +471,19 @@ check_script_changes() {
     echo "=== Changes Summary ==="
     echo ""
 
-    if check_changes; then
-        print_warning "Linter made changes to the following files:"
+    # Check if anything changed since the initial snapshot
+    if [ -z "$INITIAL_SNAPSHOT" ]; then
+        print_success "No changes made by linter"
+    elif git diff --quiet "$INITIAL_SNAPSHOT" 2>/dev/null; then
+        print_success "No changes made by linter"
+    else
+        echo -e "   ${BLUE}ℹ${NC} Linter made changes to the following files:"
         echo ""
-        git diff --name-only | while IFS= read -r file; do
+        git diff --name-only "$INITIAL_SNAPSHOT" 2>/dev/null | while IFS= read -r file; do
             echo -e "      ${YELLOW}${file}${NC}"
         done
         echo ""
         echo -e "Review changes with: ${GREEN}git diff${NC}"
-    else
-        print_success "No changes made by linter"
     fi
 
     echo ""
@@ -479,7 +493,7 @@ print_summary() {
     echo "==================================="
 
     if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
-        if [ "$MODE" = "fix" ] && check_changes; then
+        if [ "$MODE" = "fix" ] && [ -n "$INITIAL_SNAPSHOT" ] && ! git diff --quiet "$INITIAL_SNAPSHOT" 2>/dev/null; then
             echo -e "${GREEN}✓ All checks passed (with auto-fixes applied)${NC}"
             echo -e "   Review changes with: ${GREEN}git diff${NC}"
         else
@@ -557,8 +571,11 @@ parse_args() {
 main() {
     parse_args "$@"
 
-    # Save git state before making any changes
-    save_git_state
+    # Take initial snapshot before making any changes (for fix mode summary)
+    INITIAL_SNAPSHOT=""
+    if [ "$MODE" = "fix" ]; then
+        INITIAL_SNAPSHOT=$(take_snapshot)
+    fi
 
     # Run appropriate checks
     case "$TARGET" in
