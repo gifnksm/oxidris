@@ -193,7 +193,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             let turn = stats.completed_pieces();
             let capture_board = BoardAndPlacement {
                 turn,
-                board: field.board().clone(),
+                before_placement: field.board().clone(),
                 placement: turn_plan.placement(),
             };
             let (_cleared_lines, result) = turn_plan.apply(&analysis, &mut field, &mut stats);

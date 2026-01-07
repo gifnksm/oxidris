@@ -40,8 +40,8 @@ pub struct PlacementAnalysis {
 
 impl PlacementAnalysis {
     #[must_use]
-    pub fn from_board(board: &BitBoard, placement: Piece) -> Self {
-        let mut board = board.clone();
+    pub fn from_board(before_placement: &BitBoard, placement: Piece) -> Self {
+        let mut board = before_placement.clone();
         board.fill_piece(placement);
         let cleared_lines = board.clear_lines();
 

@@ -43,7 +43,7 @@ pub struct BoardAndPlacement {
     /// Turn number when this board state was captured (0-indexed)
     pub turn: usize,
     /// Board state before the piece placement
-    pub board: BitBoard,
+    pub before_placement: BitBoard,
     /// Piece that was placed on this board
     pub placement: Piece,
 }

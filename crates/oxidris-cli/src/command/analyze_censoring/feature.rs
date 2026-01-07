@@ -95,7 +95,7 @@ fn collect_feature_data(
         let game_end = session.survived_turns;
 
         for board in &session.boards {
-            let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
+            let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
             let raw_value = feature.extract_raw(&analysis);
             let remaining = game_end - board.turn;
             feature_data

@@ -24,7 +24,7 @@ impl RawBoardSample {
     /// Extracts raw values without any transformation or normalization.
     /// This is used for computing statistics.
     pub fn from_board(sources: &[BoxedBoardFeatureSource], board: &BoardAndPlacement) -> Self {
-        let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
+        let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
         let raw_values = sources
             .iter()
             .map(|source| source.extract_raw(&analysis))
@@ -104,7 +104,7 @@ impl BoardSample {
     /// assert_eq!(sample.feature_vector.len(), all_features.len());
     /// ```
     pub fn from_board(features: &[BoxedBoardFeature], board: &BoardAndPlacement) -> Self {
-        let analysis = PlacementAnalysis::from_board(&board.board, board.placement);
+        let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
         let feature_vector = features
             .iter()
             .map(|feature| feature.compute_feature_value(&analysis))
