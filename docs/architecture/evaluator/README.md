@@ -68,7 +68,7 @@ Assigns a score to a single piece placement using a four-step pipeline:
 3. **Feature Normalization** - Scale to [0, 1] using data-driven percentiles computed from gameplay sessions
 4. **Weighted Evaluation** - Compute weighted sum: `score = Σ(wᵢ × featureᵢ)`
 
-**Feature Construction:** Features are built dynamically at runtime via `FeatureBuilder` (see `oxidris-cli::analysis::feature_builder`), which computes normalization parameters from session statistics.
+**Feature Construction:** Features are built dynamically at runtime via `FeatureBuilder` (see `oxidris-analysis::feature_builder`), which computes normalization parameters from session statistics.
 
 **Implementation:** `oxidris-evaluator::placement_evaluator`, `oxidris-evaluator::board_feature`
 
@@ -115,13 +115,15 @@ For detailed implementation documentation, design decisions, API usage, and curr
 - **`crates/oxidris-evaluator/src/turn_evaluator.rs`** - Turn selection, greedy lookahead strategy
 - **`crates/oxidris-evaluator/src/session_evaluator.rs`** - Fitness functions (Aggro/Defensive), design rationale and limitations
 
-**Feature Construction (CLI):**
+**Feature Construction (Analysis System):**
 
-- **`crates/oxidris-cli/src/analysis/feature_builder.rs`** - Runtime feature construction, terminology, design decisions
-- **`crates/oxidris-cli/src/analysis/normalization.rs`** - Normalization parameter computation
-- **`crates/oxidris-cli/src/analysis/statistics.rs`** - Feature statistics from session data
+- **`crates/oxidris-analysis/src/feature_builder.rs`** - Runtime feature construction, terminology, design decisions
+- **`crates/oxidris-analysis/src/normalization.rs`** - Normalization parameter computation
+- **`crates/oxidris-analysis/src/statistics.rs`** - Feature statistics from session data
+- **`crates/oxidris-analysis/src/session.rs`** - Session data structures
+- **`crates/oxidris-analysis/src/sample.rs`** - Feature sample extraction
 
-Run `cargo doc --open --package oxidris-evaluator` to view rendered documentation.
+Run `cargo doc --open --package oxidris-evaluator` or `cargo doc --open --package oxidris-analysis` to view rendered documentation.
 
 ## Further Reading
 

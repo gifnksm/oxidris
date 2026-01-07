@@ -854,6 +854,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxidris-analysis"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "oxidris-engine",
+ "oxidris-evaluator",
+ "oxidris-stats",
+ "serde",
+]
+
+[[package]]
 name = "oxidris-cli"
 version = "0.1.0"
 dependencies = [
@@ -862,6 +873,7 @@ dependencies = [
  "clap",
  "crossterm",
  "derive_more",
+ "oxidris-analysis",
  "oxidris-engine",
  "oxidris-evaluator",
  "oxidris-stats",

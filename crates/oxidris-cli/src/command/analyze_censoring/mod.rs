@@ -11,17 +11,15 @@ use std::{collections::BTreeMap, fs::File, io::Write, ops::Range, path::PathBuf}
 
 use anyhow::Context;
 use clap::Args;
+use oxidris_analysis::{session::SessionData, survival::SurvivalStatsMap};
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
 
 use crate::{
-    analysis::survival::SurvivalStatsMap,
     command::analyze_censoring::table::SurvivalTableRow,
-    model::{
-        km_normalization::{
-            FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
-        },
-        session::{SessionCollection, SessionData},
+    model::km_normalization::{
+        FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
     },
+    util,
 };
 
 #[derive(Debug, Clone, Args)]
@@ -56,7 +54,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Feature {feature_id} not found"))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    let collection = SessionCollection::open(&arg.boards)?;
+    let collection = util::read_boards_file(&arg.boards)?;
     let max_turns = collection.max_turns;
     let sessions = &collection.sessions;
 

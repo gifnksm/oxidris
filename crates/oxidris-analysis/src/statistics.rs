@@ -3,7 +3,7 @@ use oxidris_evaluator::board_feature::{
 };
 use oxidris_stats::comprehensive::ComprehensiveStats;
 
-use crate::analysis::{BoardSample, RawBoardSample};
+use crate::sample::{BoardSample, RawBoardSample};
 
 /// Statistical summary for raw feature values only
 ///
@@ -18,6 +18,7 @@ pub struct RawFeatureStatistics {
 impl RawFeatureStatistics {
     /// Compute statistics from raw values
     #[expect(clippy::cast_precision_loss)]
+    #[must_use]
     pub fn from_raw_values(values: &[u32]) -> Self {
         assert!(
             !values.is_empty(),
@@ -42,6 +43,7 @@ impl RawFeatureStatistics {
     }
 
     /// Compute statistics for all sources across samples
+    #[must_use]
     pub fn from_samples(
         sources: &[BoxedBoardFeatureSource],
         samples: &[RawBoardSample],
@@ -80,14 +82,17 @@ impl RawFeatureStatistics {
 /// # Examples
 ///
 /// ```no_run
-/// use oxidris_cli::analysis::BoardFeatureStatistics;
-/// # let features = todo!();
-/// # let samples = todo!();
+/// use oxidris_analysis::{sample::BoardSample, statistics::BoardFeatureStatistics};
+/// use oxidris_evaluator::board_feature::BoxedBoardFeature;
+///
+/// let features: Vec<BoxedBoardFeature> = todo!();
+/// let samples: Vec<BoardSample> = todo!();
+///
 /// // Compute statistics for all features
 /// let stats = BoardFeatureStatistics::from_samples(&features, &samples);
 ///
 /// // Analyze a specific feature
-/// println!("Raw mean: {}", stats[0].raw.mean);
+/// println!("Raw mean: {}", stats[0].raw.stats.mean);
 /// println!(
 ///     "Normalized P95: {}",
 ///     stats[0].normalized.percentiles.get(95.0).unwrap()
@@ -116,9 +121,10 @@ impl BoardFeatureStatistics {
     /// # Examples
     ///
     /// ```no_run
-    /// use oxidris_cli::analysis::BoardFeatureStatistics;
-    /// # let samples = todo!();
-    /// # let feature_idx = 0;
+    /// use oxidris_analysis::{sample::BoardSample, statistics::BoardFeatureStatistics};
+    ///
+    /// let samples: Vec<BoardSample> = todo!();
+    /// let feature_idx = 0;
     /// let values = samples
     ///     .iter()
     ///     .map(|s| s.feature_vector[feature_idx])
@@ -126,6 +132,7 @@ impl BoardFeatureStatistics {
     /// let stats = BoardFeatureStatistics::from_feature_values(&values);
     /// ```
     #[expect(clippy::cast_precision_loss)]
+    #[must_use]
     pub fn from_feature_values(values: &[BoardFeatureValue]) -> Self {
         assert!(
             !values.is_empty(),
@@ -187,14 +194,18 @@ impl BoardFeatureStatistics {
     /// # Examples
     ///
     /// ```no_run
-    /// use oxidris_cli::analysis::BoardFeatureStatistics;
-    /// # let features = todo!();
-    /// # let samples = todo!();
+    /// use oxidris_analysis::{sample::BoardSample, statistics::BoardFeatureStatistics};
+    /// use oxidris_evaluator::board_feature::BoxedBoardFeature;
+    ///
+    /// let features: Vec<BoxedBoardFeature> = todo!();
+    /// let samples: Vec<BoardSample> = todo!();
+    ///
     /// let stats = BoardFeatureStatistics::from_samples(&features, &samples);
     /// for (i, feature_stats) in stats.iter().enumerate() {
-    ///     println!("Feature {}: mean = {}", i, feature_stats.raw.mean);
+    ///     println!("Feature {}: mean = {}", i, feature_stats.raw.stats.mean);
     /// }
     /// ```
+    #[must_use]
     pub fn from_samples(
         features: &[BoxedBoardFeature],
         board_samples: &[BoardSample],

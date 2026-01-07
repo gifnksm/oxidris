@@ -207,11 +207,20 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
 - **Training script**: `crates/oxidris-cli/src/train_ai.rs`
 - **Data generation**: `crates/oxidris-cli/src/generate_boards.rs`
 
+### Analysis system
+
+- **Session data**: `crates/oxidris-analysis/src/session.rs`
+- **Feature samples**: `crates/oxidris-analysis/src/sample.rs`
+- **Statistics**: `crates/oxidris-analysis/src/statistics.rs`
+- **Normalization**: `crates/oxidris-analysis/src/normalization.rs`
+- **Feature builder**: `crates/oxidris-analysis/src/feature_builder.rs`
+- **Board index**: `crates/oxidris-analysis/src/index.rs`
+- **Survival analysis**: `crates/oxidris-analysis/src/survival.rs`
+
 ### KM-based normalization
 
 - **KM estimator**: `crates/oxidris-stats/src/survival.rs`
-- **Data structures**: `crates/oxidris-cli/src/data.rs`
-- **Normalization generation**: `crates/oxidris-cli/src/analyze_censoring.rs`
+- **Normalization generation**: `crates/oxidris-cli/src/command/analyze_censoring/mod.rs`
 
 ### Models and Data
 

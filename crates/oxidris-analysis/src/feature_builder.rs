@@ -77,10 +77,12 @@
 //! # Example
 //!
 //! ```no_run
-//! use oxidris_cli::analysis::{BoardFeatureNormalizationParamCollection, FeatureBuilder};
-//! use oxidris_cli::analysis::{RawBoardSample, RawFeatureStatistics};
+//! use oxidris_analysis::{
+//!     feature_builder::FeatureBuilder, normalization::BoardFeatureNormalizationParamCollection,
+//!     sample::RawBoardSample, session::SessionData, statistics::RawFeatureStatistics,
+//! };
 //! use oxidris_evaluator::board_feature;
-//! # let sessions = todo!();
+//! let sessions: Vec<SessionData> = todo!();
 //!
 //! // 1. Get feature sources
 //! let sources = board_feature::all_board_feature_sources();
@@ -99,7 +101,6 @@
 //! let features = builder.build_all_features().unwrap();
 //! ```
 
-use anyhow::Context as _;
 use oxidris_evaluator::board_feature::{
     BoardFeatureSource, BoxedBoardFeature, FeatureSignal, IWellReward, LineClearBonus,
     LinearNormalized,
@@ -110,7 +111,15 @@ use oxidris_evaluator::board_feature::{
     },
 };
 
-use crate::analysis::{BoardFeatureNormalizationParam, BoardFeatureNormalizationParamCollection};
+use crate::normalization::{
+    BoardFeatureNormalizationParam, BoardFeatureNormalizationParamCollection,
+};
+
+#[derive(Debug, derive_more::Display, derive_more::Error)]
+pub enum BuildFeatureError {
+    #[display("Missing normalization parameters for feature source '{source_id}'")]
+    MissingNormalizationParam { source_id: String },
+}
 
 /// Feature builder that constructs features from runtime parameters
 pub struct FeatureBuilder {
@@ -118,12 +127,13 @@ pub struct FeatureBuilder {
 }
 
 impl FeatureBuilder {
+    #[must_use]
     pub fn new(params: BoardFeatureNormalizationParamCollection) -> Self {
         Self { params }
     }
 
     /// Build all board features with runtime normalization
-    pub fn build_all_features(&self) -> anyhow::Result<Vec<BoxedBoardFeature>> {
+    pub fn build_all_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
         Ok(vec![
             // Survival features
             self.build_num_holes_linear_penalty()?,
@@ -160,7 +170,10 @@ impl FeatureBuilder {
     ///
     /// This approach provides gradual feedback across the entire game, making it suitable
     /// for general board quality metrics that don't have critical thresholds.
-    fn build_linear_penalty_for<S>(&self, source: &S) -> anyhow::Result<BoxedBoardFeature>
+    fn build_linear_penalty_for<S>(
+        &self,
+        source: &S,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError>
     where
         S: BoardFeatureSource,
     {
@@ -190,7 +203,7 @@ impl FeatureBuilder {
     /// This threshold-based approach reflects situations where the metric is only concerning
     /// at extreme values (e.g., top-out risk only matters near the ceiling). Values below P75
     /// are considered safe and map to 0.0.
-    fn build_linear_risk_for<S>(&self, source: &S) -> anyhow::Result<BoxedBoardFeature>
+    fn build_linear_risk_for<S>(&self, source: &S) -> Result<BoxedBoardFeature, BuildFeatureError>
     where
         S: BoardFeatureSource,
     {
@@ -213,7 +226,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `num_holes_linear_penalty`
-    fn build_num_holes_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_num_holes_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&NumHoles)
     }
 
@@ -226,7 +239,9 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `sum_of_hole_depth_linear_penalty`
-    fn build_sum_of_hole_depth_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_sum_of_hole_depth_linear_penalty(
+        &self,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&SumOfHoleDepth)
     }
 
@@ -239,7 +254,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `max_height_linear_penalty`
-    fn build_max_height_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_max_height_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&MaxHeight)
     }
 
@@ -252,7 +267,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `max_height_linear_risk`
-    fn build_max_height_linear_risk(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_max_height_linear_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_risk_for(&MaxHeight)
     }
 
@@ -265,7 +280,9 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `center_column_max_height_linear_penalty`
-    fn build_center_column_max_height_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_center_column_max_height_linear_penalty(
+        &self,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&CenterColumnMaxHeight)
     }
 
@@ -278,7 +295,9 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `center_column_max_height_linear_risk`
-    fn build_center_column_max_height_linear_risk(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_center_column_max_height_linear_risk(
+        &self,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_risk_for(&CenterColumnMaxHeight)
     }
 
@@ -291,7 +310,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `total_height_linear_penalty`
-    fn build_total_height_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_total_height_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&TotalHeight)
     }
 
@@ -303,7 +322,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `row_transitions_linear_penalty`
-    fn build_row_transitions_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_row_transitions_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&RowTransitions)
     }
 
@@ -315,7 +334,9 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `column_transitions_linear_penalty`
-    fn build_column_transitions_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_column_transitions_linear_penalty(
+        &self,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&ColumnTransitions)
     }
 
@@ -327,7 +348,9 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `surface_bumpiness_linear_penalty`
-    fn build_surface_bumpiness_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_surface_bumpiness_linear_penalty(
+        &self,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&SurfaceBumpiness)
     }
 
@@ -340,7 +363,9 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `surface_roughness_linear_penalty`
-    fn build_surface_roughness_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_surface_roughness_linear_penalty(
+        &self,
+    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&SurfaceRoughness)
     }
 
@@ -354,7 +379,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `sum_of_well_depth_linear_penalty`
-    fn build_well_depth_linear_penalty(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_well_depth_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_penalty_for(&SumOfWellDepth)
     }
 
@@ -367,7 +392,7 @@ impl FeatureBuilder {
     /// # Feature ID
     ///
     /// `sum_of_well_depth_linear_risk`
-    fn build_well_depth_linear_risk(&self) -> anyhow::Result<BoxedBoardFeature> {
+    fn build_well_depth_linear_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
         self.build_linear_risk_for(&SumOfWellDepth)
     }
 
@@ -412,12 +437,14 @@ impl FeatureBuilder {
     }
 
     /// Get normalization parameters for a specific feature source
-    fn get_param<S>(&self, source: &S) -> anyhow::Result<&BoardFeatureNormalizationParam>
+    fn get_param<S>(&self, source: &S) -> Result<&BoardFeatureNormalizationParam, BuildFeatureError>
     where
         S: BoardFeatureSource,
     {
         self.params
             .get(source)
-            .with_context(|| format!("Missing percentiles for feature source '{}'", source.id()))
+            .ok_or_else(|| BuildFeatureError::MissingNormalizationParam {
+                source_id: source.id().to_string(),
+            })
     }
 }

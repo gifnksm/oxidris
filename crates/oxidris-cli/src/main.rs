@@ -1,4 +1,3 @@
-mod analysis;
 mod command;
 mod model;
 mod ui;

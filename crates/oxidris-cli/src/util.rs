@@ -1,19 +1,20 @@
 use std::{
     fs::File,
     io::{self, BufWriter, StdoutLock, Write as _},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::Context;
+use oxidris_analysis::{
+    feature_builder::FeatureBuilder,
+    normalization::BoardFeatureNormalizationParamCollection,
+    sample::RawBoardSample,
+    session::{SessionCollection, SessionData},
+    statistics::RawFeatureStatistics,
+};
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
 
-use crate::{
-    analysis::{
-        BoardFeatureNormalizationParamCollection, FeatureBuilder, RawBoardSample,
-        RawFeatureStatistics,
-    },
-    model::session::SessionData,
-};
+use crate::model::ai_model::AiModel;
 
 #[derive(Debug)]
 pub enum Output {
@@ -94,6 +95,41 @@ impl io::Write for Output {
             Output::File { writer, .. } => writer.flush(),
         }
     }
+}
+
+pub fn read_json_file<T, P>(file_kind: &str, path: P) -> anyhow::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    let file = File::open(path)
+        .with_context(|| format!("Failed to open {} file: {}", file_kind, path.display()))?;
+
+    let reader = io::BufReader::new(file);
+    let value = serde_json::from_reader(reader).with_context(|| {
+        format!(
+            "Failed to parse {} JSON file: {}",
+            file_kind,
+            path.display()
+        )
+    })?;
+
+    Ok(value)
+}
+
+pub fn read_boards_file<P>(path: P) -> anyhow::Result<SessionCollection>
+where
+    P: AsRef<Path>,
+{
+    read_json_file("boards", path)
+}
+
+pub fn read_ai_model_file<P>(path: P) -> anyhow::Result<AiModel>
+where
+    P: AsRef<Path>,
+{
+    read_json_file("AI model", path)
 }
 
 pub fn build_feature_from_session(

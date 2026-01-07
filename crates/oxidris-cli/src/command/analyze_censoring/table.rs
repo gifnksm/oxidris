@@ -5,7 +5,7 @@
 
 use std::fmt::Write as _;
 
-use crate::analysis::survival::SurvivalStats;
+use oxidris_analysis::survival::SurvivalStats;
 
 /// A row in a survival analysis table
 pub(super) struct SurvivalTableRow<'a> {

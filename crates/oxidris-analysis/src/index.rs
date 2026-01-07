@@ -1,6 +1,6 @@
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 
-use crate::analysis::BoardSample;
+use crate::sample::BoardSample;
 
 /// Sorted index for efficient board sample lookup by feature values
 ///
@@ -27,11 +27,13 @@ use crate::analysis::BoardSample;
 /// # Examples
 ///
 /// ```no_run
-/// use oxidris_cli::analysis::BoardIndex;
-/// # let features = todo!();
-/// # let samples = todo!();
-/// # let feature_idx = 0;
-/// # let board_idx = 0;
+/// use oxidris_analysis::{index::BoardIndex, sample::BoardSample};
+/// use oxidris_evaluator::board_feature::BoxedBoardFeature;
+///
+/// let features: Vec<BoxedBoardFeature> = todo!();
+/// let samples: Vec<BoardSample> = todo!();
+/// let feature_idx = 0;
+/// let board_idx = 0;
 /// let index = BoardIndex::from_samples(&features, &samples);
 ///
 /// // Get top 10 boards for a feature
@@ -65,12 +67,16 @@ impl BoardIndex {
     /// # Examples
     ///
     /// ```no_run
-    /// use oxidris_cli::analysis::BoardIndex;
-    /// # let features = todo!();
-    /// # let samples = todo!();
+    /// use oxidris_analysis::{index::BoardIndex, sample::BoardSample};
+    /// use oxidris_evaluator::board_feature::BoxedBoardFeature;
+    ///
+    /// let features: Vec<BoxedBoardFeature> = todo!();
+    /// let samples: Vec<BoardSample> = todo!();
+    ///
     /// let index = BoardIndex::from_samples(&features, &samples);
     /// // Index maintains one sorted list per feature
     /// ```
+    #[must_use]
     pub fn from_samples(features: &[BoxedBoardFeature], board_samples: &[BoardSample]) -> Self {
         Self {
             sorted_indices: (0..features.len())
@@ -105,9 +111,11 @@ impl BoardIndex {
     /// # Examples
     ///
     /// ```no_run
-    /// use oxidris_cli::analysis::BoardIndex;
-    /// # let index = todo!();
-    /// # let holes_feature_idx = 0;
+    /// use oxidris_analysis::index::BoardIndex;
+    ///
+    /// let index: BoardIndex = todo!();
+    /// let holes_feature_idx = 0;
+    ///
     /// // Get boards with worst hole counts (95th percentile = most holes)
     /// let worst = index.get_boards_at_percentile(holes_feature_idx, 95.0);
     /// println!("Found {} boards with severe hole problems", worst.len());
@@ -117,7 +125,7 @@ impl BoardIndex {
         clippy::cast_possible_truncation,
         clippy::cast_precision_loss
     )]
-    #[expect(unused, reason = "may be used later")] // TODO
+    #[must_use]
     pub fn get_boards_at_percentile(&self, feature_idx: usize, percentile: f32) -> &[usize] {
         let indices = &self.sorted_indices[feature_idx];
         let total = indices.len() as f32;
@@ -147,16 +155,19 @@ impl BoardIndex {
     /// # Examples
     ///
     /// ```no_run
-    /// use oxidris_cli::analysis::BoardIndex;
-    /// # let index = todo!();
-    /// # let height_feature_idx = 0;
+    /// use oxidris_analysis::index::BoardIndex;
+    ///
+    /// let index: BoardIndex = todo!();
+    ///
+    /// let height_feature_idx = 0;
+    ///
     /// // Get top 10 boards by height
     /// let top_10 = index.get_boards_in_rank_range(height_feature_idx, 0, 10);
     ///
     /// // Get boards ranked 100-199
     /// let mid_tier = index.get_boards_in_rank_range(height_feature_idx, 100, 200);
     /// ```
-    #[expect(unused, reason = "may be used later")] // TODO
+    #[must_use]
     pub fn get_boards_in_rank_range(
         &self,
         feature_idx: usize,
@@ -185,16 +196,16 @@ impl BoardIndex {
     /// # Examples
     ///
     /// ```no_run
-    /// use oxidris_cli::analysis::BoardIndex;
-    /// # let index = todo!();
-    /// # let feature_idx = 0;
-    /// # let sample_idx = 42;
-    /// # let samples_len = 1000;
+    /// use oxidris_analysis::index::BoardIndex;
+    /// let index: BoardIndex = todo!();
+    /// let feature_idx = 0;
+    /// let sample_idx = 42;
+    /// let samples_len = 1000;
     /// if let Some(rank) = index.get_board_rank(feature_idx, sample_idx) {
     ///     println!("This board is ranked #{} out of {}", rank, samples_len);
     /// }
     /// ```
-    #[expect(unused, reason = "may be used later")] // TODO
+    #[must_use]
     pub fn get_board_rank(&self, feature_idx: usize, board_idx: usize) -> Option<usize> {
         self.sorted_indices[feature_idx]
             .iter()

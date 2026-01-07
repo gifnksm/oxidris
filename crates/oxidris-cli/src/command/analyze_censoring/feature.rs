@@ -6,12 +6,12 @@
 use std::{fmt::Write as _, path::Path};
 
 use anyhow::Context;
+use oxidris_analysis::{session::SessionData, survival::SurvivalStatsMap};
 use oxidris_evaluator::{
     board_feature::BoxedBoardFeatureSource, placement_analysis::PlacementAnalysis,
 };
 
 use super::table;
-use crate::{analysis::survival::SurvivalStatsMap, model::session::SessionData};
 
 /// Compute survival statistics for all values of a feature
 ///

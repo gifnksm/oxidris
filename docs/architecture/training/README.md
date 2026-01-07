@@ -16,7 +16,14 @@ The training system optimizes feature weights for the evaluator using a genetic 
 ## Architecture
 
 ```text
-Training Data (board states)
+Training Data (session boards)
+    ↓
+Statistical Analysis (oxidris-analysis)
+    ├─ Feature extraction & sampling
+    ├─ Statistics computation
+    └─ Normalization parameters
+    ↓
+Feature Construction (oxidris-analysis)
     ↓
 Population of Weight Candidates
     ↓
@@ -228,14 +235,22 @@ Both models use the same feature set but learn different weight combinations bas
 
 ### Training Tools
 
-- Training script: `crates/oxidris-cli/src/train_ai.rs` (defines GA parameters and phase logic)
-- Data generation: `crates/oxidris-cli/src/generate_boards.rs`
-- Data structures: `crates/oxidris-cli/src/data.rs`
+- Training script: `crates/oxidris-cli/src/command/train_ai.rs` (defines GA parameters and phase logic)
+- Data generation: `crates/oxidris-cli/src/command/generate_boards.rs`
+
+### Analysis System
+
+- Feature builder: `crates/oxidris-analysis/src/feature_builder.rs` (runtime feature construction)
+- Session data: `crates/oxidris-analysis/src/session.rs` (training data structures)
+- Statistics: `crates/oxidris-analysis/src/statistics.rs` (feature statistics)
+- Normalization: `crates/oxidris-analysis/src/normalization.rs` (parameter computation)
+- Sample extraction: `crates/oxidris-analysis/src/sample.rs` (feature sampling)
 
 ### Output
 
 - Trained models: `models/ai/aggro.json`, `models/ai/defensive.json`
-- Training data: `data/boards.json`
+- Training data: `data/boards.json` (generated, not in repo)
+- Normalization params: `data/normalization_params.json` (generated, not in repo)
 
 ## See Also
 

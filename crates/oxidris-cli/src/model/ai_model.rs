@@ -1,6 +1,3 @@
-use std::{fs::File, io::BufReader, path::Path};
-
-use anyhow::Context;
 use chrono::{DateTime, Utc};
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeature, FeatureProcessing};
 use serde::{Deserialize, Serialize};
@@ -23,21 +20,6 @@ pub struct TrainedBoardFeature {
 }
 
 impl AiModel {
-    pub fn open<P>(path: P) -> anyhow::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        let file = File::open(path)
-            .with_context(|| format!("Failed to open AI model file: {}", path.display()))?;
-
-        let reader = BufReader::new(file);
-        let model = serde_json::from_reader(reader)
-            .with_context(|| format!("Failed to read AI model file: {}", path.display()))?;
-
-        Ok(model)
-    }
-
     pub(crate) fn to_feature_weights(&self) -> anyhow::Result<(Vec<BoxedBoardFeature>, Vec<f32>)> {
         let all_sources = board_feature::all_board_feature_sources();
         self.board_features

@@ -571,8 +571,11 @@ Phase 3 design is now complete. Phase 4 implementation tasks:
 
 - **Feature trait architecture**: `crates/oxidris-evaluator/src/board_feature/mod.rs`
 - **Feature sources**: `crates/oxidris-evaluator/src/board_feature/source.rs`
-- **Feature builder**: `crates/oxidris-cli/src/analysis/feature_builder.rs`
-- **Normalization params**: `crates/oxidris-cli/src/analysis/normalization.rs`
+- **Feature builder**: `crates/oxidris-analysis/src/feature_builder.rs`
+- **Session data**: `crates/oxidris-analysis/src/session.rs`
+- **Statistics**: `crates/oxidris-analysis/src/statistics.rs`
+- **Normalization**: `crates/oxidris-analysis/src/normalization.rs`
+- **Normalization params**: `crates/oxidris-analysis/src/normalization.rs`
 - **KM estimator**: `crates/oxidris-stats/src/survival.rs`
 - **KM normalization generation**: `crates/oxidris-cli/src/command/analyze_censoring/mod.rs`
 - **Data structures**: `crates/oxidris-cli/src/data.rs`

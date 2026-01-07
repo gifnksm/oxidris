@@ -1,6 +1,7 @@
+use oxidris_analysis::{
+    index::BoardIndex, sample::BoardSample, statistics::BoardFeatureStatistics,
+};
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
-
-use crate::analysis::{BoardFeatureStatistics, BoardIndex, BoardSample};
 
 use self::app::App;
 

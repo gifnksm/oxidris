@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use crate::{
-    analysis::{BoardFeatureStatistics, BoardIndex, BoardSample},
-    model::session::SessionCollection,
-    util,
+use oxidris_analysis::{
+    index::BoardIndex, sample::BoardSample, statistics::BoardFeatureStatistics,
 };
+
+use crate::util;
 
 mod ui;
 
@@ -18,7 +18,7 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     let AnalyzeBoardFeaturesArg { boards_file } = arg;
 
     eprintln!("Loading boards from {}...", boards_file.display());
-    let sessions = SessionCollection::open(boards_file)?.sessions;
+    let sessions = util::read_boards_file(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
 
     let features = util::build_feature_from_session(&sessions)?;

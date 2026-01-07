@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt, path::PathBuf};
 
+use oxidris_analysis::session::{BoardAndPlacement, SessionCollection, SessionData};
 use oxidris_engine::{GameField, GameStats};
 use oxidris_evaluator::{
     placement_analysis::PlacementAnalysis, placement_evaluator::PlacementEvaluator,
@@ -7,10 +8,7 @@ use oxidris_evaluator::{
 };
 use rand::Rng;
 
-use crate::{
-    model::session::{BoardAndPlacement, SessionCollection, SessionData},
-    util::Output,
-};
+use crate::util::Output;
 
 const MAX_TURNS: usize = 500;
 const TURNS_HISTOGRAM_WIDTH: usize = 10;

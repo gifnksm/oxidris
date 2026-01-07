@@ -17,7 +17,12 @@ Oxidris is built around three core systems:
 2. **Training** - Weight optimization using genetic algorithms
 3. **Engine** - Tetris game mechanics and rules
 
-Each system is documented in its own subdirectory.
+These are supported by:
+
+- **Analysis** - Offline data analysis and feature engineering (`oxidris-analysis`)
+- **Statistics** - Low-level statistical functions (`oxidris-stats`)
+
+The core systems are documented in their own subdirectories below.
 
 ## System Documentation
 
@@ -52,11 +57,18 @@ The game engine implements Tetris mechanics for AI training.
 ### Training Flow
 
 ```text
-Weak AI Gameplay
+Weak AI Gameplay (Engine)
     ↓
-Training Data (board states)
+Training Data Collection (session boards)
     ↓
-Genetic Algorithm
+Statistical Analysis (oxidris-analysis)
+    ├─ Feature extraction & sampling
+    ├─ Statistics computation
+    └─ Normalization parameters
+    ↓
+Feature Construction (oxidris-analysis)
+    ↓
+Genetic Algorithm (Training)
     ↓
 Feature Weights (models/ai/*.json)
 ```
@@ -75,18 +87,43 @@ Weighted Sum (Evaluator)
 Placement Score
 ```
 
+## Supporting Libraries
+
+### Analysis System (`oxidris-analysis`)
+
+The analysis system provides offline data analysis tools for feature engineering:
+
+- **Session data handling**: Load and parse training data
+- **Feature sampling**: Extract feature values from board states
+- **Statistical analysis**: Compute distributions, percentiles, histograms
+- **Normalization parameters**: Calculate data-driven normalization ranges
+- **Feature construction**: Build features with runtime-computed parameters
+- **Survival analysis**: Kaplan-Meier estimation for censored data
+
+This system bridges the gap between training data collection and feature construction, enabling data-driven feature normalization.
+
+### Statistics Library (`oxidris-stats`)
+
+Low-level statistical functions used by the analysis system:
+
+- Percentile computation
+- Histogram generation
+- Kaplan-Meier survival curve estimation
+
 ## Key Design Decisions
 
 ### Data-Driven Approach
 
 - Feature normalization uses percentiles from actual gameplay data
 - No hand-tuned parameters in evaluation
+- Analysis system computes normalization parameters offline
 
 ### Separation of Concerns
 
 - **Engine**: Game mechanics only, no AI logic
 - **Evaluator**: Board evaluation only, no training logic
 - **Training**: Weight optimization only, no game mechanics
+- **Analysis**: Offline data processing, separate from runtime evaluation
 
 ### Linear Evaluation Model
 

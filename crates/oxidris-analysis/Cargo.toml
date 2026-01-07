@@ -1,0 +1,14 @@
+[package]
+name = "oxidris-analysis"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["error", "display"] }
+oxidris-engine.workspace = true
+oxidris-evaluator.workspace = true
+oxidris-stats.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

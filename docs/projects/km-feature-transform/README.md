@@ -317,7 +317,17 @@ See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
 ## Code Locations
 
+### Analysis System
+
+- **Session data**: `crates/oxidris-analysis/src/session.rs`
+- **Feature samples**: `crates/oxidris-analysis/src/sample.rs`
+- **Statistics**: `crates/oxidris-analysis/src/statistics.rs`
+- **Normalization**: `crates/oxidris-analysis/src/normalization.rs`
+- **Feature builder**: `crates/oxidris-analysis/src/feature_builder.rs`
+- **Survival analysis**: `crates/oxidris-analysis/src/survival.rs`
+
+### Supporting Systems
+
 - **KM Estimator**: `crates/oxidris-stats/src/survival.rs`
-- **Data Structures**: `crates/oxidris-cli/src/data.rs`
-- **Normalization Generation**: `crates/oxidris-cli/src/analyze_censoring.rs`
+- **Normalization Generation Tool**: `crates/oxidris-cli/src/command/analyze_censoring/mod.rs`
 - **Feature Definitions**: `crates/oxidris-evaluator/src/board_feature/mod.rs`

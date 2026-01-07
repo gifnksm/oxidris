@@ -11,10 +11,7 @@ use oxidris_evaluator::{
 use oxidris_training::genetic::{Individual, Population, PopulationEvolver};
 
 use crate::{
-    model::{
-        ai_model::{AiModel, TrainedBoardFeature},
-        session::SessionCollection,
-    },
+    model::ai_model::{AiModel, TrainedBoardFeature},
     util::{self, Output},
 };
 
@@ -101,7 +98,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
     } = arg;
 
     eprintln!("Loading boards from {}...", boards_file.display());
-    let sessions = SessionCollection::open(boards_file)?.sessions;
+    let sessions = util::read_boards_file(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
 
     let session_evaluator = match ai {

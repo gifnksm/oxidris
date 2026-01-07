@@ -10,15 +10,19 @@
 //! 1. Extract raw feature values from sessions using [`BoxedBoardFeatureSource`]
 //! 2. Compute statistics (percentiles) using [`RawFeatureStatistics`]
 //! 3. Build normalization parameters using [`BoardFeatureNormalizationParamCollection`]
-//! 4. Use parameters to construct features with [`FeatureBuilder`](super::FeatureBuilder)
+//! 4. Use parameters to construct features with [`FeatureBuilder`](crate::feature_builder::FeatureBuilder)
 //!
 //! # Example
 //!
 //! ```no_run
-//! use oxidris_cli::analysis::BoardFeatureNormalizationParamCollection;
-//! use oxidris_cli::analysis::{RawBoardSample, RawFeatureStatistics};
-//! use oxidris_evaluator::board_feature;
-//! # let sessions = todo!();
+//! use oxidris_analysis::{
+//!     normalization::BoardFeatureNormalizationParamCollection, sample::RawBoardSample,
+//!     session::SessionData, statistics::RawFeatureStatistics,
+//! };
+//! use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
+//!
+//! let sessions: Vec<SessionData> = todo!();
+//! let feature: BoxedBoardFeatureSource = todo!();
 //!
 //! let sources = board_feature::all_board_feature_sources();
 //! let raw_samples = RawBoardSample::from_sessions(&sources, &sessions);
@@ -28,7 +32,7 @@
 //! let norm_params = BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats);
 //!
 //! // Access percentiles for a specific source
-//! if let Some(param) = norm_params.get("num_holes") {
+//! if let Some(param) = norm_params.get(&feature) {
 //!     println!(
 //!         "P05: {}, P95: {}",
 //!         param.value_percentiles.p05, param.value_percentiles.p95
@@ -40,12 +44,12 @@ use std::{collections::HashMap, iter};
 
 use oxidris_evaluator::board_feature::{BoardFeatureSource, BoxedBoardFeatureSource};
 
-use crate::analysis::RawFeatureStatistics;
+use crate::statistics::RawFeatureStatistics;
 
 /// Collection of normalization parameters for all feature sources
 ///
 /// Maps feature source IDs to their respective normalization parameters.
-/// Used by [`FeatureBuilder`](super::FeatureBuilder) to construct features
+/// Used by [`FeatureBuilder`](crate::feature_builder::FeatureBuilder) to construct features
 /// with runtime-computed normalization ranges.
 #[derive(Debug, Clone)]
 pub struct BoardFeatureNormalizationParamCollection {
@@ -71,7 +75,7 @@ pub struct BoardFeatureNormalizationParam {
 /// - P75, P95: Used for risk features (threshold-based)
 /// - P50: Median value (for reference)
 #[derive(Debug, Clone)]
-#[expect(dead_code)]
+
 pub struct ValuePercentiles {
     pub p01: f32,
     pub p05: f32,
@@ -95,6 +99,7 @@ impl BoardFeatureNormalizationParamCollection {
     /// # Returns
     ///
     /// A collection mapping source IDs to normalization parameters
+    #[must_use]
     pub fn from_stats(sources: &[BoxedBoardFeatureSource], stats: &[RawFeatureStatistics]) -> Self {
         let feature_params = iter::zip(sources, stats)
             .map(|(source, stats)| {
@@ -125,6 +130,7 @@ impl BoardFeatureNormalizationParamCollection {
 
 impl BoardFeatureNormalizationParam {
     /// Construct normalization parameters from raw feature statistics
+    #[must_use]
     pub fn from_stats(stats: &RawFeatureStatistics) -> Self {
         Self {
             value_percentiles: ValuePercentiles::from_stats(stats),
@@ -134,6 +140,7 @@ impl BoardFeatureNormalizationParam {
 
 impl ValuePercentiles {
     /// Extract percentile values from raw feature statistics
+    #[must_use]
     pub fn from_stats(stats: &RawFeatureStatistics) -> Self {
         Self {
             p01: stats.raw.percentiles.get(1.0).unwrap(),

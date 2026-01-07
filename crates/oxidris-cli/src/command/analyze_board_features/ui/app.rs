@@ -1,8 +1,9 @@
 use crossterm::event::{self, Event, KeyEventKind};
+use oxidris_analysis::{
+    index::BoardIndex, sample::BoardSample, statistics::BoardFeatureStatistics,
+};
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use ratatui::{DefaultTerminal, Frame};
-
-use crate::analysis::{BoardFeatureStatistics, BoardIndex, BoardSample};
 
 use super::screens::feature_list::FeatureListScreen;
 
