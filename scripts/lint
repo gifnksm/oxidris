@@ -91,11 +91,19 @@ cleanup_temp() {
 }
 
 # ============================================================================
-# Common Checks
+# Common Checks (run for all targets)
 # ============================================================================
 
+run_common_checks() {
+    echo "=== Common Checks ==="
+    echo ""
+
+    check_typos
+    echo ""
+}
+
 check_typos() {
-    echo "Typos Check"
+    echo "Typos Check (all files)"
 
     if ! command -v typos &>/dev/null; then
         print_warning "typos not installed (install with: cargo install typos-cli)"
@@ -200,17 +208,9 @@ check_docs_codeblocks() {
 }
 
 run_docs_checks() {
-    echo "=== Documentation Linter ==="
+    echo "=== Documentation Checks ==="
     echo ""
 
-    if [ "$MODE" = "check" ]; then
-        print_info "Mode: check only (no auto-fix)"
-    else
-        print_info "Mode: fix (auto-fix enabled)"
-    fi
-    echo ""
-
-    check_typos
     check_docs_markdown
     check_docs_codeblocks
 }
@@ -325,17 +325,9 @@ check_rust_doc() {
 }
 
 run_rust_checks() {
-    echo "=== Rust Code Linter ==="
+    echo "=== Rust Code Checks ==="
     echo ""
 
-    if [ "$MODE" = "check" ]; then
-        print_info "Mode: check only (no auto-fix, fast with cache)"
-    else
-        print_info "Mode: fix (auto-fix enabled, slower)"
-    fi
-    echo ""
-
-    check_typos
     check_rust_clippy
     check_rust_fmt
     check_rust_tests
@@ -448,17 +440,9 @@ check_shell_shfmt() {
 }
 
 run_shell_checks() {
-    echo "=== Shell Script Linter ==="
+    echo "=== Shell Script Checks ==="
     echo ""
 
-    if [ "$MODE" = "check" ]; then
-        print_info "Mode: check only (no auto-fix)"
-    else
-        print_info "Mode: fix (auto-fix enabled for shfmt)"
-    fi
-    echo ""
-
-    check_typos
     check_shell_shellcheck
     check_shell_shfmt
 }
@@ -571,13 +555,24 @@ parse_args() {
 main() {
     parse_args "$@"
 
+    # Show mode info
+    if [ "$MODE" = "check" ]; then
+        print_info "Mode: check only (no auto-fix)"
+    else
+        print_info "Mode: fix (auto-fix enabled)"
+    fi
+    echo ""
+
     # Take initial snapshot before making any changes (for fix mode summary)
     INITIAL_SNAPSHOT=""
     if [ "$MODE" = "fix" ]; then
         INITIAL_SNAPSHOT=$(take_snapshot)
     fi
 
-    # Run appropriate checks
+    # Run common checks first (always)
+    run_common_checks
+
+    # Run target-specific checks
     case "$TARGET" in
     docs)
         run_docs_checks
