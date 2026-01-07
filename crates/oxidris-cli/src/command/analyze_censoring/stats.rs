@@ -180,3 +180,35 @@ where
         })
         .collect()
 }
+
+#[expect(clippy::cast_precision_loss)]
+pub(super) fn filter_by_percentiles<'a, T>(
+    all_stats: &'a BTreeMap<T, SurvivalStats>,
+    percentiles: &[f64],
+) -> BTreeMap<&'a T, (f64, &'a SurvivalStats)>
+where
+    T: Clone + Ord,
+{
+    let total_boards = all_stats
+        .values()
+        .map(|stats| stats.boards_count)
+        .sum::<usize>();
+
+    let mut cumulative_boards = 0;
+    let mut percentile_values = BTreeMap::new();
+    let mut percentile_idx = 0;
+
+    for (value, stats) in all_stats {
+        cumulative_boards += stats.boards_count;
+        let current_percentile = cumulative_boards as f64 / total_boards as f64;
+
+        while percentile_idx < percentiles.len()
+            && current_percentile >= percentiles[percentile_idx]
+        {
+            percentile_values.insert(value, (percentiles[percentile_idx], stats));
+            percentile_idx += 1;
+        }
+    }
+
+    percentile_values
+}

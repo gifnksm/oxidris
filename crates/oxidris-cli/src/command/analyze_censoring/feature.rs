@@ -55,58 +55,25 @@ pub(super) fn display_feature_statistics(
     let total_values = all_stats.len();
 
     // Select percentile values to display
-    let percentile_values = filter_by_percentiles(all_stats);
+    let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
+    let percentile_values = stats::filter_by_percentiles(all_stats, &percentiles);
 
     // Display table with representative values
     let rows: Vec<_> = percentile_values
         .iter()
-        .map(|(value, stats)| table::SurvivalTableRow {
-            label: value.to_string(),
+        .map(|(value, (percentile, stats))| table::SurvivalTableRow {
+            label: format!("{:<10} {value:>10}", format!("P{:}", percentile * 100.0),),
             stats,
         })
         .collect();
 
     println!("{} ({})", feature.name(), feature.id());
-    table::print_survival_table("Value", rows, include_km);
+    table::print_survival_table(
+        &format!("{:<10} {:>10}", "Percentile", "Raw Value"),
+        rows,
+        include_km,
+    );
     println!("  (Showing P0, P25, P50, P75, P100 by board count, total values: {total_values})");
-}
-
-/// Filter survival statistics to only include percentile values
-///
-/// Returns a map of feature values to their corresponding survival statistics
-/// for P0, P25, P50, P75, and P100 percentiles
-#[expect(clippy::cast_precision_loss)]
-fn filter_by_percentiles(
-    all_stats: &BTreeMap<u32, SurvivalStats>,
-) -> BTreeMap<u32, &SurvivalStats> {
-    let total_boards = all_stats
-        .values()
-        .map(|stats| stats.boards_count)
-        .sum::<usize>();
-
-    let mut cumulative_boards = 0;
-    let mut percentile_values = BTreeMap::new();
-    let percentiles = [0.0, 0.25, 0.5, 0.75, 1.0];
-    let mut percentile_idx = 0;
-
-    for (value, stats) in all_stats {
-        cumulative_boards += stats.boards_count;
-        let current_percentile = cumulative_boards as f64 / total_boards as f64;
-
-        while percentile_idx < percentiles.len()
-            && current_percentile >= percentiles[percentile_idx]
-        {
-            percentile_values.insert(*value, stats);
-            percentile_idx += 1;
-        }
-    }
-
-    // Ensure we always have the last value
-    if let Some((max_value, max_stats)) = all_stats.last_key_value() {
-        percentile_values.insert(*max_value, max_stats);
-    }
-
-    percentile_values
 }
 
 /// Save KM curves to CSV file for all feature values

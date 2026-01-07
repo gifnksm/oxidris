@@ -21,7 +21,7 @@ pub(super) struct SurvivalTableRow<'a> {
 fn print_survival_table_header(label_col: &str, include_km: bool) {
     if include_km {
         println!(
-            "  {:<20} {:>8} {:>10} {:>12} {:>12} {:>10} {:>12} {:>12}",
+            "  {:<21} {:>8} {:>10} {:>12} {:>12} {:>10} {:>12} {:>12}",
             label_col,
             "Boards",
             "Censored%",
@@ -33,7 +33,7 @@ fn print_survival_table_header(label_col: &str, include_km: bool) {
         );
     } else {
         println!(
-            "  {:<20} {:>8} {:>10} {:>12} {:>12} {:>10}",
+            "  {:<21} {:>8} {:>10} {:>12} {:>12} {:>10}",
             label_col, "Boards", "Censored%", "Mean(Comp)", "Mean(All)", "All/Comp",
         );
     }
@@ -65,7 +65,7 @@ fn print_survival_table_row(row: &SurvivalTableRow, include_km: bool) {
             .map_or("N/A".to_string(), |m| format!("{m:.1}"));
 
         println!(
-            "  {:<20} {:>8} {:>9.1}% {:>12.1} {:>12.1} {:>10} {:>12} {:>12}",
+            "  {:<21} {:>8} {:>9.1}% {:>12.1} {:>12.1} {:>10} {:>12} {:>12}",
             row.label,
             stats.boards_count,
             stats.censoring_rate(),
@@ -77,7 +77,7 @@ fn print_survival_table_row(row: &SurvivalTableRow, include_km: bool) {
         );
     } else {
         println!(
-            "  {:<20} {:>8} {:>9.1}% {:>12.1} {:>12.1} {:>10}",
+            "  {:<21} {:>8} {:>9.1}% {:>12.1} {:>12.1} {:>10}",
             row.label,
             stats.boards_count,
             stats.censoring_rate(),

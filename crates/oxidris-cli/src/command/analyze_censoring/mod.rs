@@ -114,7 +114,6 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
 /// Generate normalization parameters from pre-computed feature statistics
 ///
 /// Reuses the already-computed KM statistics to avoid redundant calculation.
-#[expect(clippy::cast_precision_loss)]
 fn generate_normalization_params(
     feature_stats: &[(BoxedBoardFeatureSource, BTreeMap<u32, SurvivalStats>)],
     max_turns: usize,
@@ -128,55 +127,18 @@ fn generate_normalization_params(
             anyhow::bail!("No data for feature {}", feature.id());
         }
 
-        // Extract KM medians and board counts from pre-computed statistics
-        let mut value_km_data: Vec<(u32, f64, usize)> = vec![];
+        let total_unique_values = all_stats.len();
+        let percentile_values = stats::filter_by_percentiles(all_stats, &[0.05, 0.95]);
 
-        for (value, stats) in all_stats {
-            if let Some(median) = stats.median_km {
-                value_km_data.push((*value, median, stats.boards_count));
-            }
-        }
+        let (&&p05_value, (_, p05_stats)) = percentile_values.first_key_value().unwrap();
+        let (&&p95_value, (_, p95_stats)) = percentile_values.last_key_value().unwrap();
+        let p05_km = p05_stats.median_km.unwrap();
+        let p95_km = p95_stats.median_km.unwrap();
 
-        if value_km_data.is_empty() {
-            anyhow::bail!("No valid KM medians for feature {}", feature.id());
-        }
-
-        let total_unique_values = value_km_data.len();
-
-        // Sort by feature value to calculate cumulative board counts
-        value_km_data.sort_by_key(|(value, _, _)| *value);
-
-        // Find P05 and P95 feature values based on board count
-        let total_boards: usize = value_km_data.iter().map(|(_, _, count)| count).sum();
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let p05_count = (total_boards as f64 * 0.05) as usize;
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let p95_count = (total_boards as f64 * 0.95) as usize;
-
-        let mut cumulative = 0;
-        let mut p05_value = value_km_data[0].0;
-        let mut p05_km = value_km_data[0].1;
-        let mut p95_value = value_km_data[0].0;
-        let mut p95_km = value_km_data[0].1;
-
-        for (value, km_median, count) in &value_km_data {
-            if cumulative <= p05_count {
-                p05_value = *value;
-                p05_km = *km_median;
-            }
-            if cumulative <= p95_count {
-                p95_value = *value;
-                p95_km = *km_median;
-            }
-            cumulative += count;
-        }
-
-        // Generate transform mapping (raw value -> KM median)
-        let mut transform_mapping = BTreeMap::new();
-
-        for (value, km_median, _) in &value_km_data {
-            transform_mapping.insert(*value, *km_median);
-        }
+        let transform_mapping = all_stats
+            .iter()
+            .filter_map(|(value, stats)| stats.median_km.map(|km| (*value, km)))
+            .collect::<BTreeMap<u32, f64>>();
 
         let normalization = NormalizationRange {
             km_min: p95_km,
@@ -289,13 +251,21 @@ fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
     let rows: Vec<_> = phase_stats
         .iter()
         .map(|(phase, stats)| SurvivalTableRow {
-            label: format!("{:9} {:4?}", phase.to_str(), phase.range(max_turns)),
+            label: format!(
+                "{:<10} {:<10}",
+                phase.to_str(),
+                format!("{:4?}", phase.range(max_turns))
+            ),
             stats,
         })
         .collect();
 
     println!("Censoring by Capture Phase");
-    table::print_survival_table("Phase", rows, include_km);
+    table::print_survival_table(
+        &format!("{:<10} {:<10}", "Phase", "Range"),
+        rows,
+        include_km,
+    );
 }
 
 fn analyze_by_evaluator(sessions: &[SessionData]) {
