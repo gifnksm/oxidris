@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
+use oxidris_analysis::sample::BoardSample;
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use oxidris_stats::comprehensive::ComprehensiveStats;
 use ratatui::{
@@ -21,6 +22,7 @@ use crate::command::analyze_board_features::ui::app::{AppData, Screen};
 pub struct FeatureListScreen {
     features: Vec<BoxedBoardFeature>,
     selected_feature: usize,
+    clip_scatter_plot: bool,
 }
 
 impl FeatureListScreen {
@@ -29,16 +31,47 @@ impl FeatureListScreen {
         Self {
             features,
             selected_feature: 0,
+            clip_scatter_plot: true,
         }
     }
 
+    /// Extract raw feature values and pair them with a target value (transformed or normalized).
     #[expect(clippy::cast_precision_loss)]
+    fn build_scatter_data<F>(&self, data: &AppData, extract_y: F) -> Vec<(f64, f64)>
+    where
+        F: Fn(&BoardSample) -> f32,
+    {
+        data.board_samples
+            .iter()
+            .map(|sample| {
+                let raw = f64::from(sample.feature_vector[self.selected_feature].raw as f32);
+                let y = f64::from(extract_y(sample));
+                (raw, y)
+            })
+            .collect()
+    }
+
+    /// Calculate the Y-axis range for data points within the clipped X range.
+    fn calculate_y_range_for_clipped_x(data: &[(f64, f64)], x_max: f64) -> [f64; 2] {
+        let y_max = data
+            .iter()
+            .copied()
+            .filter_map(|(x, y)| (x <= x_max).then_some(y))
+            .max_by(f64::total_cmp)
+            .unwrap_or(0.0);
+        [0.0, y_max]
+    }
+
     pub fn draw(&self, frame: &mut Frame, data: &AppData) {
         let feature_stats = &data.statistics[self.selected_feature];
 
+        // Split area to reserve bottom line for help
+        let main_layout =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(frame.area());
+
         let panes = Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
             .spacing(Spacing::Overlap(1))
-            .split(frame.area());
+            .split(main_layout[0]);
 
         let left_panes = Layout::vertical([
             Constraint::Fill(1),
@@ -74,43 +107,47 @@ impl FeatureListScreen {
             stats: &feature_stats.normalized,
         };
 
-        let raw_trans_data = data
-            .board_samples
-            .iter()
-            .map(|fm| {
-                (
-                    f64::from(fm.feature_vector[self.selected_feature].raw as f32),
-                    f64::from(fm.feature_vector[self.selected_feature].transformed),
-                )
-            })
-            .collect::<Vec<(f64, f64)>>();
+        // Calculate X-axis range (clipped or full)
+        let raw_max = if self.clip_scatter_plot {
+            feature_stats
+                .raw
+                .percentiles
+                .get(95.0)
+                .unwrap_or(feature_stats.raw.stats.max)
+        } else {
+            feature_stats.raw.stats.max
+        };
+        let raw_range = [0.0, f64::from(raw_max)];
 
+        // Build scatter plot data
+        let raw_trans_data = self.build_scatter_data(data, |sample| {
+            sample.feature_vector[self.selected_feature].transformed
+        });
+        let raw_norm_data = self.build_scatter_data(data, |sample| {
+            sample.feature_vector[self.selected_feature].normalized
+        });
+
+        // Calculate Y-axis ranges
+        let trans_range = Self::calculate_y_range_for_clipped_x(&raw_trans_data, raw_range[1]);
+        let norm_range = [0.0, 1.0];
+
+        // Create scatter plot widgets
         let raw_trans_chart = FeatureScatter {
             label: "Raw vs Transformed",
             data: &raw_trans_data,
             x_title: "Raw",
-            x_bounds: [0.0, f64::from(feature_stats.raw.stats.max)],
+            x_bounds: raw_range,
             y_title: "Transformed",
-            y_bounds: [0.0, f64::from(feature_stats.transformed.stats.max)],
+            y_bounds: trans_range,
         };
 
-        let raw_norm_data = data
-            .board_samples
-            .iter()
-            .map(|bm| {
-                (
-                    f64::from(bm.feature_vector[self.selected_feature].raw as f32),
-                    f64::from(bm.feature_vector[self.selected_feature].normalized),
-                )
-            })
-            .collect::<Vec<(f64, f64)>>();
         let raw_norm_chart = FeatureScatter {
             label: "Raw vs Normalized",
             data: &raw_norm_data,
             x_title: "Raw",
-            x_bounds: [0.0, f64::from(feature_stats.raw.stats.max)],
+            x_bounds: raw_range,
             y_title: "Normalized",
-            y_bounds: [0.0, 1.0],
+            y_bounds: norm_range,
         };
 
         frame.render_widget(feature_list_pane, left_panes[0]);
@@ -120,12 +157,21 @@ impl FeatureListScreen {
         frame.render_widget(raw_pane, right_panes[0]);
         frame.render_widget(transformed_pane, right_panes[1]);
         frame.render_widget(normalized_pane, right_panes[2]);
+
+        // Render help line at bottom
+        let clip_status = if self.clip_scatter_plot { "P95" } else { "Max" };
+        let help_text = format!("↑/↓: Select | c: Toggle Clip ({clip_status}) | q/ESC: Quit");
+        let help_line = Paragraph::new(help_text).style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(help_line, main_layout[1]);
     }
 
     pub(crate) fn handle_input(&mut self, key_event: KeyEvent, screen: &mut Screen) {
         match key_event.code {
             KeyCode::Char('q') | KeyCode::Esc => {
                 *screen = Screen::Exiting;
+            }
+            KeyCode::Char('c') => {
+                self.clip_scatter_plot = !self.clip_scatter_plot;
             }
             KeyCode::Up => {
                 if self.selected_feature == 0 {
