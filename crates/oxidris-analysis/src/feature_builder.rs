@@ -108,7 +108,7 @@ use oxidris_evaluator::board_feature::{
         NumHoles, RowTransitions, SumOfHoleDepth, SumOfWellDepth, SurfaceBumpiness,
         SurfaceRoughness, TotalHeight,
     },
-    transform::{IWellReward, LineClearBonus, RawTransform},
+    transform::{IWellReward, LineClearBonus, RawTransform, RawTransformParam},
 };
 
 use crate::normalization::{
@@ -174,14 +174,17 @@ impl FeatureBuilder {
     where
         S: BoardFeatureSource,
     {
-        let param = self.get_param(source)?;
+        let norm_param = self.get_param(source)?;
+        let param = RawTransformParam::new(
+            FeatureSignal::Negative,
+            norm_param.value_percentiles.p05,
+            norm_param.value_percentiles.p95,
+        );
         Ok(Box::new(RawTransform::new(
             format!("{}_raw_penalty", source.id()).into(),
             format!("{} (Linear Penalty)", source.name()).into(),
-            FeatureSignal::Negative,
-            param.value_percentiles.p05,
-            param.value_percentiles.p95,
             source.clone_boxed(),
+            param,
         )))
     }
 
@@ -204,14 +207,17 @@ impl FeatureBuilder {
     where
         S: BoardFeatureSource,
     {
-        let param = self.get_param(source)?;
+        let norm_param = self.get_param(source)?;
+        let param = RawTransformParam::new(
+            FeatureSignal::Negative,
+            norm_param.value_percentiles.p75,
+            norm_param.value_percentiles.p95,
+        );
         Ok(Box::new(RawTransform::new(
             format!("{}_raw_risk", source.id()).into(),
             format!("{} (Linear Risk)", source.name()).into(),
-            FeatureSignal::Negative,
-            param.value_percentiles.p75,
-            param.value_percentiles.p95,
             source.clone_boxed(),
+            param,
         )))
     }
 

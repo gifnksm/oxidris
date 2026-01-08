@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::board_feature::{BoardFeatureSource, BoxedBoardFeature, FeatureSignal};
 
-pub use self::{raw_transform::*, specialized::*};
+pub use self::{raw::*, specialized::*};
 
-mod raw_transform;
+mod raw;
 mod specialized;
 
 fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 {
@@ -21,11 +21,7 @@ fn linear_normalize(val: f32, signal: FeatureSignal, min: f32, max: f32) -> f32 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureProcessing {
-    RawTransform {
-        signal: FeatureSignal,
-        normalize_min: f32,
-        normalize_max: f32,
-    },
+    RawTransform(RawTransformParam),
     LineClearBonus,
     IWellReward,
 }
@@ -41,18 +37,9 @@ impl FeatureProcessing {
         S: BoardFeatureSource + Clone + 'static,
     {
         match self {
-            Self::RawTransform {
-                signal,
-                normalize_min,
-                normalize_max,
-            } => Box::new(RawTransform::new(
-                id,
-                name,
-                *signal,
-                *normalize_min,
-                *normalize_max,
-                source,
-            )) as BoxedBoardFeature,
+            Self::RawTransform(param) => {
+                Box::new(RawTransform::new(id, name, source, param.clone())) as BoxedBoardFeature
+            }
             Self::LineClearBonus => Box::new(LineClearBonus::new(id, name, source)),
             FeatureProcessing::IWellReward => Box::new(IWellReward::new(id, name, source)),
         }

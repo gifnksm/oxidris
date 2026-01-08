@@ -1,5 +1,7 @@
 use std::{borrow::Cow, fmt};
 
+use serde::{Deserialize, Serialize};
+
 use crate::board_feature::{
     BoardFeature, BoardFeatureSource, BoxedBoardFeature, FeatureProcessing, FeatureSignal,
 };
@@ -50,46 +52,63 @@ use crate::placement_analysis::PlacementAnalysis;
 ///
 /// ```rust,no_run
 /// use oxidris_evaluator::board_feature::{
-///     FeatureSignal, source::NumHoles, transform::RawTransform,
+///     FeatureSignal,
+///     source::NumHoles,
+///     transform::{RawTransform, RawTransformParam},
 /// };
 /// use std::borrow::Cow;
 ///
 /// // Create a penalty feature for holes with P05-P95 normalization
-/// let feature = RawTransform::new(
-///     Cow::Borrowed("holes_penalty"),
-///     Cow::Borrowed("Holes Penalty"),
+/// let param = RawTransformParam::new(
 ///     FeatureSignal::Negative, // Lower holes is better
 ///     2.0,                     // P05 (min)
 ///     15.0,                    // P95 (max)
+/// );
+/// let feature = RawTransform::new(
+///     Cow::Borrowed("holes_penalty"),
+///     Cow::Borrowed("Holes Penalty"),
 ///     NumHoles,
+///     param,
 /// );
 /// ```
 #[derive(Debug, Clone)]
 pub struct RawTransform<S> {
     id: Cow<'static, str>,
     name: Cow<'static, str>,
+    source: S,
+    param: RawTransformParam,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RawTransformParam {
     signal: FeatureSignal,
     normalize_min: f32,
     normalize_max: f32,
-    source: S,
 }
 
 impl<S> RawTransform<S> {
     pub const fn new(
         id: Cow<'static, str>,
         name: Cow<'static, str>,
-        signal: FeatureSignal,
-        normalize_min: f32,
-        normalize_max: f32,
         source: S,
+        param: RawTransformParam,
     ) -> Self {
         Self {
             id,
             name,
+            source,
+            param,
+        }
+    }
+}
+
+impl RawTransformParam {
+    #[must_use]
+    pub const fn new(signal: FeatureSignal, normalize_min: f32, normalize_max: f32) -> Self {
+        Self {
             signal,
             normalize_min,
             normalize_max,
-            source,
         }
     }
 }
@@ -111,11 +130,7 @@ where
     }
 
     fn feature_processing(&self) -> FeatureProcessing {
-        FeatureProcessing::RawTransform {
-            signal: self.signal,
-            normalize_min: self.normalize_min,
-            normalize_max: self.normalize_max,
-        }
+        FeatureProcessing::RawTransform(self.param.clone())
     }
 
     fn clone_boxed(&self) -> BoxedBoardFeature {
@@ -134,9 +149,9 @@ where
     fn normalize(&self, transformed: f32) -> f32 {
         super::linear_normalize(
             transformed,
-            self.signal,
-            self.normalize_min,
-            self.normalize_max,
+            self.param.signal,
+            self.param.normalize_min,
+            self.param.normalize_max,
         )
     }
 }
