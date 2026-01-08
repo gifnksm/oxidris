@@ -105,10 +105,15 @@
 //! // Get feature values at P05 and P95 percentiles
 //! let percentiles = stats_map.filter_by_percentiles(&[0.05, 0.95]);
 //!
-//! for (value, (percentile, stats)) in &percentiles {
+//! for (value, (percentiles, stats)) in &percentiles {
+//!     let percentile_labels = percentiles
+//!         .iter()
+//!         .map(|p| format!("P{:.0}", p * 100.0))
+//!         .collect::<Vec<_>>()
+//!         .join("/");
 //!     println!(
-//!         "P{:.0}: value={}, KM median={:.1}",
-//!         percentile * 100.0,
+//!         "{}: value={}, KM median={:.1}",
+//!         percentile_labels,
 //!         value,
 //!         stats.median_km.unwrap_or(0.0)
 //!     );
@@ -117,6 +122,7 @@
 
 use std::collections::BTreeMap;
 
+use oxidris_evaluator::{board_feature::BoardFeatureSource, placement_analysis::PlacementAnalysis};
 use oxidris_stats::survival::KaplanMeierCurve;
 
 use crate::session::{BoardAndPlacement, SessionData};
@@ -271,7 +277,10 @@ impl<K> SurvivalStatsMap<K> {
 
     #[expect(clippy::cast_precision_loss)]
     #[must_use]
-    pub fn filter_by_percentiles(&self, percentiles: &[f64]) -> BTreeMap<&K, (f64, &SurvivalStats)>
+    pub fn filter_by_percentiles(
+        &self,
+        percentiles: &[f64],
+    ) -> BTreeMap<&K, (Vec<f64>, &SurvivalStats)>
     where
         K: Ord,
     {
@@ -292,11 +301,31 @@ impl<K> SurvivalStatsMap<K> {
             while percentile_idx < percentiles.len()
                 && current_percentile >= percentiles[percentile_idx]
             {
-                percentile_values.insert(value, (percentiles[percentile_idx], stats));
+                percentile_values
+                    .entry(value)
+                    .or_insert_with(|| (vec![], stats))
+                    .0
+                    .push(percentiles[percentile_idx]);
                 percentile_idx += 1;
             }
         }
 
         percentile_values
+    }
+}
+
+impl SurvivalStatsMap<u32> {
+    /// Collect survival statistics grouped by a specific board feature value
+    ///
+    /// This function extracts survival time data from session data,
+    /// grouping observations by the raw value of a provided board feature.
+    pub fn collect_by_feature_value(
+        sessions: &[SessionData],
+        feature: &dyn BoardFeatureSource,
+    ) -> Self {
+        Self::collect_by_group(sessions, |_, board| {
+            let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
+            feature.extract_raw(&analysis)
+        })
     }
 }

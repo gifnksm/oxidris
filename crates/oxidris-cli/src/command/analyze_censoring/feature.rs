@@ -6,34 +6,12 @@
 use std::{fmt::Write as _, path::Path};
 
 use anyhow::Context;
-use oxidris_analysis::{session::SessionData, survival::SurvivalStatsMap};
-use oxidris_evaluator::{
-    board_feature::BoxedBoardFeatureSource, placement_analysis::PlacementAnalysis,
-};
+use oxidris_analysis::survival::SurvivalStatsMap;
+use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
+
+use crate::command::analyze_censoring::table::SurvivalTableRow;
 
 use super::table;
-
-/// Compute survival statistics for all values of a feature
-///
-/// This function collects data for all feature values and computes full
-/// Kaplan-Meier statistics. The results can be reused for display,
-/// CSV export, and normalization parameter generation.
-///
-/// # Arguments
-/// * `feature` - The feature to analyze
-/// * `sessions` - All gameplay sessions
-///
-/// # Returns
-/// Vector of (`feature_value`, `SurvivalStats`) sorted by feature value
-pub(super) fn collect_feature_survival_stats(
-    feature: &BoxedBoardFeatureSource,
-    sessions: &[SessionData],
-) -> SurvivalStatsMap<u32> {
-    SurvivalStatsMap::collect_by_group(sessions, |_session, board| {
-        let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
-        feature.extract_raw(&analysis)
-    })
-}
 
 /// Display feature statistics with representative percentile values
 ///
@@ -54,13 +32,19 @@ pub(super) fn display_feature_statistics(
     let percentile_values = all_stats.filter_by_percentiles(&percentiles);
 
     // Display table with representative values
-    let rows: Vec<_> = percentile_values
-        .iter()
-        .map(|(value, (percentile, stats))| table::SurvivalTableRow {
-            label: format!("{:<10} {value:>10}", format!("P{:}", percentile * 100.0),),
-            stats,
-        })
-        .collect();
+    let rows = SurvivalTableRow::from_map(
+        percentile_values
+            .iter()
+            .map(|(value, (percentiles, stats))| ((**value, percentiles), *stats)),
+        |(value, percentiles)| {
+            let percentiles = percentiles
+                .iter()
+                .map(|p| format!("P{:}", p * 100.0))
+                .collect::<Vec<_>>()
+                .join("/");
+            format!("{percentiles:<10} {value:>10}")
+        },
+    );
 
     println!("{} ({})", feature.name(), feature.id());
     table::print_survival_table(

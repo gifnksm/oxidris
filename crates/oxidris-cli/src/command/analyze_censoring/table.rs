@@ -15,6 +15,23 @@ pub(super) struct SurvivalTableRow<'a> {
     pub stats: &'a SurvivalStats,
 }
 
+impl<'a> SurvivalTableRow<'a> {
+    /// Create a new `SurvivalTableRow`
+    pub fn new(label: String, stats: &'a SurvivalStats) -> Self {
+        SurvivalTableRow { label, stats }
+    }
+
+    pub fn from_map<K, M, F>(map: M, mut label: F) -> Vec<Self>
+    where
+        M: IntoIterator<Item = (K, &'a SurvivalStats)>,
+        F: FnMut(K) -> String,
+    {
+        map.into_iter()
+            .map(|(k, stats)| SurvivalTableRow::new(label(k), stats))
+            .collect()
+    }
+}
+
 /// Print table header
 ///
 /// # Arguments
@@ -87,7 +104,7 @@ fn print_survival_table_row(row: &SurvivalTableRow, include_km: bool) {
             .map(|km| (km - stats.mean_all) / stats.mean_all * 100.0)
             .map_or("N/A".to_string(), |pct| format!("{pct:+.1}%"));
 
-        writeln!(&mut row, " {median_str:>12} {km_vs_all_str:>12}").unwrap();
+        write!(&mut row, " {median_str:>12} {km_vs_all_str:>12}").unwrap();
     }
     println!("  {row}");
 }

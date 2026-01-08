@@ -7,7 +7,7 @@ mod feature;
 //mod stats;
 mod table;
 
-use std::{collections::BTreeMap, fs::File, io::Write, ops::Range, path::PathBuf};
+use std::{collections::BTreeMap, fmt, fs::File, io::Write, ops::Range, path::PathBuf};
 
 use anyhow::Context;
 use clap::Args;
@@ -76,7 +76,7 @@ pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
     // Compute statistics for all features (reused for display, CSV, and normalization)
     let mut feature_stats = Vec::new();
     for feature in &target_features {
-        let stats = feature::collect_feature_survival_stats(feature, sessions);
+        let stats = SurvivalStatsMap::collect_by_feature_value(sessions, feature);
         feature::display_feature_statistics(feature, &stats);
 
         // Save CSV files if output directory specified
@@ -207,6 +207,12 @@ enum Phase {
     VeryLate,
 }
 
+impl fmt::Display for Phase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
 impl Phase {
     fn to_str(self) -> &'static str {
         match self {
@@ -244,18 +250,10 @@ fn analyze_by_capture_phase(sessions: &[SessionData], max_turns: usize) {
         Phase::from_turn(board.turn, max_turns)
     });
 
-    let rows: Vec<_> = phase_stats
-        .map
-        .iter()
-        .map(|(phase, stats)| SurvivalTableRow {
-            label: format!(
-                "{:<10} {:<10}",
-                phase.to_str(),
-                format!("{:4?}", phase.range(max_turns))
-            ),
-            stats,
-        })
-        .collect();
+    let rows = SurvivalTableRow::from_map(&phase_stats.map, |phase| {
+        let range = format!("{:4?}", phase.range(max_turns));
+        format!("{phase:<10} {range:<10}")
+    });
 
     println!("Censoring by Capture Phase");
     table::print_survival_table(&format!("{:<10} {:<10}", "Phase", "Range"), rows, false);
@@ -266,14 +264,7 @@ fn analyze_by_evaluator(sessions: &[SessionData]) {
         session.placement_evaluator.clone()
     });
 
-    let rows: Vec<_> = evaluator_stats
-        .map
-        .iter()
-        .map(|(evaluator, stats)| SurvivalTableRow {
-            label: evaluator.clone(),
-            stats,
-        })
-        .collect();
+    let rows = SurvivalTableRow::from_map(&evaluator_stats.map, Clone::clone);
 
     println!("Censoring by Evaluator");
     table::print_survival_table("Evaluator", rows, true);
