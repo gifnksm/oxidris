@@ -325,14 +325,14 @@ complete, FeatureBuilder integration started.
 
 ## Completed Work
 
-- ✅ Designed MappedNormalized<S> type (Phase 3)
+- ✅ Designed TableTransform<S> type (Phase 3)
 - ✅ Defined coexistence strategy with RawNormalized
 - ✅ Created feature naming convention
 - ✅ Updated roadmap.md with decisions
 
 ## Pending Work
 
-- ⬜ Implement MappedNormalized type in evaluator crate
+- ⬜ Implement TableTransform type in evaluator crate
 - ⬜ Integrate with FeatureBuilder
 - ⬜ Add training tool support
 - ⬜ Validation and testing
@@ -344,7 +344,7 @@ complete, FeatureBuilder integration started.
 
 ## Next Steps
 
-Start with implementing MappedNormalized<S> in:
+Start with implementing TableTransform<S> in:
 `crates/oxidris-evaluator/src/board_feature/normalized.rs`
 
 Reference Phase 4 tasks in:
@@ -352,7 +352,7 @@ Reference Phase 4 tasks in:
 
 ## Notes
 
-Decision: Use MappedNormalized<S> name instead of KMNormalized
+Decision: Use TableTransform<S> name instead of KMNormalized
 to allow future non-KM mappings (log, sqrt, etc.)
 ```
 

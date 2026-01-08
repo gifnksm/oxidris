@@ -233,7 +233,7 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
 ### Current Project Status
 
 - **Active:** KM-Based Survival Feature Normalization (Phase 4)
-- **Phase 3:** Design complete (2026-01-06) - `MappedNormalized<S>` type, feature naming, coexistence strategy
+- **Phase 3:** Design complete (2026-01-06) - `TableTransform<S>` type, feature naming, coexistence strategy
 - **Phase 4:** Implementation - type, FeatureBuilder integration, training tools
 - **Focus:** Survival features (holes, height) only
 - See [KM Project Docs](docs/projects/km-feature-transform/) for details

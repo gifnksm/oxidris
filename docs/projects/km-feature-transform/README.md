@@ -172,14 +172,14 @@ These features have clear, direct impact on survival time, making KM-based norma
 
 #### Phase 3: Infrastructure (2026-01-06) - Design Complete
 
-- `MappedNormalized<S>` type design
-  - Separate type from `LinearNormalized<S>` with `BTreeMap<u32, f32>` mapping
+- `TableTransform<S>` type design
+  - Separate type from `RawTransform<S>` with `BTreeMap<u32, f32>` mapping
   - Clipping logic for out-of-range values (clip to min/max key)
 - `FeatureProcessing` integration design
-  - `MappedNormalized` variant for serialization
+  - `TableTransform` variant for serialization
 - Feature naming convention
-  - Linear: `*_linear_penalty`, `*_linear_risk`
-  - Mapped (KM): `*_km_penalty`
+  - Linear: `*_raw_penalty`, `*_raw_risk`
+  - Mapped (KM): `*_table_km`
   - Feature set coexistence strategy
 - Model selection mechanism
   - Model name determines feature set (`aggro_linear` vs `aggro_km`)
@@ -187,23 +187,43 @@ These features have clear, direct impact on survival time, making KM-based norma
 
 ### 📋 Not Started (Phase 4)
 
-- Implement `MappedNormalized<S>` type
+- Implement `TableTransform<S>` type
   - Type with `BTreeMap<u32, f32>` mapping field
   - `transform()` with clipping logic
   - `BoardFeature` trait implementation
-- Add `MappedNormalized` variant to `FeatureProcessing` enum
+- Add `TableTransform` variant to `FeatureProcessing` enum
 - Extend `FeatureBuilder` for mapped features
   - Construct both linear and mapped feature sets
   - Feature set selection logic
 - Implement KM-based survival features
-  - `num_holes_km_penalty`, `sum_of_hole_depth_km_penalty`
-  - `max_height_km_penalty`, `center_column_max_height_km_penalty`, `total_height_km_penalty`
+  - `num_holes_table_km`, `sum_of_hole_depth_table_km`
+  - `max_height_table_km`, `center_column_max_height_table_km`, `total_height_table_km`
 - Update training tools for model name-based feature set selection
 - Update `analyze-board-features` to display both feature sets
 - Train and benchmark KM-based evaluator
 - Validate improvements over linear normalization
 
-## Recent Changes (2026-01-06)
+## Recent Changes
+
+### 2026-01-08: Feature Naming Convention Update
+
+Renamed types and features to better reflect their transformation approach:
+
+- **Types**:
+  - `LinearNormalized<S>` → `RawTransform<S>` (emphasizes minimal transformation of raw values)
+  - `MappedNormalized<S>` → `TableTransform<S>` (describes lookup table-based transformation)
+
+- **Enum variants**:
+  - `FeatureProcessing::LinearNormalized` → `FeatureProcessing::RawTransform`
+
+- **Feature IDs**:
+  - `*_linear_penalty` → `*_raw_penalty` (e.g., `num_holes_raw_penalty`)
+  - `*_linear_risk` → `*_raw_risk` (e.g., `max_height_raw_risk`)
+  - `*_km_penalty` → `*_table_km` (planned, e.g., `num_holes_table_km`)
+
+**Rationale**: "Raw" better describes the minimal `raw as f32` transformation, while "table" explicitly indicates lookup-based transformation. This naming makes the distinction between transformation methods clearer.
+
+### 2026-01-06: Evaluator Architecture Refactoring
 
 The evaluator system underwent major refactoring:
 
@@ -283,8 +303,8 @@ cargo run --release -- analyze-board-features \
 
 **Feature Set Coexistence:**
 
-- Linear features (`*_linear_penalty`, `*_linear_risk`) remain available for backward compatibility
-- KM features (`*_km_penalty`) are added as a new feature set
+- Linear features (`*_raw_penalty`, `*_raw_risk`) remain available for backward compatibility
+- KM features (`*_table_km`) are added as a new feature set
 - Model name determines which feature set is used during training
 - Analysis tools can display both for comparison
 
@@ -294,10 +314,10 @@ See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
 ### Phase 4: Implement Survival Features
 
-1. Implement `MappedNormalized<S>` type with clipping logic
-2. Add `MappedNormalized` variant to `FeatureProcessing` enum
+1. Implement `TableTransform<S>` type with clipping logic
+2. Add `TableTransform` variant to `FeatureProcessing` enum
 3. Extend `FeatureBuilder` to construct mapped features
-4. Implement KM-based survival features (`*_km_penalty`)
+4. Implement KM-based survival features (`*_table_km`)
 5. Update training tools for model name-based feature set selection
 6. Update `analyze-board-features` to display both linear and KM features
 7. Train KM-based evaluator and compare with linear baseline

@@ -12,11 +12,11 @@
 //!
 //! Features follow a naming convention based on their behavior:
 //!
-//! - **Penalty**: Smooth negative signals across the full range (e.g., `num_holes_linear_penalty`)
+//! - **Penalty**: Smooth negative signals across the full range (e.g., `num_holes_raw_penalty`)
 //!   - Uses P05-P95 normalization for continuous feedback throughout the game
 //!   - Applied to general board quality metrics without critical thresholds
 //!
-//! - **Risk**: Thresholded negative signals for dangerous states (e.g., `max_height_linear_risk`)
+//! - **Risk**: Thresholded negative signals for dangerous states (e.g., `max_height_raw_risk`)
 //!   - Uses P75-P95 normalization to focus on high-risk scenarios
 //!   - Ignores safe values (below P75), only penalizes approaching danger zones
 //!   - Reflects situations where the metric is only concerning at extreme values
@@ -56,9 +56,9 @@
 //!
 //! **1. Duplicate features with different normalization ranges:**
 //!
-//! - `max_height_linear_penalty` (P05-P95) vs `max_height_linear_risk` (P75-P95)
-//! - `center_column_max_height_linear_penalty` vs `center_column_max_height_linear_risk`
-//! - `sum_of_well_depth_linear_penalty` vs `sum_of_well_depth_linear_risk`
+//! - `max_height_raw_penalty` (P05-P95) vs `max_height_raw_risk` (P75-P95)
+//! - `center_column_max_height_raw_penalty` vs `center_column_max_height_raw_risk`
+//! - `sum_of_well_depth_raw_penalty` vs `sum_of_well_depth_raw_risk`
 //!
 //! These exist as an ad-hoc workaround to approximate non-linearity through different
 //! scaling ranges. A systematic approach using non-linear transformations would be better.
@@ -103,7 +103,7 @@
 
 use oxidris_evaluator::board_feature::{
     BoardFeatureSource, BoxedBoardFeature, FeatureSignal, IWellReward, LineClearBonus,
-    LinearNormalized,
+    RawTransform,
     source::{
         CenterColumnMaxHeight, ColumnTransitions, EdgeIWellDepth, MaxHeight, NumClearedLines,
         NumHoles, RowTransitions, SumOfHoleDepth, SumOfWellDepth, SurfaceBumpiness,
@@ -136,20 +136,20 @@ impl FeatureBuilder {
     pub fn build_all_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
         Ok(vec![
             // Survival features
-            self.build_num_holes_linear_penalty()?,
-            self.build_sum_of_hole_depth_linear_penalty()?,
-            self.build_max_height_linear_penalty()?,
-            self.build_max_height_linear_risk()?,
-            self.build_center_column_max_height_linear_penalty()?,
-            self.build_center_column_max_height_linear_risk()?,
-            self.build_total_height_linear_penalty()?,
+            self.build_num_holes_raw_penalty()?,
+            self.build_sum_of_hole_depth_raw_penalty()?,
+            self.build_max_height_raw_penalty()?,
+            self.build_max_height_raw_risk()?,
+            self.build_center_column_max_height_raw_penalty()?,
+            self.build_center_column_max_height_raw_risk()?,
+            self.build_total_height_raw_penalty()?,
             // Structure features
-            self.build_surface_bumpiness_linear_penalty()?,
-            self.build_surface_roughness_linear_penalty()?,
-            self.build_row_transitions_linear_penalty()?,
-            self.build_column_transitions_linear_penalty()?,
-            self.build_well_depth_linear_penalty()?,
-            self.build_well_depth_linear_risk()?,
+            self.build_surface_bumpiness_raw_penalty()?,
+            self.build_surface_roughness_raw_penalty()?,
+            self.build_row_transitions_raw_penalty()?,
+            self.build_column_transitions_raw_penalty()?,
+            self.build_well_depth_raw_penalty()?,
+            self.build_well_depth_raw_risk()?,
             // Score features
             self.build_line_clear_bonus(),
             self.build_i_well_reward(),
@@ -170,16 +170,13 @@ impl FeatureBuilder {
     ///
     /// This approach provides gradual feedback across the entire game, making it suitable
     /// for general board quality metrics that don't have critical thresholds.
-    fn build_linear_penalty_for<S>(
-        &self,
-        source: &S,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError>
+    fn build_raw_penalty_for<S>(&self, source: &S) -> Result<BoxedBoardFeature, BuildFeatureError>
     where
         S: BoardFeatureSource,
     {
         let param = self.get_param(source)?;
-        Ok(Box::new(LinearNormalized::new(
-            format!("{}_linear_penalty", source.id()).into(),
+        Ok(Box::new(RawTransform::new(
+            format!("{}_raw_penalty", source.id()).into(),
             format!("{} (Linear Penalty)", source.name()).into(),
             FeatureSignal::Negative,
             param.value_percentiles.p05,
@@ -203,13 +200,13 @@ impl FeatureBuilder {
     /// This threshold-based approach reflects situations where the metric is only concerning
     /// at extreme values (e.g., top-out risk only matters near the ceiling). Values below P75
     /// are considered safe and map to 0.0.
-    fn build_linear_risk_for<S>(&self, source: &S) -> Result<BoxedBoardFeature, BuildFeatureError>
+    fn build_raw_risk_for<S>(&self, source: &S) -> Result<BoxedBoardFeature, BuildFeatureError>
     where
         S: BoardFeatureSource,
     {
         let param = self.get_param(source)?;
-        Ok(Box::new(LinearNormalized::new(
-            format!("{}_linear_risk", source.id()).into(),
+        Ok(Box::new(RawTransform::new(
+            format!("{}_raw_risk", source.id()).into(),
             format!("{} (Linear Risk)", source.name()).into(),
             FeatureSignal::Negative,
             param.value_percentiles.p75,
@@ -225,50 +222,48 @@ impl FeatureBuilder {
     ///
     /// # Feature ID
     ///
-    /// `num_holes_linear_penalty`
-    fn build_num_holes_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&NumHoles)
+    /// `num_holes_raw_penalty`
+    fn build_num_holes_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&NumHoles)
     }
 
     /// Build smooth penalty for cumulative hole depth (weighted by blocks above).
     ///
-    /// Penalizes deeply buried holes that are costly to clear. Unlike [`Self::build_num_holes_linear_penalty`],
+    /// Penalizes deeply buried holes that are costly to clear. Unlike [`Self::build_num_holes_raw_penalty`],
     /// this weights holes by their depth, making deeply buried holes contribute more to the penalty.
     /// Uses P05-P95 normalization for continuous feedback.
     ///
     /// # Feature ID
     ///
-    /// `sum_of_hole_depth_linear_penalty`
-    fn build_sum_of_hole_depth_linear_penalty(
-        &self,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&SumOfHoleDepth)
+    /// `sum_of_hole_depth_raw_penalty`
+    fn build_sum_of_hole_depth_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&SumOfHoleDepth)
     }
 
     /// Build smooth penalty for maximum column height.
     ///
     /// Penalizes the tallest column throughout the game, providing continuous feedback on
-    /// localized vertical pressure. Complements [`Self::build_max_height_linear_risk`] which focuses
+    /// localized vertical pressure. Complements [`Self::build_max_height_raw_risk`] which focuses
     /// on imminent top-out danger. Uses P05-P95 normalization.
     ///
     /// # Feature ID
     ///
-    /// `max_height_linear_penalty`
-    fn build_max_height_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&MaxHeight)
+    /// `max_height_raw_penalty`
+    fn build_max_height_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&MaxHeight)
     }
 
     /// Build thresholded risk for imminent top-out based on maximum height.
     ///
-    /// Focuses on dangerous states close to the ceiling. Unlike [`Self::build_max_height_linear_penalty`],
+    /// Focuses on dangerous states close to the ceiling. Unlike [`Self::build_max_height_raw_penalty`],
     /// this ignores most of the game (below P75) and only penalizes approaching the ceiling,
     /// reflecting the irreversible nature of top-out. Uses P75-P95 normalization.
     ///
     /// # Feature ID
     ///
-    /// `max_height_linear_risk`
-    fn build_max_height_linear_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_risk_for(&MaxHeight)
+    /// `max_height_raw_risk`
+    fn build_max_height_raw_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_risk_for(&MaxHeight)
     }
 
     /// Build smooth penalty for center column height (columns 3-6).
@@ -279,26 +274,26 @@ impl FeatureBuilder {
     ///
     /// # Feature ID
     ///
-    /// `center_column_max_height_linear_penalty`
-    fn build_center_column_max_height_linear_penalty(
+    /// `center_column_max_height_raw_penalty`
+    fn build_center_column_max_height_raw_penalty(
         &self,
     ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&CenterColumnMaxHeight)
+        self.build_raw_penalty_for(&CenterColumnMaxHeight)
     }
 
     /// Build thresholded risk for center column top-out.
     ///
     /// Focuses on dangerous center column height that threatens early top-out. Uses the same
-    /// thresholded approach as [`Self::build_max_height_linear_risk`] but specifically for the center
+    /// thresholded approach as [`Self::build_max_height_raw_risk`] but specifically for the center
     /// 4 columns. Uses P75-P95 normalization.
     ///
     /// # Feature ID
     ///
-    /// `center_column_max_height_linear_risk`
-    fn build_center_column_max_height_linear_risk(
+    /// `center_column_max_height_raw_risk`
+    fn build_center_column_max_height_raw_risk(
         &self,
     ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_risk_for(&CenterColumnMaxHeight)
+        self.build_raw_risk_for(&CenterColumnMaxHeight)
     }
 
     /// Build smooth penalty for total height (sum of all column heights).
@@ -309,9 +304,9 @@ impl FeatureBuilder {
     ///
     /// # Feature ID
     ///
-    /// `total_height_linear_penalty`
-    fn build_total_height_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&TotalHeight)
+    /// `total_height_raw_penalty`
+    fn build_total_height_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&TotalHeight)
     }
 
     /// Build smooth penalty for horizontal fragmentation (row transitions).
@@ -321,9 +316,9 @@ impl FeatureBuilder {
     ///
     /// # Feature ID
     ///
-    /// `row_transitions_linear_penalty`
-    fn build_row_transitions_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&RowTransitions)
+    /// `row_transitions_raw_penalty`
+    fn build_row_transitions_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&RowTransitions)
     }
 
     /// Build smooth penalty for vertical fragmentation (column transitions).
@@ -333,11 +328,9 @@ impl FeatureBuilder {
     ///
     /// # Feature ID
     ///
-    /// `column_transitions_linear_penalty`
-    fn build_column_transitions_linear_penalty(
-        &self,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&ColumnTransitions)
+    /// `column_transitions_raw_penalty`
+    fn build_column_transitions_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&ColumnTransitions)
     }
 
     /// Build smooth penalty for surface height variation (first-order differences).
@@ -347,53 +340,49 @@ impl FeatureBuilder {
     ///
     /// # Feature ID
     ///
-    /// `surface_bumpiness_linear_penalty`
-    fn build_surface_bumpiness_linear_penalty(
-        &self,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&SurfaceBumpiness)
+    /// `surface_bumpiness_raw_penalty`
+    fn build_surface_bumpiness_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&SurfaceBumpiness)
     }
 
     /// Build smooth penalty for local surface curvature (second-order differences).
     ///
     /// Penalizes small-scale surface unevenness using discrete Laplacian (second-order differences).
-    /// More sensitive to local irregularities than [`Self::build_surface_bumpiness_linear_penalty`]
+    /// More sensitive to local irregularities than [`Self::build_surface_bumpiness_raw_penalty`]
     /// while tolerating gradual slopes. Uses P05-P95 normalization.
     ///
     /// # Feature ID
     ///
-    /// `surface_roughness_linear_penalty`
-    fn build_surface_roughness_linear_penalty(
-        &self,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&SurfaceRoughness)
+    /// `surface_roughness_raw_penalty`
+    fn build_surface_roughness_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&SurfaceRoughness)
     }
 
     /// Build smooth penalty for well depth beyond safe threshold.
     ///
     /// Penalizes over-committed vertical wells throughout the game. Only wells deeper than 1
     /// are considered (shallow wells are allowed for controlled play). Complements
-    /// [`Self::build_well_depth_linear_risk`] which focuses on extreme well depth. Uses P05-P95
+    /// [`Self::build_well_depth_raw_risk`] which focuses on extreme well depth. Uses P05-P95
     /// normalization.
     ///
     /// # Feature ID
     ///
-    /// `sum_of_well_depth_linear_penalty`
-    fn build_well_depth_linear_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_penalty_for(&SumOfWellDepth)
+    /// `sum_of_well_depth_raw_penalty`
+    fn build_well_depth_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_penalty_for(&SumOfWellDepth)
     }
 
     /// Build thresholded risk for dangerously deep wells.
     ///
     /// Focuses on extreme well depth that threatens board flexibility. Unlike
-    /// [`Self::build_well_depth_linear_penalty`], this ignores moderate wells and only penalizes
+    /// [`Self::build_well_depth_raw_penalty`], this ignores moderate wells and only penalizes
     /// wells beyond safe operational limits. Uses P75-P95 normalization.
     ///
     /// # Feature ID
     ///
-    /// `sum_of_well_depth_linear_risk`
-    fn build_well_depth_linear_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_linear_risk_for(&SumOfWellDepth)
+    /// `sum_of_well_depth_raw_risk`
+    fn build_well_depth_raw_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
+        self.build_raw_risk_for(&SumOfWellDepth)
     }
 
     /// Build discrete bonus for line clears with emphasis on 4-line tetrises.

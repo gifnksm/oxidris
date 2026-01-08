@@ -117,25 +117,27 @@ This roadmap outlines the development of KM-based normalization for **survival f
 - [x] Implement data structures for normalization parameters
 - [x] Implement normalization parameter generation from gameplay data
 - [x] Create tools to generate `data/normalization_params.json`
-- [x] Design `MappedNormalized<S>` type
-  - Separate type from `LinearNormalized<S>` with mapping-based transform
+- [x] Design `TableTransform<S>` type
+  - Separate type from `RawTransform<S>` with mapping-based transform
   - Uses `BTreeMap<u32, f32>` for raw → transformed value lookup
   - Clipping behavior for out-of-range values (clip to min/max key)
   - Follows `FeatureBuilder` construction pattern (established 2026-01-06)
 - [x] Design `FeatureProcessing` integration
-  - Add `MappedNormalized` variant to enum for serialization
+  - Add `TableTransform` variant to enum for serialization
 - [x] Define feature naming convention
-  - Linear features: `*_linear_penalty`, `*_linear_risk`
-  - Mapped (KM) features: `*_km_penalty`
+  - Linear features: `*_raw_penalty`, `*_raw_risk` (renamed from `*_linear_penalty`, `*_linear_risk`)
+  - Mapped (KM) features: `*_table_km` (renamed from planned `*_km_penalty`)
+  - Type names: `RawTransform<S>` (renamed from `LinearNormalized<S>`), `TableTransform<S>` (renamed from `MappedNormalized<S>`)
   - Feature set selection via model name (`aggro_linear` vs `aggro_km`)
 
 **Key Decisions:**
 
-- **Type Structure**: `MappedNormalized<S>` as separate type (not extension of `LinearNormalized<S>`)
+- **Type Structure**: `TableTransform<S>` as separate type (not extension of `RawTransform<S>`)
 - **Lookup Table**: `BTreeMap<u32, f32>` for flexibility with sparse mappings
 - **Clipping**: Out-of-range values clip to nearest boundary (min/max key in mapping)
 - **Feature Coexistence**: Keep linear features, add KM features as new set
 - **Model Selection**: Model name determines feature set (`aggro_linear` vs `aggro_km`)
+- **Naming Convention**: `raw` for minimal transformation, `table` for lookup-based transformation, `km` for KM survival analysis method
 
 **Deliverables:**
 
@@ -157,24 +159,24 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 **Tasks:**
 
-- [ ] Implement `MappedNormalized<S>` type
+- [ ] Implement `TableTransform<S>` type
   - Implement type with `BTreeMap<u32, f32>` mapping field
   - Implement `transform()` with clipping logic for out-of-range values
   - Implement `BoardFeature` trait
 
-- [ ] Add `MappedNormalized` variant to `FeatureProcessing` enum
+- [ ] Add `TableTransform` variant to `FeatureProcessing` enum
   - Add variant with mapping, signal, and normalization range fields
   - Update serialization/deserialization
   - Update `apply()` method for feature reconstruction
 
 - [ ] Extend `FeatureBuilder` for mapped features
-  - Add method to construct `MappedNormalized<S>` from KM normalization parameters
+  - Add method to construct `TableTransform<S>` from KM normalization parameters
   - Support building both linear and mapped feature sets
   - Implement feature set selection logic
 
 - [ ] Implement KM-based survival features
-  - `num_holes_km_penalty`, `sum_of_hole_depth_km_penalty` (holes directly cause game over)
-  - `max_height_km_penalty`, `center_column_max_height_km_penalty`, `total_height_km_penalty` (height determines available space)
+  - `num_holes_table_km`, `sum_of_hole_depth_table_km` (holes directly cause game over)
+  - `max_height_table_km`, `center_column_max_height_table_km`, `total_height_table_km` (height determines available space)
   - Use KM transform to capture non-linear survival relationships
 
 - [ ] Update training tools for feature set selection
@@ -203,7 +205,7 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 **Deliverables:**
 
-- `MappedNormalized<S>` type implementation
+- `TableTransform<S>` type implementation
 - KM-based survival features integrated with trait system
 - Trained KM-based evaluator
 - Both linear and KM feature sets available for comparison

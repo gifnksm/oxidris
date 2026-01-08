@@ -1,7 +1,7 @@
 //! Feature source types for extracting raw values from board states.
 //!
 //! These types implement [`BoardFeatureSource`] and define how to extract raw measurements
-//! from placement analysis. They are wrapped by feature types (e.g., [`super::LinearNormalized`],
+//! from placement analysis. They are wrapped by feature types (e.g., [`super::RawTransform`],
 //! [`super::LineClearBonus`]) to provide transformation and normalization.
 
 use crate::{board_feature::BoardFeatureSource, placement_analysis::PlacementAnalysis};

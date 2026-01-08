@@ -34,7 +34,7 @@
 //!
 //! Feature sources are wrapped by feature types that provide transformation and normalization:
 //!
-//! - [`LinearNormalized`] - Linear transformation with percentile-based normalization
+//! - [`RawTransform`] - Linear transformation with percentile-based normalization
 //! - [`LineClearBonus`] - Discrete bonus mapping for line clears
 //! - [`IWellReward`] - Triangular reward for optimal I-well depth
 //!
@@ -263,16 +263,16 @@ impl BoardFeature for BoxedBoardFeature {
 ///
 /// - **P75-P95**: Thresholded penalties/rewards for dangerous states
 ///   - Ignores safe values (below P75), only penalizes high-risk scenarios
-///   - Used for critical metrics (e.g., `max_height_linear_risk`, `sum_of_well_depth_linear_risk`)
+///   - Used for critical metrics (e.g., `max_height_raw_risk`, `sum_of_well_depth_raw_risk`)
 ///
 /// # Example
 ///
 /// ```rust,no_run
-/// use oxidris_evaluator::board_feature::{FeatureSignal, LinearNormalized, source::NumHoles};
+/// use oxidris_evaluator::board_feature::{FeatureSignal, RawTransform, source::NumHoles};
 /// use std::borrow::Cow;
 ///
 /// // Create a penalty feature for holes with P05-P95 normalization
-/// let feature = LinearNormalized::new(
+/// let feature = RawTransform::new(
 ///     Cow::Borrowed("holes_penalty"),
 ///     Cow::Borrowed("Holes Penalty"),
 ///     FeatureSignal::Negative, // Lower holes is better
@@ -282,7 +282,7 @@ impl BoardFeature for BoxedBoardFeature {
 /// );
 /// ```
 #[derive(Debug, Clone)]
-pub struct LinearNormalized<S> {
+pub struct RawTransform<S> {
     id: Cow<'static, str>,
     name: Cow<'static, str>,
     signal: FeatureSignal,
@@ -291,7 +291,7 @@ pub struct LinearNormalized<S> {
     source: S,
 }
 
-impl<S> LinearNormalized<S> {
+impl<S> RawTransform<S> {
     pub const fn new(
         id: Cow<'static, str>,
         name: Cow<'static, str>,
@@ -311,7 +311,7 @@ impl<S> LinearNormalized<S> {
     }
 }
 
-impl<S> BoardFeature for LinearNormalized<S>
+impl<S> BoardFeature for RawTransform<S>
 where
     S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
 {
@@ -328,7 +328,7 @@ where
     }
 
     fn feature_processing(&self) -> FeatureProcessing {
-        FeatureProcessing::LinearNormalized {
+        FeatureProcessing::RawTransform {
             signal: self.signal,
             normalize_min: self.normalize_min,
             normalize_max: self.normalize_max,
@@ -361,7 +361,7 @@ where
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureProcessing {
-    LinearNormalized {
+    RawTransform {
         signal: FeatureSignal,
         normalize_min: f32,
         normalize_max: f32,
@@ -381,11 +381,11 @@ impl FeatureProcessing {
         S: BoardFeatureSource + Clone + 'static,
     {
         match self {
-            Self::LinearNormalized {
+            Self::RawTransform {
                 signal,
                 normalize_min,
                 normalize_max,
-            } => Box::new(LinearNormalized::new(
+            } => Box::new(RawTransform::new(
                 id,
                 name,
                 *signal,

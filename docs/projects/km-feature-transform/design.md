@@ -60,14 +60,14 @@ The `BoardFeature` trait provides instance methods for `transform()` and `normal
 **Stage 1: Transform** (raw value → KM median)
 
 - Look up raw value in mapping table to get KM median survival time
-- Apply clipping for out-of-range values (see `MappedNormalized<S>` design below)
+- Apply clipping for out-of-range values (see `TableTransform<S>` design below)
 
 **Stage 2: Normalize** (KM median → 0-1)
 
 - Linear scaling using P05/P95 KM medians as bounds
-- Same normalization logic as `LinearNormalized<S>`, but applied to KM median values
+- Same normalization logic as `RawTransform<S>`, but applied to KM median values
 
-This two-stage approach is implemented in the `MappedNormalized<S>` type (see Integration section below).
+This two-stage approach is implemented in the `TableTransform<S>` type (see Integration section below).
 
 ### Why This Method?
 
@@ -250,22 +250,22 @@ This is useful for initializing feature weights to equalize their impact.
 
 ## Integration with BoardFeature Trait
 
-### MappedNormalized<S> Type Design
+### TableTransform<S> Type Design
 
-KM normalization is implemented as a separate type from `LinearNormalized<S>`:
+KM normalization is implemented as a separate type from `RawTransform<S>`:
 
-**Type Name:** `MappedNormalized<S>`
+**Type Name:** `TableTransform<S>`
 
 - Represents mapping-based transformation (lookup table)
 - Generic over feature source `S: BoardFeatureSource`
-- Parallel to `LinearNormalized<S>` but with different transform logic
+- Parallel to `RawTransform<S>` but with different transform logic
 
 **Key Concept:** Instead of `transform(raw) = raw as f32`, use a lookup table: `transform(raw) = mapping[raw]`
 
 **Data Structure:**
 
 ```rust
-pub struct MappedNormalized<S> {
+pub struct TableTransform<S> {
     id: Cow<'static, str>,
     name: Cow<'static, str>,
     signal: FeatureSignal,
@@ -323,16 +323,20 @@ The `FeatureBuilder` would construct features with KM mapping data, similar to h
 
 ### FeatureProcessing Integration
 
+> [!NOTE]
+> **Implementation Status:** The `TableTransform` variant described below is part of Phase 4 and not yet implemented.
+> Current implementation (as of 2026-01-06) only includes the `RawTransform` variant.
+
 Add a new variant to the `FeatureProcessing` enum:
 
 ```rust
 pub enum FeatureProcessing {
-    LinearNormalized {
+    RawTransform {  // Current: matches RawTransform<S> type name
         signal: FeatureSignal,
         normalize_min: f32,
         normalize_max: f32,
     },
-    MappedNormalized {
+    TableTransform {  // Phase 4: Not yet implemented, will match TableTransform<S> type name
         signal: FeatureSignal,
         mapping: BTreeMap<u32, f32>,
         normalize_min: f32,
@@ -351,15 +355,37 @@ To support coexistence of linear and mapped features:
 
 **Linear Features (existing):**
 
-- `num_holes_linear_penalty`
-- `max_height_linear_penalty`
-- `max_height_linear_risk`
+- `num_holes_raw_penalty`
+- `max_height_raw_penalty`
+- `max_height_raw_risk`
 
 **Mapped Features (new - KM-based):**
 
-- `num_holes_km_penalty`
-- `max_height_km_penalty`
-- `sum_of_hole_depth_km_penalty`
+- `num_holes_table_km`
+- `max_height_table_km`
+- `sum_of_hole_depth_table_km`
+
+**Naming Rationale:**
+
+- **`raw`** - Reflects that `RawTransform<S>` applies minimal transformation (`raw as f32`) before normalization
+  - Renamed from `linear` to emphasize the raw measurement aspect
+  - `linear` was ambiguous (linear transform? linear normalization? both?)
+  - `raw` clearly indicates "minimally processed raw value"
+
+- **`table`** - Indicates that `TableTransform<S>` uses a lookup table for transformation
+  - Reflects the implementation detail (`BTreeMap<u32, f32>` mapping)
+  - More descriptive than `mapped` (which could mean many things)
+  - Distinguishes from other potential mapping approaches
+
+- **`km`** - Specifies the transformation method (Kaplan-Meier survival analysis)
+  - Renamed from `km_penalty` to `table_km` for consistency with transform type
+  - Makes the data source explicit (KM-based normalization parameters)
+  - Distinguishes from potential future transformations (e.g., `table_cox` for Cox regression)
+
+- **`penalty` vs `risk`** - Semantic distinction in normalization range
+  - `penalty` uses P05-P95 (continuous feedback across full range)
+  - `risk` uses P75-P95 (thresholded, only penalizes dangerous states)
+  - These suffixes remain only for `raw` features; KM features eliminate the need for duplicates
 
 **Benefits:**
 
@@ -522,7 +548,7 @@ Following the current `FeatureBuilder` pattern (established 2026-01-06):
 ### Design Decisions Summary
 
 1. **Type Structure:** ✅ Decided
-   - New type: `MappedNormalized<S>` (separate from `LinearNormalized<S>`)
+   - New type: `TableTransform<S>` (separate from `RawTransform<S>`)
    - Rationale: Different transform logic, clearer separation of concerns
 
 2. **Lookup Table:** ✅ Decided
@@ -535,12 +561,12 @@ Following the current `FeatureBuilder` pattern (established 2026-01-06):
    - Gracefully handles extreme values
 
 4. **FeatureProcessing Integration:** ✅ Decided
-   - Add `MappedNormalized` variant with mapping field
+   - Add `TableTransform` variant with mapping field
    - Enables model serialization and feature reconstruction
 
 5. **Feature Naming:** ✅ Decided
-   - Linear: `*_linear_penalty`, `*_linear_risk`
-   - Mapped (KM): `*_km_penalty`
+   - Linear: `*_raw_penalty`, `*_raw_risk`
+   - Mapped (KM): `*_table_km`
    - Both coexist; selection via model name
 
 6. **Feature Set Strategy:** ✅ Decided
@@ -553,10 +579,10 @@ Following the current `FeatureBuilder` pattern (established 2026-01-06):
 
 Phase 3 design is now complete. Phase 4 implementation tasks:
 
-1. Implement `MappedNormalized<S>` type with clipping logic
-2. Add `MappedNormalized` variant to `FeatureProcessing` enum
+1. Implement `TableTransform<S>` type with clipping logic
+2. Add `TableTransform` variant to `FeatureProcessing` enum
 3. Extend `FeatureBuilder` to construct mapped features
-4. Implement KM-based survival features (`*_km_penalty`)
+4. Implement KM-based survival features (`*_table_km`)
 5. Update training tools to support model name-based feature set selection
 6. Update `analyze-board-features` to display both feature sets
 
