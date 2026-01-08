@@ -147,69 +147,128 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 ---
 
-## Phase 4: Survival Features with KM Normalization 📋
+## Phase 4: Survival Features with KM Normalization ✅
+
+**Status:** Completed (2026-01-08)
+
+**Objectives:**
+
+1. ✅ Apply KM-based normalization to survival features (holes, height)
+2. 📋 Train and validate evaluator using KM-normalized survival features (Phase 5)
+3. 📋 Demonstrate that KM normalization improves survival prediction (Phase 5)
+
+**Completed:**
+
+- [x] Implement `TableTransform<S>` type
+  - Implemented with `Vec<f32>` lookup table (P05-P95 range)
+  - `transform()` with clamping logic for out-of-range values
+  - Full `BoardFeature` trait implementation
+  - Edge case handling (zero division in normalization)
+
+- [x] Add `TableTransform` variant to `FeatureProcessing` enum
+  - Added variant with serializable parameters
+  - Proper serialization/deserialization support
+  - Integration with feature reconstruction
+
+- [x] Extend `FeatureBuilder` for table-based features
+  - `build_table_km_for()` constructs `TableTransform<S>` from normalization parameters
+  - `build_all_features()` builds both raw and table features
+  - `build_raw_features()` builds only raw features
+  - `FeatureSet` enum for feature selection
+
+- [x] Implement KM-based survival features
+  - `num_holes_table_km`, `sum_of_hole_depth_table_km`
+  - `max_height_table_km`, `center_column_max_height_table_km`, `total_height_table_km`
+  - All features use KM median survival time as transformation
+
+- [x] Update CLI tools for feature set selection
+  - `train-ai` uses `FeatureSet::Raw` (backward compatible)
+  - `analyze-board-features` uses `FeatureSet::All` (displays both)
+  - `build_feature_from_session()` utility performs complete pipeline
+
+- [x] Implement survival statistics pipeline
+  - `SurvivalStatsMap::collect_by_feature_value()` groups by feature value
+  - KM median calculation with proper censoring handling
+  - Linear interpolation for missing KM median values
+  - P05-P95 percentile-based table range selection
+  - `SurvivalTable::from_survival_stats()` generates lookup tables
+
+- [x] Update `analyze-board-features` for dual feature sets
+  - Automatically builds both raw and table features
+  - Interactive TUI displays all features
+  - Side-by-side comparison enabled
+
+**Implementation Details:**
+
+- **Table Structure**: `Vec<f32>` covering P05-P95 feature value range
+  - Index = `raw_value - feature_min_value`
+  - Out-of-range values clamped to table boundaries
+  - Linear interpolation fills gaps in KM median data
+
+- **Normalization**: Two-stage pipeline
+  - Stage 1: `transform()` - raw value → survival time (via table lookup)
+  - Stage 2: `normalize()` - survival time → [0, 1] (using survival range)
+
+- **Feature Set Management**:
+  - Training uses `FeatureSet::Raw` (established raw features)
+  - Analysis uses `FeatureSet::All` (both raw and table for comparison)
+
+**Deliverables:**
+
+- ✅ `TableTransform<S>` type fully implemented
+- ✅ KM-based survival features integrated with trait system
+- ✅ Both raw and table feature sets available
+- ✅ CLI tools updated for feature set selection
+- 📋 Training validation (moved to Phase 5)
+
+---
+
+## Phase 5: Validation and Training 📋
 
 **Status:** Not Started
 
 **Objectives:**
 
-1. Apply KM-based normalization to survival features (holes, height)
-2. Train and validate evaluator using KM-normalized survival features
-3. Demonstrate that KM normalization improves survival prediction
+1. Train evaluator using KM-based survival features
+2. Validate that KM transform captures non-linear relationships
+3. Compare KM-based evaluator performance vs. raw baseline
+4. Measure feature correlation with survival time
+5. Analyze learned weights for interpretability
 
 **Tasks:**
 
-- [ ] Implement `TableTransform<S>` type
-  - Implement type with `BTreeMap<u32, f32>` mapping field
-  - Implement `transform()` with clipping logic for out-of-range values
-  - Implement `BoardFeature` trait
+- [ ] Train KM-based evaluator
+  - Modify `train-ai` to support `FeatureSet::All` option
+  - Train with table-based KM features
+  - Save trained model for comparison
 
-- [ ] Add `TableTransform` variant to `FeatureProcessing` enum
-  - Add variant with mapping, signal, and normalization range fields
-  - Update serialization/deserialization
-  - Update `apply()` method for feature reconstruction
+- [ ] Benchmark and compare
+  - Compare survival time: KM-based vs. raw-based evaluator
+  - Measure training convergence speed
+  - Analyze feature weight distributions
 
-- [ ] Extend `FeatureBuilder` for mapped features
-  - Add method to construct `TableTransform<S>` from KM normalization parameters
-  - Support building both linear and mapped feature sets
-  - Implement feature set selection logic
+- [ ] Validate feature effectiveness
+  - Measure correlation between features and survival time
+  - Verify non-linear transformation captures actual relationships
+  - Compare KM transform vs. raw transform for each feature
 
-- [ ] Implement KM-based survival features
-  - `num_holes_table_km`, `sum_of_hole_depth_table_km` (holes directly cause game over)
-  - `max_height_table_km`, `center_column_max_height_table_km`, `total_height_table_km` (height determines available space)
-  - Use KM transform to capture non-linear survival relationships
+- [ ] Analyze interpretability
+  - Check if learned weights correlate with survival ranges
+  - Verify that features with larger survival impact get higher weights
+  - Document findings and insights
 
-- [ ] Update training tools for feature set selection
-  - Support model name-based feature set selection (`aggro_linear` vs `aggro_km`)
-  - Keep linear features for backward compatibility
-  - Add KM features as new feature set
-
-- [ ] Update `analyze-board-features` for dual feature sets
-  - Display both linear and KM features
-  - Enable side-by-side comparison
-  - Show transformation differences
-
-- [ ] Validate survival feature effectiveness
-  - Analyze KM curves for each feature
-  - Measure correlation with survival time
-  - Compare KM transform vs. linear transform
-
-- [ ] Train and benchmark evaluator
-  - Train using KM-based survival features
-  - Compare performance vs. linear normalization
-  - Analyze learned weights and interpretability
-
-- [ ] Consider feature set cleanup (optional, after validation)
-  - Evaluate removing duplicate `*_risk` features if KM approach is validated
-  - Keep both linear and KM sets for comparison initially
+- [ ] Document results
+  - Record performance metrics
+  - Document lessons learned
+  - Decide on feature set for production use
 
 **Deliverables:**
 
-- `TableTransform<S>` type implementation
-- KM-based survival features integrated with trait system
-- Trained KM-based evaluator
-- Both linear and KM feature sets available for comparison
-- Validation analysis showing improvement over linear normalization
+- Trained KM-based evaluator model
+- Performance comparison report (KM vs. raw)
+- Feature correlation analysis
+- Weight interpretability analysis
+- Decision on feature set adoption
 
 ---
 
@@ -220,14 +279,22 @@ This roadmap outlines the development of KM-based normalization for **survival f
 - ✅ Normalization parameters successfully generated from gameplay data
 - ✅ Infrastructure ready for `BoardFeature` trait integration
 - ✅ KM curves show clear non-linear relationships for survival features
-- ✅ Design approach finalized (mapping-based transform)
+- ✅ Design approach finalized (table-based transform)
 
-### Phase 4: Survival Features (Project Goal)
+### Phase 4: Implementation ✅
 
-- Survival-based evaluator achieves ≥ current heuristic evaluator survival time
+- ✅ `TableTransform<S>` type successfully implemented
+- ✅ Both raw and table feature sets available
+- ✅ CLI tools support feature set selection
+- ✅ Survival statistics pipeline working correctly
+- ✅ Interactive analysis tool displays all features
+
+### Phase 5: Validation (Project Goal)
+
+- KM-based evaluator achieves ≥ raw-based evaluator survival time
 - Survival features show strong correlation with survival (|r| > 0.5)
-- KM transform shows clear improvement over linear transform
-- Learned weights are interpretable (correlate with feature km_range)
+- KM transform demonstrates measurable improvement over raw transform
+- Learned weights are interpretable (correlate with survival ranges)
 - Training converges in reasonable time (<1000 generations)
 
 ---
@@ -235,14 +302,15 @@ This roadmap outlines the development of KM-based normalization for **survival f
 ## Dependencies
 
 ```text
-Phase 1 → Phase 2 → Phase 3 → Phase 4 (Complete)
-                               ↓
-                          Future Work (separate projects)
+Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 (In Progress)
+                                          ↓
+                                     Future Work (separate projects)
 ```
 
 - Phase 1-2: Data generation and KM survival analysis (completed)
 - Phase 3: Infrastructure for KM normalization (completed 2026-01-06)
-- Phase 4: Survival features with KM normalization (project goal)
+- Phase 4: Implementation of table-based features (completed 2026-01-08)
+- Phase 5: Validation and training (project goal)
 - Future Work: Structure features, score optimization, advanced techniques (out of scope)
 
 ---

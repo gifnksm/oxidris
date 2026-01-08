@@ -12,7 +12,7 @@ use oxidris_training::genetic::{Individual, Population, PopulationEvolver};
 
 use crate::{
     model::ai_model::{AiModel, TrainedBoardFeature},
-    util::{self, Output},
+    util::{self, FeatureSet, Output},
 };
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, derive_more::FromStr)]
@@ -110,7 +110,7 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         }
     };
 
-    let features = util::build_feature_from_session(&sessions)?;
+    let features = util::build_feature_from_session(FeatureSet::Raw, &sessions)?;
 
     let mut rng = rand::rng();
     let mut population = Population::random(

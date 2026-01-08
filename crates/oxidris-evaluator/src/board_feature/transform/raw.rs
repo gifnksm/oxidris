@@ -87,6 +87,7 @@ pub struct RawTransformParam {
 }
 
 impl<S> RawTransform<S> {
+    #[must_use]
     pub fn new(id: String, name: String, source: S, param: RawTransformParam) -> Self {
         Self {
             id,

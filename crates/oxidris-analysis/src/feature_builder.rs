@@ -80,6 +80,7 @@
 //! use oxidris_analysis::{
 //!     feature_builder::FeatureBuilder, normalization::BoardFeatureNormalizationParamCollection,
 //!     sample::RawBoardSample, session::SessionData, statistics::RawFeatureStatistics,
+//!     survival::SurvivalStatsMap,
 //! };
 //! use oxidris_evaluator::board_feature;
 //! let sessions: Vec<SessionData> = todo!();
@@ -92,9 +93,11 @@
 //!
 //! // 3. Compute statistics
 //! let raw_stats = RawFeatureStatistics::from_samples(&sources, &raw_samples);
+//! let survival_stats = SurvivalStatsMap::collect_all_by_feature_value(&sessions, &sources);
 //!
 //! // 4. Build normalization parameters
-//! let norm_params = BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats);
+//! let norm_params =
+//!     BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats, &survival_stats);
 //!
 //! // 5. Construct features with runtime normalization
 //! let builder = FeatureBuilder::new(norm_params);
@@ -108,7 +111,10 @@ use oxidris_evaluator::board_feature::{
         NumHoles, RowTransitions, SumOfHoleDepth, SumOfWellDepth, SurfaceBumpiness,
         SurfaceRoughness, TotalHeight,
     },
-    transform::{IWellReward, LineClearBonus, RawTransform, RawTransformParam},
+    transform::{
+        IWellReward, LineClearBonus, RawTransform, RawTransformParam, TableTransform,
+        TableTransformParam,
+    },
 };
 
 use crate::normalization::{
@@ -132,28 +138,119 @@ impl FeatureBuilder {
         Self { params }
     }
 
-    /// Build all board features with runtime normalization
+    /// Build all raw board features with runtime normalization
+    ///
+    /// Constructs only raw-transform features (no table-based transforms).
+    /// Includes survival, structure, and score features.
+    ///
+    /// # Returns
+    ///
+    /// Vector of boxed board features with raw transformations
+    ///
+    /// # Errors
+    ///
+    /// Returns error if normalization parameters are missing for any feature
+    pub fn build_raw_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
+        let mut features = vec![];
+        features.extend_from_slice(&self.build_survival_raw_features()?);
+        features.extend_from_slice(&self.build_structure_raw_features()?);
+        features.extend_from_slice(&self.build_score_features());
+        Ok(features)
+    }
+
+    /// Build all board features including both raw and table transforms
+    ///
+    /// Constructs the complete feature set:
+    /// - Raw transforms for all features (survival, structure, score)
+    /// - Table transforms for survival features (KM-based)
+    ///
+    /// # Returns
+    ///
+    /// Vector of boxed board features with both raw and table transformations
+    ///
+    /// # Errors
+    ///
+    /// Returns error if normalization parameters are missing for any feature
     pub fn build_all_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
+        let mut features = vec![];
+        features.extend_from_slice(&self.build_survival_raw_features()?);
+        features.extend_from_slice(&self.build_survival_table_features()?);
+        features.extend_from_slice(&self.build_structure_raw_features()?);
+        features.extend_from_slice(&self.build_score_features());
+        Ok(features)
+    }
+
+    /// Build survival features with raw transformations
+    ///
+    /// Constructs penalty and risk features for survival-critical metrics:
+    /// - Holes (`num_holes`, `sum_of_hole_depth`)
+    /// - Height (`max_height`, `center_column_max_height`, `total_height`)
+    ///
+    /// # Returns
+    ///
+    /// Vector of survival features with raw (penalty/risk) transforms
+    fn build_survival_raw_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
         Ok(vec![
-            // Survival features
-            self.build_num_holes_raw_penalty()?,
-            self.build_sum_of_hole_depth_raw_penalty()?,
-            self.build_max_height_raw_penalty()?,
-            self.build_max_height_raw_risk()?,
-            self.build_center_column_max_height_raw_penalty()?,
-            self.build_center_column_max_height_raw_risk()?,
-            self.build_total_height_raw_penalty()?,
-            // Structure features
-            self.build_surface_bumpiness_raw_penalty()?,
-            self.build_surface_roughness_raw_penalty()?,
-            self.build_row_transitions_raw_penalty()?,
-            self.build_column_transitions_raw_penalty()?,
-            self.build_well_depth_raw_penalty()?,
-            self.build_well_depth_raw_risk()?,
-            // Score features
-            self.build_line_clear_bonus(),
-            self.build_i_well_reward(),
+            self.build_raw_penalty_for(&NumHoles)?,
+            self.build_raw_penalty_for(&SumOfHoleDepth)?,
+            self.build_raw_penalty_for(&MaxHeight)?,
+            self.build_raw_risk_for(&MaxHeight)?,
+            self.build_raw_penalty_for(&CenterColumnMaxHeight)?,
+            self.build_raw_risk_for(&CenterColumnMaxHeight)?,
+            self.build_raw_penalty_for(&TotalHeight)?,
         ])
+    }
+
+    /// Build survival features with table-based KM transformations
+    ///
+    /// Constructs KM survival-based features that map raw values to
+    /// median survival times via pre-computed lookup tables.
+    ///
+    /// # Returns
+    ///
+    /// Vector of survival features with table (KM) transforms
+    fn build_survival_table_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
+        Ok(vec![
+            self.build_table_km_for(&NumHoles)?,
+            self.build_table_km_for(&SumOfHoleDepth)?,
+            self.build_table_km_for(&MaxHeight)?,
+            self.build_table_km_for(&CenterColumnMaxHeight)?,
+            self.build_table_km_for(&TotalHeight)?,
+        ])
+    }
+
+    /// Build structure features with raw transformations
+    ///
+    /// Constructs features that measure board structure quality:
+    /// - Surface metrics (bumpiness, roughness)
+    /// - Transition metrics (row, column)
+    /// - Well depth
+    ///
+    /// # Returns
+    ///
+    /// Vector of structure features with raw (penalty/risk) transforms
+    fn build_structure_raw_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
+        Ok(vec![
+            self.build_raw_penalty_for(&SurfaceBumpiness)?,
+            self.build_raw_penalty_for(&SurfaceRoughness)?,
+            self.build_raw_penalty_for(&RowTransitions)?,
+            self.build_raw_penalty_for(&ColumnTransitions)?,
+            self.build_raw_penalty_for(&SumOfWellDepth)?,
+            self.build_raw_risk_for(&SumOfWellDepth)?,
+        ])
+    }
+
+    /// Build score features
+    ///
+    /// Constructs features that directly relate to game score:
+    /// - Line clear bonus (discrete rewards)
+    /// - I-piece well reward (strategic bonus)
+    ///
+    /// # Returns
+    ///
+    /// Vector of score features (no normalization needed)
+    fn build_score_features(&self) -> Vec<BoxedBoardFeature> {
+        vec![self.build_line_clear_bonus(), self.build_i_well_reward()]
     }
 
     /// Build a linear penalty feature with P05-P95 normalization range.
@@ -221,174 +318,52 @@ impl FeatureBuilder {
         )))
     }
 
-    /// Build smooth penalty for number of holes across the board.
+    /// Build a table-based KM survival feature for a given source
     ///
-    /// Penalizes trapped empty spaces (holes) that are difficult to fill without clearing lines.
-    /// Uses P05-P95 normalization for continuous feedback throughout the game.
+    /// Creates a feature that transforms raw values through a lookup table
+    /// of Kaplan-Meier median survival times. Each raw feature value maps
+    /// to its corresponding median survival time.
     ///
-    /// # Feature ID
+    /// # Type Parameters
     ///
-    /// `num_holes_raw_penalty`
-    fn build_num_holes_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&NumHoles)
-    }
-
-    /// Build smooth penalty for cumulative hole depth (weighted by blocks above).
+    /// * `S` - Board feature source type
     ///
-    /// Penalizes deeply buried holes that are costly to clear. Unlike [`Self::build_num_holes_raw_penalty`],
-    /// this weights holes by their depth, making deeply buried holes contribute more to the penalty.
-    /// Uses P05-P95 normalization for continuous feedback.
+    /// # Arguments
     ///
-    /// # Feature ID
+    /// * `source` - Feature source to transform
     ///
-    /// `sum_of_hole_depth_raw_penalty`
-    fn build_sum_of_hole_depth_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&SumOfHoleDepth)
-    }
-
-    /// Build smooth penalty for maximum column height.
+    /// # Returns
     ///
-    /// Penalizes the tallest column throughout the game, providing continuous feedback on
-    /// localized vertical pressure. Complements [`Self::build_max_height_raw_risk`] which focuses
-    /// on imminent top-out danger. Uses P05-P95 normalization.
+    /// Boxed board feature with table transformation
     ///
-    /// # Feature ID
+    /// # Errors
     ///
-    /// `max_height_raw_penalty`
-    fn build_max_height_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&MaxHeight)
-    }
-
-    /// Build thresholded risk for imminent top-out based on maximum height.
+    /// Returns error if normalization parameters are missing for the source
     ///
-    /// Focuses on dangerous states close to the ceiling. Unlike [`Self::build_max_height_raw_penalty`],
-    /// this ignores most of the game (below P75) and only penalizes approaching the ceiling,
-    /// reflecting the irreversible nature of top-out. Uses P75-P95 normalization.
+    /// # Feature ID Format
     ///
-    /// # Feature ID
+    /// `{source_id}_table_km` (e.g., "`num_holes_table_km`")
     ///
-    /// `max_height_raw_risk`
-    fn build_max_height_raw_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_risk_for(&MaxHeight)
-    }
-
-    /// Build smooth penalty for center column height (columns 3-6).
+    /// # Feature Name Format
     ///
-    /// Penalizes high stacking in the strategically critical center 4 columns throughout the game.
-    /// Center columns are harder to clear and restrict piece placement more than edge columns.
-    /// Uses P05-P95 normalization.
-    ///
-    /// # Feature ID
-    ///
-    /// `center_column_max_height_raw_penalty`
-    fn build_center_column_max_height_raw_penalty(
-        &self,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&CenterColumnMaxHeight)
-    }
-
-    /// Build thresholded risk for center column top-out.
-    ///
-    /// Focuses on dangerous center column height that threatens early top-out. Uses the same
-    /// thresholded approach as [`Self::build_max_height_raw_risk`] but specifically for the center
-    /// 4 columns. Uses P75-P95 normalization.
-    ///
-    /// # Feature ID
-    ///
-    /// `center_column_max_height_raw_risk`
-    fn build_center_column_max_height_raw_risk(
-        &self,
-    ) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_risk_for(&CenterColumnMaxHeight)
-    }
-
-    /// Build smooth penalty for total height (sum of all column heights).
-    ///
-    /// Penalizes global stacking pressure by measuring cumulative height across all columns.
-    /// Captures overall board "weight" and complements localized height metrics. Uses P05-P95
-    /// normalization for continuous feedback.
-    ///
-    /// # Feature ID
-    ///
-    /// `total_height_raw_penalty`
-    fn build_total_height_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&TotalHeight)
-    }
-
-    /// Build smooth penalty for horizontal fragmentation (row transitions).
-    ///
-    /// Penalizes horizontally fragmented structures with narrow gaps and broken rows.
-    /// Uses P05-P95 normalization for continuous feedback on structural quality.
-    ///
-    /// # Feature ID
-    ///
-    /// `row_transitions_raw_penalty`
-    fn build_row_transitions_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&RowTransitions)
-    }
-
-    /// Build smooth penalty for vertical fragmentation (column transitions).
-    ///
-    /// Penalizes vertical fragmentation within columns, including internal splits and covered holes.
-    /// Uses P05-P95 normalization for continuous feedback on vertical structure quality.
-    ///
-    /// # Feature ID
-    ///
-    /// `column_transitions_raw_penalty`
-    fn build_column_transitions_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&ColumnTransitions)
-    }
-
-    /// Build smooth penalty for surface height variation (first-order differences).
-    ///
-    /// Penalizes step-like surface patterns and non-flat surfaces that complicate piece placement.
-    /// Measures first-order height differences between adjacent columns. Uses P05-P95 normalization.
-    ///
-    /// # Feature ID
-    ///
-    /// `surface_bumpiness_raw_penalty`
-    fn build_surface_bumpiness_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&SurfaceBumpiness)
-    }
-
-    /// Build smooth penalty for local surface curvature (second-order differences).
-    ///
-    /// Penalizes small-scale surface unevenness using discrete Laplacian (second-order differences).
-    /// More sensitive to local irregularities than [`Self::build_surface_bumpiness_raw_penalty`]
-    /// while tolerating gradual slopes. Uses P05-P95 normalization.
-    ///
-    /// # Feature ID
-    ///
-    /// `surface_roughness_raw_penalty`
-    fn build_surface_roughness_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&SurfaceRoughness)
-    }
-
-    /// Build smooth penalty for well depth beyond safe threshold.
-    ///
-    /// Penalizes over-committed vertical wells throughout the game. Only wells deeper than 1
-    /// are considered (shallow wells are allowed for controlled play). Complements
-    /// [`Self::build_well_depth_raw_risk`] which focuses on extreme well depth. Uses P05-P95
-    /// normalization.
-    ///
-    /// # Feature ID
-    ///
-    /// `sum_of_well_depth_raw_penalty`
-    fn build_well_depth_raw_penalty(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_penalty_for(&SumOfWellDepth)
-    }
-
-    /// Build thresholded risk for dangerously deep wells.
-    ///
-    /// Focuses on extreme well depth that threatens board flexibility. Unlike
-    /// [`Self::build_well_depth_raw_penalty`], this ignores moderate wells and only penalizes
-    /// wells beyond safe operational limits. Uses P75-P95 normalization.
-    ///
-    /// # Feature ID
-    ///
-    /// `sum_of_well_depth_raw_risk`
-    fn build_well_depth_raw_risk(&self) -> Result<BoxedBoardFeature, BuildFeatureError> {
-        self.build_raw_risk_for(&SumOfWellDepth)
+    /// `{source_name} (Table KM)` (e.g., "Number of Holes (Table KM)")
+    fn build_table_km_for<S>(&self, source: &S) -> Result<BoxedBoardFeature, BuildFeatureError>
+    where
+        S: BoardFeatureSource,
+    {
+        let norm_param = self.get_param(source)?;
+        let param = TableTransformParam::new(
+            norm_param.survival_table.feature_min_value,
+            norm_param.survival_table.normalize_min,
+            norm_param.survival_table.normalize_max,
+            norm_param.survival_table.median_survival_turns.clone(),
+        );
+        Ok(Box::new(TableTransform::new(
+            format!("{}_table_km", source.id()),
+            format!("{} (Table KM)", source.name()),
+            source.clone_boxed(),
+            param,
+        )))
     }
 
     /// Build discrete bonus for line clears with emphasis on 4-line tetrises.

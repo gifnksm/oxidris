@@ -328,4 +328,19 @@ impl SurvivalStatsMap<u32> {
             feature.extract_raw(&analysis)
         })
     }
+
+    /// Collect survival statistics for multiple board features
+    ///
+    /// This function processes a list of board feature sources,
+    /// collecting survival statistics grouped by each feature's raw value.
+    pub fn collect_all_by_feature_value<F>(sessions: &[SessionData], features: &[F]) -> Vec<Self>
+    where
+        F: AsRef<dyn BoardFeatureSource>,
+    {
+        // FIXME: This computes PlacementAnalysis multiple times per board
+        features
+            .iter()
+            .map(|feature| Self::collect_by_feature_value(sessions, feature.as_ref()))
+            .collect()
+    }
 }

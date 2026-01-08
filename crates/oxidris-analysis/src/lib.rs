@@ -54,6 +54,7 @@
 //! use oxidris_analysis::{
 //!     feature_builder::FeatureBuilder, normalization::BoardFeatureNormalizationParamCollection,
 //!     sample::RawBoardSample, session::SessionData, statistics::RawFeatureStatistics,
+//!     survival::SurvivalStatsMap,
 //! };
 //! use oxidris_evaluator::board_feature;
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,9 +70,11 @@
 //!
 //! // 4. Compute statistics
 //! let raw_stats = RawFeatureStatistics::from_samples(&sources, &raw_samples);
+//! let survival_stats = SurvivalStatsMap::collect_all_by_feature_value(&sessions, &sources);
 //!
 //! // 5. Generate normalization parameters
-//! let norm_params = BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats);
+//! let norm_params =
+//!     BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats, &survival_stats);
 //!
 //! // 6. Build features with runtime parameters
 //! let builder = FeatureBuilder::new(norm_params);

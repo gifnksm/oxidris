@@ -11,6 +11,7 @@ use oxidris_analysis::{
     sample::RawBoardSample,
     session::{SessionCollection, SessionData},
     statistics::RawFeatureStatistics,
+    survival::SurvivalStatsMap,
 };
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
 
@@ -118,6 +119,19 @@ where
     Ok(value)
 }
 
+/// Read board session data from a JSON file
+///
+/// # Arguments
+///
+/// * `path` - Path to the boards JSON file
+///
+/// # Returns
+///
+/// Deserialized session collection
+///
+/// # Errors
+///
+/// Returns error if file cannot be opened or parsed
 pub fn read_boards_file<P>(path: P) -> anyhow::Result<SessionCollection>
 where
     P: AsRef<Path>,
@@ -125,6 +139,19 @@ where
     read_json_file("boards", path)
 }
 
+/// Read AI model configuration from a JSON file
+///
+/// # Arguments
+///
+/// * `path` - Path to the AI model JSON file
+///
+/// # Returns
+///
+/// Deserialized AI model configuration
+///
+/// # Errors
+///
+/// Returns error if file cannot be opened or parsed
 pub fn read_ai_model_file<P>(path: P) -> anyhow::Result<AiModel>
 where
     P: AsRef<Path>,
@@ -132,7 +159,50 @@ where
     read_json_file("AI model", path)
 }
 
+/// Feature set selection for feature building
+///
+/// Determines which types of features to construct from session data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeatureSet {
+    /// All features including raw and table transforms
+    All,
+    /// Only raw-transform features (penalty/risk)
+    Raw,
+}
+
+/// Build board features from session data with computed normalization parameters
+///
+/// This function performs the complete feature engineering pipeline:
+///
+/// 1. Extract raw feature values from all boards in sessions
+/// 2. Compute raw feature statistics (percentiles)
+/// 3. Compute survival statistics grouped by feature values (Kaplan-Meier)
+/// 4. Generate normalization parameters from statistics
+/// 5. Build feature set (raw only or all including table transforms)
+///
+/// # Arguments
+///
+/// * `feature_set` - Which features to build (All or Raw only)
+/// * `sessions` - Session data containing board states and placements
+///
+/// # Returns
+///
+/// Vector of boxed board features with runtime normalization
+///
+/// # Errors
+///
+/// Returns error if normalization parameters cannot be computed or
+/// features cannot be constructed
+///
+/// # Performance
+///
+/// This function processes all boards in all sessions multiple times:
+/// - Once for raw value extraction
+/// - Once for survival analysis
+///
+/// For large datasets, this may take significant time and memory.
 pub fn build_feature_from_session(
+    feature_set: FeatureSet,
     sessions: &[SessionData],
 ) -> anyhow::Result<Vec<BoxedBoardFeature>> {
     let sources = board_feature::source::all_board_feature_sources();
@@ -145,14 +215,22 @@ pub fn build_feature_from_session(
     let raw_stats = RawFeatureStatistics::from_samples(&sources, &raw_samples);
     eprintln!("Raw feature statistics computed");
 
+    eprintln!("Computing feature survival statistics...");
+    let survival_stats = SurvivalStatsMap::collect_all_by_feature_value(sessions, &sources);
+    eprintln!("Feature survival statistics computed");
+
     eprintln!("Computing feature normalization parameters...");
-    let norm_params = BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats);
+    let norm_params =
+        BoardFeatureNormalizationParamCollection::from_stats(&sources, &raw_stats, &survival_stats);
     eprintln!("Normalization parameters computed");
 
     eprintln!("Building feature builder...");
     let feature_builder = FeatureBuilder::new(norm_params);
-    let features = feature_builder.build_all_features()?;
-    eprintln!("Feature builder built");
+    let features = match feature_set {
+        FeatureSet::All => feature_builder.build_all_features()?,
+        FeatureSet::Raw => feature_builder.build_raw_features()?,
+    };
+    eprintln!("Built {} features", features.len());
 
     Ok(features)
 }

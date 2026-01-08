@@ -250,50 +250,59 @@ This is useful for initializing feature weights to equalize their impact.
 
 ## Integration with BoardFeature Trait
 
-### TableTransform<S> Type Design
+### `TableTransform<S>` Type Design
 
 KM normalization is implemented as a separate type from `RawTransform<S>`:
 
 **Type Name:** `TableTransform<S>`
 
-- Represents mapping-based transformation (lookup table)
+- Represents table-based transformation (lookup table)
 - Generic over feature source `S: BoardFeatureSource`
 - Parallel to `RawTransform<S>` but with different transform logic
 
-**Key Concept:** Instead of `transform(raw) = raw as f32`, use a lookup table: `transform(raw) = mapping[raw]`
+**Key Concept:** Instead of `transform(raw) = raw as f32`, use a lookup table: `transform(raw) = table[raw - feature_min_value]`
 
 **Data Structure:**
 
 ```rust
 pub struct TableTransform<S> {
-    id: Cow<'static, str>,
-    name: Cow<'static, str>,
-    signal: FeatureSignal,
-    mapping: BTreeMap<u32, f32>,  // raw → transformed value (e.g., KM median)
-    normalize_min: f32,            // worst case (P95's transformed value)
-    normalize_max: f32,            // best case (P05's transformed value)
+    id: String,
+    name: String,
     source: S,
+    param: TableTransformParam,
+}
+
+pub struct TableTransformParam {
+    feature_min_value: u32,  // P05 feature value (table start index)
+    normalize_min: f32,      // worst case survival time
+    normalize_max: f32,      // best case survival time
+    table: Vec<f32>,         // transformed values for [P05, P95] range
 }
 ```
 
-**Transform Logic with Clipping:**
+**Transform Logic with Clamping:**
 
-For raw values outside the mapping range `[a, b]`:
+The table covers the P05-P95 range of feature values. For raw values outside this range:
 
-- `raw < a` → use `mapping[a]` (clip to minimum observed value)
-- `raw > b` → use `mapping[b]` (clip to maximum observed value)
-- `a ≤ raw ≤ b` → use `mapping[raw]` or interpolate if missing
+- `raw < feature_min_value` → clamp to `feature_min_value`, use `table[0]`
+- `raw > feature_max_value` → clamp to `feature_max_value`, use `table[table.len() - 1]`
+- Within range → use `table[raw - feature_min_value]`
 
-This clipping ensures graceful handling of extreme values not seen during training.
+where `feature_max_value = feature_min_value + table.len() - 1`
+
+This clamping ensures graceful handling of extreme values not seen during training.
 
 **Example:**
 
 ```rust
-// Mapping range: [0, 33] holes
-// raw=0  → mapping[0] = 322.8 turns
-// raw=3  → mapping[3] = 177.5 turns
-// raw=33 → mapping[33] = 7.1 turns
-// raw=50 → mapping[33] = 7.1 turns (clipped to max key)
+// Table covers P05-P95: holes 0-33
+// feature_min_value = 0
+// table.len() = 34 (covers 0..=33)
+//
+// raw=0  → table[0] = 322.8 turns
+// raw=3  → table[3] = 177.5 turns
+// raw=33 → table[33] = 7.1 turns
+// raw=50 → clamped to 33 → table[33] = 7.1 turns
 ```
 
 ### Feature Construction via FeatureBuilder
@@ -331,16 +340,16 @@ Add a new variant to the `FeatureProcessing` enum:
 
 ```rust
 pub enum FeatureProcessing {
-    RawTransform {  // Current: matches RawTransform<S> type name
+    RawTransform {
         signal: FeatureSignal,
         normalize_min: f32,
         normalize_max: f32,
     },
-    TableTransform {  // Phase 4: Not yet implemented, will match TableTransform<S> type name
-        signal: FeatureSignal,
-        mapping: BTreeMap<u32, f32>,
+    TableTransform {
+        feature_min_value: u32,
         normalize_min: f32,
         normalize_max: f32,
+        table: Vec<f32>,
     },
     LineClearBonus,
     IWellReward,
@@ -373,7 +382,7 @@ To support coexistence of linear and mapped features:
   - `raw` clearly indicates "minimally processed raw value"
 
 - **`table`** - Indicates that `TableTransform<S>` uses a lookup table for transformation
-  - Reflects the implementation detail (`BTreeMap<u32, f32>` mapping)
+  - Reflects the implementation detail (`Vec<f32>` table covering P05-P95 range)
   - More descriptive than `mapped` (which could mean many things)
   - Distinguishes from other potential mapping approaches
 
@@ -396,9 +405,9 @@ To support coexistence of linear and mapped features:
 
 **Feature Set Selection:**
 
-- Training: `--model-name aggro_linear` → uses linear features
-- Training: `--model-name aggro_km` → uses mapped (KM) features
-- Analysis: Both feature sets available for side-by-side comparison
+- Training: Uses `FeatureSet::Raw` → constructs only raw features
+- Analysis: Uses `FeatureSet::All` → constructs both raw and table features
+- Feature set determined by `FeatureSet` enum, not model name
 
 ### Compatibility
 
@@ -531,53 +540,55 @@ Different normalization ranges are no longer needed—KM transform handles it.
 See [roadmap.md](./roadmap.md) for detailed implementation plan:
 
 - **Phase 1-2**: Data generation and KM survival analysis (✅ completed)
-- **Phase 3**: Infrastructure (KM estimator, data structures, trait design) (🔄 in progress)
-- **Phase 4**: Survival features with KM normalization (📋 project goal)
+- **Phase 3**: Infrastructure (KM estimator, data structures, trait design) (✅ completed 2026-01-06)
+- **Phase 4**: Survival features with KM normalization (✅ completed 2026-01-08)
+- **Phase 5**: Validation and training (📋 project goal)
 
 ## Implementation Notes
 
 ### Feature Construction Pattern
 
-Following the current `FeatureBuilder` pattern (established 2026-01-06):
+Implemented following the `FeatureBuilder` pattern (established 2026-01-06):
 
 - **Data-driven**: Normalization parameters computed from session data at runtime
 - **No static constants**: Features constructed dynamically via `FeatureBuilder`
-- **Mapping storage**: Lookup table stored as instance field (`BTreeMap<u32, f32>`)
-- **Clipping behavior**: Out-of-range values clip to nearest boundary (min/max key)
+- **Table storage**: Lookup table stored as instance field (`Vec<f32>` covering P05-P95)
+- **Clamping behavior**: Out-of-range values clamped to table boundaries
 
 ### Design Decisions Summary
 
-1. **Type Structure:** ✅ Decided
+1. **Type Structure:** ✅ Implemented
    - New type: `TableTransform<S>` (separate from `RawTransform<S>`)
    - Rationale: Different transform logic, clearer separation of concerns
 
-2. **Lookup Table:** ✅ Decided
-   - Use `BTreeMap<u32, f32>` for flexibility
-   - Supports sparse mappings and efficient range queries
+2. **Lookup Table:** ✅ Implemented
+   - Use `Vec<f32>` for efficient indexing (P05-P95 range)
+   - Index calculation: `raw - feature_min_value`
+   - Linear interpolation fills missing KM median values
 
-3. **Clipping Behavior:** ✅ Decided
-   - `raw < min_key` → use `mapping[min_key]`
-   - `raw > max_key` → use `mapping[max_key]`
-   - Gracefully handles extreme values
+3. **Clamping Behavior:** ✅ Implemented
+   - `raw < feature_min_value` → clamped to `feature_min_value`, use `table[0]`
+   - `raw > feature_max_value` → clamped to `feature_max_value`, use `table[len-1]`
+   - Gracefully handles extreme values not seen in training data
 
-4. **FeatureProcessing Integration:** ✅ Decided
-   - Add `TableTransform` variant with mapping field
+4. **FeatureProcessing Integration:** ✅ Implemented
+   - Added `TableTransform` variant with `TableTransformParam`
    - Enables model serialization and feature reconstruction
 
-5. **Feature Naming:** ✅ Decided
-   - Linear: `*_raw_penalty`, `*_raw_risk`
-   - Mapped (KM): `*_table_km`
-   - Both coexist; selection via model name
+5. **Feature Naming:** ✅ Implemented
+   - Raw: `*_raw_penalty`, `*_raw_risk`
+   - Table (KM): `*_table_km`
+   - Both coexist; selection via `FeatureSet` enum
 
-6. **Feature Set Strategy:** ✅ Decided
-   - Keep linear features (backward compatibility)
-   - Add KM features as new set
-   - Model name determines which set to use
+6. **Feature Set Strategy:** ✅ Implemented
+   - Raw features used for training (`FeatureSet::Raw`)
+   - Both raw and table features for analysis (`FeatureSet::All`)
+   - `FeatureBuilder` supports both feature sets
    - Both visible in analysis tools for comparison
 
-### Remaining Implementation Tasks
+### Implementation Complete (Phase 4 - 2026-01-08)
 
-Phase 3 design is now complete. Phase 4 implementation tasks:
+Phase 4 implementation is complete. All tasks finished:
 
 1. Implement `TableTransform<S>` type with clipping logic
 2. Add `TableTransform` variant to `FeatureProcessing` enum

@@ -157,9 +157,9 @@ These features have clear, direct impact on survival time, making KM-based norma
 
 ## Current Status
 
-**Last Updated:** 2026-01-06
+**Last Updated:** 2026-01-08
 
-### ✅ Completed (Phase 1-3)
+### ✅ Completed (Phase 1-4)
 
 #### Phase 1-2: Data & Analysis
 
@@ -170,11 +170,11 @@ These features have clear, direct impact on survival time, making KM-based norma
 - Two-stage design (transform → normalize)
 - CLI tools and documentation
 
-#### Phase 3: Infrastructure (2026-01-06) - Design Complete
+#### Phase 3: Infrastructure (2026-01-06)
 
 - `TableTransform<S>` type design
-  - Separate type from `RawTransform<S>` with `BTreeMap<u32, f32>` mapping
-  - Clipping logic for out-of-range values (clip to min/max key)
+  - Separate type from `RawTransform<S>` with table-based mapping
+  - Clipping logic for out-of-range values
 - `FeatureProcessing` integration design
   - `TableTransform` variant for serialization
 - Feature naming convention
@@ -185,27 +185,63 @@ These features have clear, direct impact on survival time, making KM-based norma
   - Model name determines feature set (`aggro_linear` vs `aggro_km`)
 - Follows `FeatureBuilder` pattern (dynamic runtime construction)
 
-### 📋 Not Started (Phase 4)
+#### Phase 4: Implementation (2026-01-08) - Implementation Complete
 
-- Implement `TableTransform<S>` type
-  - Type with `BTreeMap<u32, f32>` mapping field
-  - `transform()` with clipping logic
-  - `BoardFeature` trait implementation
-- Add `TableTransform` variant to `FeatureProcessing` enum
-- Extend `FeatureBuilder` for mapped features
-  - Construct both linear and mapped feature sets
-  - Feature set selection logic
-- Implement KM-based survival features
+- ✅ Implemented `TableTransform<S>` type
+  - Type with `Vec<f32>` lookup table (P05-P95 range)
+  - `transform()` with clamping logic for out-of-range values
+  - `BoardFeature` trait implementation with proper normalization
+  - Edge case handling (zero division prevention)
+- ✅ Added `TableTransform` variant to `FeatureProcessing` enum
+  - Proper serialization/deserialization support
+- ✅ Extended `FeatureBuilder` for table-based features
+  - `build_all_features()` constructs both raw and table features
+  - `build_raw_features()` constructs only raw features
+  - Feature set selection via `FeatureSet` enum
+- ✅ Implemented KM-based survival features
   - `num_holes_table_km`, `sum_of_hole_depth_table_km`
   - `max_height_table_km`, `center_column_max_height_table_km`, `total_height_table_km`
-- Update training tools for model name-based feature set selection
-- Update `analyze-board-features` to display both feature sets
-- Train and benchmark KM-based evaluator
+- ✅ Updated CLI tools for feature set selection
+  - `train-ai` uses `FeatureSet::Raw` (raw features only)
+  - `analyze-board-features` uses `FeatureSet::All` (both raw and table)
+- ✅ Implemented survival statistics pipeline
+  - `SurvivalStatsMap` for grouping by feature value
+  - KM median calculation with linear interpolation for missing values
+  - P05-P95 percentile-based table range selection
+
+### 📋 Next: Validation (Phase 5)
+
+- Train KM-based evaluator and compare with raw baseline
 - Validate improvements over linear normalization
+- Measure correlation between features and survival time
+- Analyze learned weights for interpretability
 
 ## Recent Changes
 
-### 2026-01-08: Feature Naming Convention Update
+### 2026-01-08: Phase 4 Implementation Complete
+
+Completed implementation of `TableTransform<S>` and KM-based survival features:
+
+- **Implementation Details**:
+  - `TableTransform<S>` uses `Vec<f32>` for lookup table (covering P05-P95 range)
+  - Clamping logic handles out-of-range values (clamp to table boundaries)
+  - Linear interpolation fills missing KM median values in survival statistics
+  - Zero-division prevention in normalization (returns 0.5 when range is zero)
+
+- **Feature Set Management**:
+  - `FeatureSet` enum controls which features to build (`All` or `Raw`)
+  - Training uses raw features only (`FeatureSet::Raw`)
+  - Analysis uses both feature sets (`FeatureSet::All`)
+
+- **CLI Integration**:
+  - `build_feature_from_session()` performs complete pipeline:
+    - Raw value extraction
+    - Raw statistics computation
+    - Survival statistics computation (KM analysis)
+    - Normalization parameter generation
+    - Feature construction
+
+### 2026-01-08: Feature Naming Convention
 
 Renamed types and features to better reflect their transformation approach:
 
@@ -219,7 +255,7 @@ Renamed types and features to better reflect their transformation approach:
 - **Feature IDs**:
   - `*_linear_penalty` → `*_raw_penalty` (e.g., `num_holes_raw_penalty`)
   - `*_linear_risk` → `*_raw_risk` (e.g., `max_height_raw_risk`)
-  - `*_km_penalty` → `*_table_km` (planned, e.g., `num_holes_table_km`)
+  - `*_km_penalty` → `*_table_km` (implemented, e.g., `num_holes_table_km`)
 
 **Rationale**: "Raw" better describes the minimal `raw as f32` transformation, while "table" explicitly indicates lookup-based transformation. This naming makes the distinction between transformation methods clearer.
 
@@ -248,87 +284,88 @@ cargo run --release -- analyze-censoring data/boards.json \
 
 ### Output Format
 
-```json
-{
-  "generator": {
-    "max_turns": 500,
-    "generated_at": "2024-01-04T12:00:00Z"
-  },
-  "features": {
-    "linear_holes_penalty": {
-      "transform_mapping": {
-        "0": 322.8,
-        "1": 304.5,
-        "3": 177.5,
-        "10": 50.0
-      },
-      "normalization": {
-        "km_min": 50.0,
-        "km_max": 322.8
-      },
-      "stats": {
-        "p05_feature_value": 0,
-        "p95_feature_value": 33,
-        "total_unique_values": 116
-      }
-    }
-  }
+The normalization parameters are embedded in the feature builder at runtime:
+
+```rust
+// Automatically computed from session data
+let norm_params = BoardFeatureNormalizationParamCollection::from_stats(
+    &sources,
+    &raw_stats,
+    &survival_stats,
+);
+
+// Used to construct features
+let builder = FeatureBuilder::new(norm_params);
+let features = builder.build_all_features()?;
+```
+
+Internal structure of normalization parameters:
+
+```rust
+pub struct BoardFeatureNormalizationParam {
+    pub value_percentiles: ValuePercentiles,  // P05, P95, etc.
+    pub survival_table: SurvivalTable,
+}
+
+pub struct SurvivalTable {
+    pub feature_min_value: u32,               // P05 feature value
+    pub median_survival_turns: Vec<f32>,      // KM medians for [P05, P95]
+    pub normalize_min: f32,                    // Min survival time
+    pub normalize_max: f32,                    // Max survival time
 }
 ```
 
-### Train AI Models (Planned)
+### Train AI Models
 
 ```bash
-# Train with linear features (existing approach)
+# Train with raw features (current approach)
 cargo run --release -- train-ai \
-    --model-name aggro_linear \
+    --model-name aggro \
     --sessions data/boards.json
-
-# Train with KM-based features (new approach)
-cargo run --release -- train-ai \
-    --model-name aggro_km \
-    --sessions data/boards.json \
-    --normalization-params data/normalization_params.json
 ```
 
-### Analyze Features (Planned)
+Training automatically uses `FeatureSet::Raw`, which constructs only raw-transformed features (penalty/risk). This ensures backward compatibility and focuses training on the established feature set.
+
+### Analyze Features
 
 ```bash
-# View both linear and KM features side-by-side
-cargo run --release -- analyze-board-features \
-    --sessions data/boards.json \
-    --normalization-params data/normalization_params.json \
-    --show-both-feature-sets
+# View both raw and table-based features side-by-side
+cargo run --release -- analyze-board-features data/boards.json
 ```
+
+The analysis tool automatically:
+
+1. Loads session data
+2. Computes raw statistics and survival statistics
+3. Builds both raw and table-based features (`FeatureSet::All`)
+4. Launches interactive TUI for exploration
 
 **Feature Set Coexistence:**
 
-- Linear features (`*_raw_penalty`, `*_raw_risk`) remain available for backward compatibility
-- KM features (`*_table_km`) are added as a new feature set
-- Model name determines which feature set is used during training
-- Analysis tools can display both for comparison
+- Raw features (`*_raw_penalty`, `*_raw_risk`) used for training
+- Table features (`*_table_km`) available for analysis and comparison
+- Both feature sets computed from same session data
+- Analysis tools display both for side-by-side comparison
 
 ## Next Steps
 
 See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
-### Phase 4: Implement Survival Features
+### Phase 5: Validation and Training
 
-1. Implement `TableTransform<S>` type with clipping logic
-2. Add `TableTransform` variant to `FeatureProcessing` enum
-3. Extend `FeatureBuilder` to construct mapped features
-4. Implement KM-based survival features (`*_table_km`)
-5. Update training tools for model name-based feature set selection
-6. Update `analyze-board-features` to display both linear and KM features
-7. Train KM-based evaluator and compare with linear baseline
-8. Validate KM transform improvement over linear transform
+1. Train evaluator with table-based KM features
+2. Compare KM-based evaluator vs. raw-based baseline
+3. Analyze correlation between features and survival time
+4. Validate that KM transform captures non-linear relationships
+5. Measure learned weights for interpretability
+6. Document findings and decide on feature set for production
 
 ### Success Criteria
 
 - Survival-based evaluator achieves ≥ current heuristic evaluator survival time
 - Survival features show strong correlation with survival (|r| > 0.5)
-- Learned weights are interpretable (correlate with feature km_range)
-- KM transform demonstrates clear improvement over linear transform
+- Learned weights are interpretable (correlate with feature survival ranges)
+- KM transform demonstrates measurable improvement over raw transform
 
 ## Documentation
 
