@@ -85,7 +85,7 @@
 //! let sessions: Vec<SessionData> = todo!();
 //!
 //! // 1. Get feature sources
-//! let sources = board_feature::all_board_feature_sources();
+//! let sources = board_feature::source::all_board_feature_sources();
 //!
 //! // 2. Extract raw samples from sessions
 //! let raw_samples = RawBoardSample::from_sessions(&sources, &sessions);
@@ -102,13 +102,13 @@
 //! ```
 
 use oxidris_evaluator::board_feature::{
-    BoardFeatureSource, BoxedBoardFeature, FeatureSignal, IWellReward, LineClearBonus,
-    RawTransform,
+    BoardFeatureSource, BoxedBoardFeature, FeatureSignal,
     source::{
         CenterColumnMaxHeight, ColumnTransitions, EdgeIWellDepth, MaxHeight, NumClearedLines,
         NumHoles, RowTransitions, SumOfHoleDepth, SumOfWellDepth, SurfaceBumpiness,
         SurfaceRoughness, TotalHeight,
     },
+    transform::{IWellReward, LineClearBonus, RawTransform},
 };
 
 use crate::normalization::{

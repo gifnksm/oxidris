@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use oxidris_evaluator::board_feature::{self, BoxedBoardFeature, FeatureProcessing};
+use oxidris_evaluator::board_feature::{self, BoxedBoardFeature, transform::FeatureProcessing};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -21,7 +21,7 @@ pub struct TrainedBoardFeature {
 
 impl AiModel {
     pub(crate) fn to_feature_weights(&self) -> anyhow::Result<(Vec<BoxedBoardFeature>, Vec<f32>)> {
-        let all_sources = board_feature::all_board_feature_sources();
+        let all_sources = board_feature::source::all_board_feature_sources();
         self.board_features
             .iter()
             .map(|tf| {

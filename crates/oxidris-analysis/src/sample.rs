@@ -56,7 +56,7 @@
 //! use oxidris_evaluator::board_feature;
 //!
 //! let sessions: Vec<SessionData> = vec![]; // Load from file
-//! let sources = board_feature::all_board_feature_sources();
+//! let sources = board_feature::source::all_board_feature_sources();
 //!
 //! // Extract raw values for all boards
 //! let raw_samples = RawBoardSample::from_sessions(&sources, &sessions);

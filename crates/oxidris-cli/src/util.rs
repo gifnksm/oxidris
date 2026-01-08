@@ -135,7 +135,7 @@ where
 pub fn build_feature_from_session(
     sessions: &[SessionData],
 ) -> anyhow::Result<Vec<BoxedBoardFeature>> {
-    let sources = board_feature::all_board_feature_sources();
+    let sources = board_feature::source::all_board_feature_sources();
 
     eprintln!("Computing feature raw values for all boards...");
     let raw_samples = RawBoardSample::from_sessions(&sources, sessions);

@@ -62,7 +62,7 @@
 //! let sessions: Vec<SessionData> = vec![]; // Load from file
 //!
 //! // 2. Get feature sources
-//! let sources = board_feature::all_board_feature_sources();
+//! let sources = board_feature::source::all_board_feature_sources();
 //!
 //! // 3. Extract raw samples
 //! let raw_samples = RawBoardSample::from_sessions(&sources, &sessions);

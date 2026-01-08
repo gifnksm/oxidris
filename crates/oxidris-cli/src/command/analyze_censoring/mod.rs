@@ -42,7 +42,7 @@ pub(crate) struct AnalyzeCensoringArg {
 }
 
 pub(crate) fn run(arg: &AnalyzeCensoringArg) -> anyhow::Result<()> {
-    let all_features = board_feature::all_board_feature_sources();
+    let all_features = board_feature::source::all_board_feature_sources();
     let target_features = arg
         .features
         .iter()

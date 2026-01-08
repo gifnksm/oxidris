@@ -24,7 +24,7 @@
 //! let sessions: Vec<SessionData> = todo!();
 //! let feature: BoxedBoardFeatureSource = todo!();
 //!
-//! let sources = board_feature::all_board_feature_sources();
+//! let sources = board_feature::source::all_board_feature_sources();
 //! let raw_samples = RawBoardSample::from_sessions(&sources, &sessions);
 //! let raw_stats = RawFeatureStatistics::from_samples(&sources, &raw_samples);
 //!

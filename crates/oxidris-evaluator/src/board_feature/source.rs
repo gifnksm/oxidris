@@ -4,7 +4,71 @@
 //! from placement analysis. They are wrapped by feature types (e.g., [`super::RawTransform`],
 //! [`super::LineClearBonus`]) to provide transformation and normalization.
 
-use crate::{board_feature::BoardFeatureSource, placement_analysis::PlacementAnalysis};
+use std::fmt;
+
+use crate::placement_analysis::PlacementAnalysis;
+
+#[must_use]
+pub fn all_board_feature_sources() -> Vec<BoxedBoardFeatureSource> {
+    vec![
+        // survival features
+        Box::new(NumHoles),
+        Box::new(SumOfHoleDepth),
+        Box::new(MaxHeight),
+        Box::new(CenterColumnMaxHeight),
+        Box::new(TotalHeight),
+        // structure features
+        Box::new(SurfaceBumpiness),
+        Box::new(SurfaceRoughness),
+        Box::new(RowTransitions),
+        Box::new(ColumnTransitions),
+        Box::new(SumOfWellDepth),
+        // score features
+        Box::new(NumClearedLines),
+        Box::new(EdgeIWellDepth),
+    ]
+}
+
+pub trait BoardFeatureSource: fmt::Debug + Send + Sync {
+    #[must_use]
+    fn id(&self) -> &str;
+    #[must_use]
+    fn name(&self) -> &str;
+    #[must_use]
+    fn type_name(&self) -> &str {
+        std::any::type_name::<Self>()
+    }
+    #[must_use]
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource;
+    #[must_use]
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32;
+}
+
+pub type BoxedBoardFeatureSource = Box<dyn BoardFeatureSource>;
+
+impl Clone for BoxedBoardFeatureSource {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
+}
+
+impl BoardFeatureSource for BoxedBoardFeatureSource {
+    fn id(&self) -> &str {
+        self.as_ref().id()
+    }
+
+    fn name(&self) -> &str {
+        self.as_ref().name()
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
+        self.as_ref().clone_boxed()
+    }
+
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
+        self.as_ref().extract_raw(analysis)
+    }
+}
 
 /// Number of holes (empty cells with at least one occupied cell above them).
 ///
@@ -28,7 +92,7 @@ impl BoardFeatureSource for NumHoles {
     fn name(&self) -> &'static str {
         "Number of Holes"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -60,7 +124,7 @@ impl BoardFeatureSource for SumOfHoleDepth {
     fn name(&self) -> &'static str {
         "Sum of Hole Depth"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -86,7 +150,7 @@ impl BoardFeatureSource for MaxHeight {
     fn name(&self) -> &'static str {
         "Max Height"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -113,7 +177,7 @@ impl BoardFeatureSource for CenterColumnMaxHeight {
     fn name(&self) -> &'static str {
         "Center Column Max Height"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -140,7 +204,7 @@ impl BoardFeatureSource for TotalHeight {
     fn name(&self) -> &'static str {
         "Total Height"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -172,7 +236,7 @@ impl BoardFeatureSource for RowTransitions {
     fn name(&self) -> &'static str {
         "Row Transitions"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -201,7 +265,7 @@ impl BoardFeatureSource for ColumnTransitions {
     fn name(&self) -> &'static str {
         "Column Transitions"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -229,7 +293,7 @@ impl BoardFeatureSource for SurfaceBumpiness {
     fn name(&self) -> &'static str {
         "Surface Bumpiness"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -258,7 +322,7 @@ impl BoardFeatureSource for SurfaceRoughness {
     fn name(&self) -> &'static str {
         "Surface Roughness"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -287,7 +351,7 @@ impl BoardFeatureSource for SumOfWellDepth {
     fn name(&self) -> &'static str {
         "Sum of Well Depth"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -314,7 +378,7 @@ impl BoardFeatureSource for NumClearedLines {
     fn name(&self) -> &'static str {
         "Number of Cleared Lines"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
@@ -343,7 +407,7 @@ impl BoardFeatureSource for EdgeIWellDepth {
     fn name(&self) -> &'static str {
         "Edge I Well Depth"
     }
-    fn clone_boxed(&self) -> super::BoxedBoardFeatureSource {
+    fn clone_boxed(&self) -> BoxedBoardFeatureSource {
         Box::new(self.clone())
     }
     fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {

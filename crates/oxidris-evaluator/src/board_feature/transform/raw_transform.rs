@@ -1,0 +1,142 @@
+use std::{borrow::Cow, fmt};
+
+use crate::board_feature::{
+    BoardFeature, BoardFeatureSource, BoxedBoardFeature, FeatureProcessing, FeatureSignal,
+};
+
+use crate::placement_analysis::PlacementAnalysis;
+
+/// Linear normalized feature with percentile-based normalization.
+///
+/// This is the standard feature type that applies linear transformation and percentile-based
+/// normalization to raw values extracted from board states. Most features use this type.
+///
+/// # Transform
+///
+/// Linear transformation: `transformed = raw as f32`
+///
+/// This simple transformation preserves the raw measurement scale but as a floating-point value.
+///
+/// # Normalization
+///
+/// Percentile-based linear normalization with configurable range:
+///
+/// ```text
+/// normalized = (transformed - min) / (max - min)
+/// normalized = normalized.clamp(0.0, 1.0)
+/// if signal == Negative:
+///     normalized = 1.0 - normalized
+/// ```
+///
+/// Where `min` and `max` are typically percentiles (P05-P95 or P75-P95) computed from
+/// actual gameplay data.
+///
+/// **Negative signal**: For features where lower raw values are better (e.g., holes, height),
+/// the normalized value is inverted so that higher normalized scores are always better.
+///
+/// # Normalization Ranges
+///
+/// Two common ranges are used:
+///
+/// - **P05-P95**: Smooth penalties/rewards across the full observed range
+///   - Provides continuous feedback throughout the game
+///   - Used for general board quality metrics (e.g., `num_holes`, `surface_bumpiness`)
+///
+/// - **P75-P95**: Thresholded penalties/rewards for dangerous states
+///   - Ignores safe values (below P75), only penalizes high-risk scenarios
+///   - Used for critical metrics (e.g., `max_height_raw_risk`, `sum_of_well_depth_raw_risk`)
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use oxidris_evaluator::board_feature::{
+///     FeatureSignal, source::NumHoles, transform::RawTransform,
+/// };
+/// use std::borrow::Cow;
+///
+/// // Create a penalty feature for holes with P05-P95 normalization
+/// let feature = RawTransform::new(
+///     Cow::Borrowed("holes_penalty"),
+///     Cow::Borrowed("Holes Penalty"),
+///     FeatureSignal::Negative, // Lower holes is better
+///     2.0,                     // P05 (min)
+///     15.0,                    // P95 (max)
+///     NumHoles,
+/// );
+/// ```
+#[derive(Debug, Clone)]
+pub struct RawTransform<S> {
+    id: Cow<'static, str>,
+    name: Cow<'static, str>,
+    signal: FeatureSignal,
+    normalize_min: f32,
+    normalize_max: f32,
+    source: S,
+}
+
+impl<S> RawTransform<S> {
+    pub const fn new(
+        id: Cow<'static, str>,
+        name: Cow<'static, str>,
+        signal: FeatureSignal,
+        normalize_min: f32,
+        normalize_max: f32,
+        source: S,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            signal,
+            normalize_min,
+            normalize_max,
+            source,
+        }
+    }
+}
+
+impl<S> BoardFeature for RawTransform<S>
+where
+    S: BoardFeatureSource + Clone + fmt::Debug + Send + Sync + 'static,
+{
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn feature_source(&self) -> &dyn BoardFeatureSource {
+        &self.source
+    }
+
+    fn feature_processing(&self) -> FeatureProcessing {
+        FeatureProcessing::RawTransform {
+            signal: self.signal,
+            normalize_min: self.normalize_min,
+            normalize_max: self.normalize_max,
+        }
+    }
+
+    fn clone_boxed(&self) -> BoxedBoardFeature {
+        Box::new(self.clone())
+    }
+
+    fn extract_raw(&self, analysis: &PlacementAnalysis) -> u32 {
+        self.source.extract_raw(analysis)
+    }
+
+    #[expect(clippy::cast_precision_loss)]
+    fn transform(&self, raw: u32) -> f32 {
+        raw as f32
+    }
+
+    fn normalize(&self, transformed: f32) -> f32 {
+        super::linear_normalize(
+            transformed,
+            self.signal,
+            self.normalize_min,
+            self.normalize_max,
+        )
+    }
+}
