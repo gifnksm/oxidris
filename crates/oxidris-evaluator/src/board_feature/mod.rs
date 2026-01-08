@@ -34,9 +34,9 @@
 //!
 //! Feature sources are wrapped by feature types that provide transformation and normalization:
 //!
-//! - [`RawTransform`] - Linear transformation with percentile-based normalization
-//! - [`LineClearBonus`] - Discrete bonus mapping for line clears
-//! - [`IWellReward`] - Triangular reward for optimal I-well depth
+//! - [`transform::RawTransform`] - Linear transformation with percentile-based normalization
+//! - [`transform::LineClearBonus`] - Discrete bonus mapping for line clears
+//! - [`transform::IWellReward`] - Triangular reward for optimal I-well depth
 //!
 //! # Feature Processing Pipeline
 //!

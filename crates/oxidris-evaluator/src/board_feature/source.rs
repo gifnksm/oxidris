@@ -1,8 +1,8 @@
 //! Feature source types for extracting raw values from board states.
 //!
 //! These types implement [`BoardFeatureSource`] and define how to extract raw measurements
-//! from placement analysis. They are wrapped by feature types (e.g., [`super::RawTransform`],
-//! [`super::LineClearBonus`]) to provide transformation and normalization.
+//! from placement analysis. They are wrapped by feature types (e.g., [`RawTransform`](super::transform::RawTransform),
+//! [`LineClearBonus`](super::transform::LineClearBonus)) to provide transformation and normalization.
 
 use std::fmt;
 
