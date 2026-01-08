@@ -127,7 +127,58 @@ pub enum BuildFeatureError {
     MissingNormalizationParam { source_id: String },
 }
 
+#[derive(Debug)]
+struct FeatureVecBuilder<'a> {
+    raw: bool,
+    table_km: bool,
+    builder: &'a FeatureBuilder,
+    features: Vec<BoxedBoardFeature>,
+}
+
+impl<'a> FeatureVecBuilder<'a> {
+    fn new(builder: &'a FeatureBuilder, raw: bool, table_km: bool) -> Self {
+        Self {
+            raw,
+            table_km,
+            builder,
+            features: vec![],
+        }
+    }
+
+    fn add_raw_penalty<S>(&mut self, source: &S) -> Result<(), BuildFeatureError>
+    where
+        S: BoardFeatureSource,
+    {
+        if self.raw {
+            self.features
+                .push(self.builder.build_raw_penalty_for(source)?);
+        }
+        Ok(())
+    }
+
+    fn add_raw_risk<S>(&mut self, source: &S) -> Result<(), BuildFeatureError>
+    where
+        S: BoardFeatureSource,
+    {
+        if self.raw {
+            self.features.push(self.builder.build_raw_risk_for(source)?);
+        }
+        Ok(())
+    }
+
+    fn add_table_km<S>(&mut self, source: &S) -> Result<(), BuildFeatureError>
+    where
+        S: BoardFeatureSource,
+    {
+        if self.table_km {
+            self.features.push(self.builder.build_table_km_for(source)?);
+        }
+        Ok(())
+    }
+}
+
 /// Feature builder that constructs features from runtime parameters
+#[derive(Debug)]
 pub struct FeatureBuilder {
     params: BoardFeatureNormalizationParamCollection,
 }
@@ -152,7 +203,7 @@ impl FeatureBuilder {
     /// Returns error if normalization parameters are missing for any feature
     pub fn build_raw_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
         let mut features = vec![];
-        features.extend_from_slice(&self.build_survival_raw_features()?);
+        features.extend_from_slice(&self.build_survival_features(true, false)?);
         features.extend_from_slice(&self.build_structure_raw_features()?);
         features.extend_from_slice(&self.build_score_features());
         Ok(features)
@@ -173,50 +224,49 @@ impl FeatureBuilder {
     /// Returns error if normalization parameters are missing for any feature
     pub fn build_all_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
         let mut features = vec![];
-        features.extend_from_slice(&self.build_survival_raw_features()?);
-        features.extend_from_slice(&self.build_survival_table_features()?);
+        features.extend_from_slice(&self.build_survival_features(true, true)?);
         features.extend_from_slice(&self.build_structure_raw_features()?);
         features.extend_from_slice(&self.build_score_features());
         Ok(features)
     }
 
-    /// Build survival features with raw transformations
+    /// Build survival features with optional raw and table transforms
     ///
-    /// Constructs penalty and risk features for survival-critical metrics:
+    /// Constructs survival-critical features:
     /// - Holes (`num_holes`, `sum_of_hole_depth`)
     /// - Height (`max_height`, `center_column_max_height`, `total_height`)
     ///
-    /// # Returns
+    /// Features from the same source are placed consecutively.
     ///
-    /// Vector of survival features with raw (penalty/risk) transforms
-    fn build_survival_raw_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
-        Ok(vec![
-            self.build_raw_penalty_for(&NumHoles)?,
-            self.build_raw_penalty_for(&SumOfHoleDepth)?,
-            self.build_raw_penalty_for(&MaxHeight)?,
-            self.build_raw_risk_for(&MaxHeight)?,
-            self.build_raw_penalty_for(&CenterColumnMaxHeight)?,
-            self.build_raw_risk_for(&CenterColumnMaxHeight)?,
-            self.build_raw_penalty_for(&TotalHeight)?,
-        ])
-    }
+    /// # Arguments
+    ///
+    /// * `raw` - Include raw-transform features (penalty/risk)
+    /// * `table_km` - Include table-transform features (KM-based)
+    fn build_survival_features(
+        &self,
+        raw: bool,
+        table_km: bool,
+    ) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
+        let mut builder = FeatureVecBuilder::new(self, raw, table_km);
 
-    /// Build survival features with table-based KM transformations
-    ///
-    /// Constructs KM survival-based features that map raw values to
-    /// median survival times via pre-computed lookup tables.
-    ///
-    /// # Returns
-    ///
-    /// Vector of survival features with table (KM) transforms
-    fn build_survival_table_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
-        Ok(vec![
-            self.build_table_km_for(&NumHoles)?,
-            self.build_table_km_for(&SumOfHoleDepth)?,
-            self.build_table_km_for(&MaxHeight)?,
-            self.build_table_km_for(&CenterColumnMaxHeight)?,
-            self.build_table_km_for(&TotalHeight)?,
-        ])
+        builder.add_raw_penalty(&NumHoles)?;
+        builder.add_table_km(&NumHoles)?;
+
+        builder.add_raw_penalty(&SumOfHoleDepth)?;
+        builder.add_table_km(&SumOfHoleDepth)?;
+
+        builder.add_raw_penalty(&MaxHeight)?;
+        builder.add_raw_risk(&MaxHeight)?;
+        builder.add_table_km(&MaxHeight)?;
+
+        builder.add_raw_penalty(&CenterColumnMaxHeight)?;
+        builder.add_raw_risk(&CenterColumnMaxHeight)?;
+        builder.add_table_km(&CenterColumnMaxHeight)?;
+
+        builder.add_raw_penalty(&TotalHeight)?;
+        builder.add_table_km(&TotalHeight)?;
+
+        Ok(builder.features)
     }
 
     /// Build structure features with raw transformations
