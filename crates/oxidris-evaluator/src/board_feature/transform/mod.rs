@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use serde::{Deserialize, Serialize};
 
 use crate::board_feature::{BoardFeatureSource, BoxedBoardFeature, FeatureSignal};
@@ -27,12 +25,7 @@ pub enum FeatureProcessing {
 }
 
 impl FeatureProcessing {
-    pub fn apply<S>(
-        &self,
-        id: Cow<'static, str>,
-        name: Cow<'static, str>,
-        source: S,
-    ) -> BoxedBoardFeature
+    pub fn apply<S>(&self, id: String, name: String, source: S) -> BoxedBoardFeature
     where
         S: BoardFeatureSource + Clone + 'static,
     {

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use crate::{
     board_feature::{
@@ -32,14 +32,14 @@ use crate::{
 /// - Linear scaling within the transformed range
 #[derive(Debug, Clone)]
 pub struct LineClearBonus<S> {
-    id: Cow<'static, str>,
-    name: Cow<'static, str>,
+    id: String,
+    name: String,
     source: S,
 }
 
 impl<S> LineClearBonus<S> {
     #[must_use]
-    pub const fn new(id: Cow<'static, str>, name: Cow<'static, str>, source: S) -> Self {
+    pub fn new(id: String, name: String, source: S) -> Self {
         Self { id, name, source }
     }
 }
@@ -116,14 +116,14 @@ where
 /// are less suitable for tetris strategy.
 #[derive(Debug, Clone)]
 pub struct IWellReward<S> {
-    id: Cow<'static, str>,
-    name: Cow<'static, str>,
+    id: String,
+    name: String,
     source: S,
 }
 
 impl<S> IWellReward<S> {
     #[must_use]
-    pub const fn new(id: Cow<'static, str>, name: Cow<'static, str>, source: S) -> Self {
+    pub fn new(id: String, name: String, source: S) -> Self {
         Self { id, name, source }
     }
 }

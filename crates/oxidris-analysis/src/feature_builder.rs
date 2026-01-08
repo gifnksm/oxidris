@@ -181,8 +181,8 @@ impl FeatureBuilder {
             norm_param.value_percentiles.p95,
         );
         Ok(Box::new(RawTransform::new(
-            format!("{}_raw_penalty", source.id()).into(),
-            format!("{} (Linear Penalty)", source.name()).into(),
+            format!("{}_raw_penalty", source.id()),
+            format!("{} (Raw Penalty)", source.name()),
             source.clone_boxed(),
             param,
         )))
@@ -214,8 +214,8 @@ impl FeatureBuilder {
             norm_param.value_percentiles.p95,
         );
         Ok(Box::new(RawTransform::new(
-            format!("{}_raw_risk", source.id()).into(),
-            format!("{} (Linear Risk)", source.name()).into(),
+            format!("{}_raw_risk", source.id()),
+            format!("{} (Raw Risk)", source.name()),
             source.clone_boxed(),
             param,
         )))

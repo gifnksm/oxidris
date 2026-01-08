@@ -33,8 +33,7 @@ impl AiModel {
                     })?
                     .clone();
                 Ok((
-                    tf.processing
-                        .apply(tf.id.clone().into(), tf.name.clone().into(), source),
+                    tf.processing.apply(tf.id.clone(), tf.name.clone(), source),
                     tf.weight,
                 ))
             })

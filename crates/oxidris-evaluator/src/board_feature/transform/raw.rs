@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -65,16 +65,16 @@ use crate::placement_analysis::PlacementAnalysis;
 ///     15.0,                    // P95 (max)
 /// );
 /// let feature = RawTransform::new(
-///     Cow::Borrowed("holes_penalty"),
-///     Cow::Borrowed("Holes Penalty"),
+///     "num_holes_raw".to_owned(),
+///     "Number of Holes (Raw Penalty)".to_owned(),
 ///     NumHoles,
 ///     param,
 /// );
 /// ```
 #[derive(Debug, Clone)]
 pub struct RawTransform<S> {
-    id: Cow<'static, str>,
-    name: Cow<'static, str>,
+    id: String,
+    name: String,
     source: S,
     param: RawTransformParam,
 }
@@ -87,12 +87,7 @@ pub struct RawTransformParam {
 }
 
 impl<S> RawTransform<S> {
-    pub const fn new(
-        id: Cow<'static, str>,
-        name: Cow<'static, str>,
-        source: S,
-        param: RawTransformParam,
-    ) -> Self {
+    pub fn new(id: String, name: String, source: S, param: RawTransformParam) -> Self {
         Self {
             id,
             name,
@@ -104,7 +99,7 @@ impl<S> RawTransform<S> {
 
 impl RawTransformParam {
     #[must_use]
-    pub const fn new(signal: FeatureSignal, normalize_min: f32, normalize_max: f32) -> Self {
+    pub fn new(signal: FeatureSignal, normalize_min: f32, normalize_max: f32) -> Self {
         Self {
             signal,
             normalize_min,
