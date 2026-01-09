@@ -209,7 +209,7 @@ enum Phase {
 
 impl fmt::Display for Phase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_str())
+        fmt::Display::fmt(self.to_str(), f)
     }
 }
 

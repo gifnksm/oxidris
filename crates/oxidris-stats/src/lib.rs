@@ -7,6 +7,7 @@
 //! - **Histogram generation**: Create frequency distributions with percentile-based binning
 //! - **Comprehensive statistics**: Combined descriptive statistics, percentiles, and histograms
 //! - **Survival analysis**: Kaplan-Meier estimator for time-to-event data with censoring
+//! - **Adaptive binning**: Data-driven binning for handling skewed distributions
 //!
 //! # Modules
 //!
@@ -15,6 +16,7 @@
 //! - [`histogram`]: Histogram construction for visualizing data distributions
 //! - [`comprehensive`]: Comprehensive statistical analysis combining multiple measures
 //! - [`survival`]: Kaplan-Meier survival curves for analyzing time-to-event data
+//! - [`binning`]: Adaptive binning algorithms for skewed distributions
 //!
 //! # Examples
 //!
@@ -71,6 +73,7 @@
 //! let curve = KaplanMeierCurve::from_data(data);
 //! ```
 
+pub mod binning;
 pub mod comprehensive;
 pub mod descriptive;
 pub mod histogram;

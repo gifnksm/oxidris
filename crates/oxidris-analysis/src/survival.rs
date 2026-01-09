@@ -314,25 +314,144 @@ impl<K> SurvivalStatsMap<K> {
     }
 }
 
+impl<K> SurvivalStatsMap<K> {
+    /// Collect survival statistics with adaptive binning
+    ///
+    /// This is a generic function that applies adaptive binning to group observations
+    /// such that each bin contains approximately `target_sample_percentage` of total samples.
+    /// This approach:
+    ///
+    /// - Preserves granularity where sample density is high (typically low values)
+    /// - Groups sparse high values together for stable KM estimates
+    /// - Ensures each bin has sufficient samples (minimum 30) for reliable statistics
+    ///
+    /// The binning algorithm is provided by [`oxidris_stats::binning::create_adaptive_bins`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sessions` - Slice of session data containing board states
+    /// * `group` - Closure that computes the grouping key from session and board
+    /// * `target_sample_percentage` - Target percentage of samples per bin (e.g., 0.03 for 3%)
+    ///
+    /// # Returns
+    ///
+    /// A map from bin representative value to [`SurvivalStats`] with KM analysis results
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use oxidris_analysis::{session::SessionData, survival::SurvivalStatsMap};
+    /// use oxidris_evaluator::{
+    ///     board_feature::{BoardFeatureSource, source::NumHoles},
+    ///     placement_analysis::PlacementAnalysis,
+    /// };
+    ///
+    /// let sessions: Vec<SessionData> = vec![];
+    /// let source = NumHoles;
+    ///
+    /// // Group by number of holes with adaptive binning
+    /// let stats = SurvivalStatsMap::collect_with_adaptive_binning(
+    ///     &sessions,
+    ///     |_session, board| {
+    ///         let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
+    ///         source.extract_raw(&analysis)
+    ///     },
+    ///     0.03 // 3% per bin
+    /// );
+    ///
+    /// // Each bin contains ~3% of samples, preserving low-value distinctions
+    /// for (bin_value, stats) in &stats.map {
+    ///     if let Some(km_median) = stats.median_km {
+    ///         println!("Bin {}: {} samples, KM median = {:.1}",
+    ///                  bin_value, stats.boards_count, km_median);
+    ///     }
+    /// }
+    /// ```
+    pub fn collect_with_adaptive_binning<F>(
+        sessions: &[SessionData],
+        mut group: F,
+        target_sample_percentage: f64,
+    ) -> Self
+    where
+        F: FnMut(&SessionData, &BoardAndPlacement) -> K,
+        K: Ord + Copy,
+    {
+        // Pass 1: Collect all values
+        let mut values = Vec::new();
+        for session in sessions {
+            for board in &session.boards {
+                values.push(group(session, board));
+            }
+        }
+
+        // Create adaptive bins using oxidris-stats
+        let bin_mapping =
+            oxidris_stats::binning::create_adaptive_bins(&values, target_sample_percentage);
+
+        // Pass 2: Collect survival data using bin mapping
+        Self::collect_by_group(sessions, |session, board| {
+            let raw_value = group(session, board);
+            // Map to bin representative (midpoint value)
+            bin_mapping
+                .get(&raw_value)
+                .map_or(raw_value, |info| info.representative)
+        })
+    }
+}
+
 impl SurvivalStatsMap<u32> {
+    /// Collect survival statistics grouped by a specific board feature value with adaptive binning
+    ///
+    /// This function extracts feature values and applies adaptive binning to group observations
+    /// such that each bin contains approximately `target_sample_percentage` of total samples.
+    ///
+    /// For more control over the grouping function, use [`SurvivalStatsMap::collect_with_adaptive_binning`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sessions` - Slice of session data containing board states
+    /// * `feature` - Board feature to extract and bin
+    /// * `target_sample_percentage` - Target percentage of samples per bin (e.g., 0.03 for 3%)
+    ///
+    /// # Returns
+    ///
+    /// A map from bin representative value to [`SurvivalStats`] with KM analysis results
+    pub fn collect_with_adaptive_binning_by_feature(
+        sessions: &[SessionData],
+        feature: &dyn BoardFeatureSource,
+        target_sample_percentage: f64,
+    ) -> Self {
+        Self::collect_with_adaptive_binning(
+            sessions,
+            |_, board| {
+                let analysis =
+                    PlacementAnalysis::from_board(&board.before_placement, board.placement);
+                feature.extract_raw(&analysis)
+            },
+            target_sample_percentage,
+        )
+    }
+
     /// Collect survival statistics grouped by a specific board feature value
     ///
     /// This function extracts survival time data from session data,
-    /// grouping observations by the raw value of a provided board feature.
+    /// grouping observations by feature value using adaptive binning with
+    /// a default target of 3% samples per bin.
+    ///
+    /// For custom binning parameters, use [`Self::collect_with_adaptive_binning_by_feature`].
     pub fn collect_by_feature_value(
         sessions: &[SessionData],
         feature: &dyn BoardFeatureSource,
     ) -> Self {
-        Self::collect_by_group(sessions, |_, board| {
-            let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
-            feature.extract_raw(&analysis)
-        })
+        const DEFAULT_TARGET_PERCENTAGE: f64 = 0.03; // 3% per bin
+        Self::collect_with_adaptive_binning_by_feature(sessions, feature, DEFAULT_TARGET_PERCENTAGE)
     }
 
-    /// Collect survival statistics for multiple board features
+    /// Collect survival statistics for multiple board features with adaptive binning
     ///
     /// This function processes a list of board feature sources,
-    /// collecting survival statistics grouped by each feature's raw value.
+    /// collecting survival statistics grouped by each feature's value using
+    /// adaptive binning (default 3% samples per bin).
     pub fn collect_all_by_feature_value<F>(sessions: &[SessionData], features: &[F]) -> Vec<Self>
     where
         F: AsRef<dyn BoardFeatureSource>,
@@ -342,5 +461,53 @@ impl SurvivalStatsMap<u32> {
             .iter()
             .map(|feature| Self::collect_by_feature_value(sessions, feature.as_ref()))
             .collect()
+    }
+
+    /// Collect survival statistics for multiple board features with custom binning
+    ///
+    /// This function processes a list of board feature sources with a custom
+    /// target percentage for adaptive binning.
+    pub fn collect_all_with_adaptive_binning<F>(
+        sessions: &[SessionData],
+        features: &[F],
+        target_sample_percentage: f64,
+    ) -> Vec<Self>
+    where
+        F: AsRef<dyn BoardFeatureSource>,
+    {
+        // FIXME: This computes PlacementAnalysis multiple times per board
+        features
+            .iter()
+            .map(|feature| {
+                Self::collect_with_adaptive_binning_by_feature(
+                    sessions,
+                    feature.as_ref(),
+                    target_sample_percentage,
+                )
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_survival_stats_basic() {
+        // Test basic survival statistics calculation
+        let data = vec![
+            (10, false), // complete at 10 turns
+            (20, false), // complete at 20 turns
+            (500, true), // censored at 500 turns
+        ];
+
+        let stats = SurvivalStats::from_data(&data);
+
+        assert_eq!(stats.boards_count, 3);
+        assert_eq!(stats.censored_count, 1);
+        assert!((stats.mean_complete - 15.0).abs() < 1e-10); // (10 + 20) / 2
+        assert!((stats.mean_all - 176.666_666_666_666_66).abs() < 1e-10); // (10 + 20 + 500) / 3
+        assert!(stats.median_km.is_some());
     }
 }
