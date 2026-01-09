@@ -185,7 +185,7 @@ These features have clear, direct impact on survival time, making KM-based norma
   - Model name determines feature set (`aggro_linear` vs `aggro_km`)
 - Follows `FeatureBuilder` pattern (dynamic runtime construction)
 
-#### Phase 4: Implementation (2026-01-08) - Implementation Complete
+#### Phase 4: Implementation (2026-01-09) - ✅ Implementation Complete
 
 - ✅ Implemented `TableTransform<S>` type
   - Type with `Vec<f32>` lookup table (P05-P95 range)
@@ -209,16 +209,95 @@ These features have clear, direct impact on survival time, making KM-based norma
   - KM median calculation with linear interpolation for missing values
   - P05-P95 percentile-based table range selection
 
-### 📋 Next: Validation (Phase 5)
+- ✅ Extended training infrastructure for KM/Raw comparison
+  - Added `FeatureSet::Km` to `util.rs` for KM-only feature sets
+  - Extended `AiType` enum to support 4 model types:
+    - `AggroKm`, `DefensiveKm` (KM-normalized survival features)
+    - `AggroRaw`, `DefensiveRaw` (raw-normalized survival features)
+  - Added `build_km_features()` to `FeatureBuilder`
+    - Survival features use TableTransform (KM)
+    - Structure features use RawTransform
+    - Score features unchanged
+  - Updated Makefile targets for 4 model variants:
+    - `train-ai-all`, `train-ai-aggro-km`, `train-ai-defensive-km`
+    - `train-ai-aggro-raw`, `train-ai-defensive-raw`
+    - `auto-play-aggro-km`, `auto-play-defensive-km`
+    - `auto-play-aggro-raw`, `auto-play-defensive-raw`
+  - Generated 4 baseline models for comparison:
+    - `models/ai/aggro-km.json` (fitness=2.56, trained 2026-01-09)
+    - `models/ai/defensive-km.json` (trained 2026-01-09)
+    - `models/ai/aggro-raw.json` (fitness=2.51, trained 2026-01-09)
+    - `models/ai/defensive-raw.json` (trained 2026-01-09)
 
-- Train KM-based evaluator and compare with raw baseline
-- Validate improvements over linear normalization
-- Measure correlation between features and survival time
-- Analyze learned weights for interpretability
+### 📋 Phase 5: Validation (CURRENT PHASE - Not Started)
+
+**Status**: Implementation complete (Phase 4), validation NOT started
+
+**Baseline Models Available:**
+
+- `aggro-km.json` (fitness=2.56, trained 2026-01-09)
+- `defensive-km.json` (trained 2026-01-09)
+- `aggro-raw.json` (fitness=2.51, trained 2026-01-09)
+- `defensive-raw.json` (trained 2026-01-09)
+
+**Validation Tasks:**
+
+1. **Model Performance Comparison**
+   - Run multiple games (≥100) for each of 4 models
+   - Measure survival time (mean, median, P25/P75)
+   - Compare KM-based vs. Raw-based models
+   - Expected: KM-based ≥ Raw-based survival
+
+2. **Feature Correlation Analysis**
+   - Measure correlation between features and survival time
+   - Verify non-linear transformation captures relationships
+   - Expected: |r| > 0.5 for survival features
+
+3. **Weight Interpretability Analysis**
+   - Compare learned weights between KM and Raw models
+   - Verify weights correlate with survival impact
+   - Check if KM features have more stable weights
+
+4. **Training Convergence Analysis**
+   - Compare training convergence speed (KM vs. Raw)
+   - Analyze fitness progression over generations
+   - Check for overfitting or instability
+
+5. **Documentation and Decision**
+   - Document validation results and findings
+   - Decide on feature set for production use
+   - Create recommendations for future work
+
+**Success Criteria:**
+
+- KM-based evaluator achieves ≥ raw-based evaluator survival time
+- Survival features show strong correlation with survival (|r| > 0.5)
+- Learned weights are interpretable (correlate with feature survival ranges)
+- KM transform demonstrates measurable improvement over raw transform
 
 ## Recent Changes
 
-### 2026-01-08: Phase 4 Implementation Complete
+### 2026-01-09: Phase 4 Complete - Implementation Done, Validation Pending
+
+**Implementation Complete:**
+
+- Extended training infrastructure to support both KM and Raw feature sets
+- Added `FeatureSet::Km` variant for KM-only features
+- Extended `AiType` to 4 variants (`AggroKm`, `DefensiveKm`, `AggroRaw`, `DefensiveRaw`)
+- Added `build_km_features()` method to `FeatureBuilder`
+- Updated Makefile with 8 new targets (train/auto-play × 4 models)
+- Generated 4 baseline models for comparison
+
+**Baseline Model Status:**
+
+- ✅ `aggro-km.json`: fitness=2.56 (uses TableTransform for survival features)
+- ✅ `defensive-km.json`: trained (uses TableTransform for survival features)
+- ✅ `aggro-raw.json`: fitness=2.51 (uses RawTransform for survival features)
+- ✅ `defensive-raw.json`: trained (uses RawTransform for survival features)
+
+**Next:** Phase 5 validation (see "Phase 5: Validation" section above)
+
+### 2026-01-08: Phase 4 Implementation Progress
 
 Completed implementation of `TableTransform<S>` and KM-based survival features:
 
@@ -318,13 +397,34 @@ pub struct SurvivalTable {
 ### Train AI Models
 
 ```bash
-# Train with raw features (current approach)
-cargo run --release -- train-ai \
-    --model-name aggro \
-    --sessions data/boards.json
+# Train with KM features (uses TableTransform for survival features)
+make train-ai-aggro-km
+make train-ai-defensive-km
+
+# Train with raw features (uses RawTransform for survival features)
+make train-ai-aggro-raw
+make train-ai-defensive-raw
+
+# Train all 4 models
+make train-ai-all
 ```
 
-Training automatically uses `FeatureSet::Raw`, which constructs only raw-transformed features (penalty/risk). This ensures backward compatibility and focuses training on the established feature set.
+Training uses different feature sets:
+
+- KM models (`*-km`): Use `FeatureSet::Km` (TableTransform for survival, RawTransform for structure)
+- Raw models (`*-raw`): Use `FeatureSet::Raw` (RawTransform for all features)
+
+### Auto-Play with Trained Models
+
+```bash
+# Play with KM-based models
+make auto-play-aggro-km
+make auto-play-defensive-km
+
+# Play with raw-based models
+make auto-play-aggro-raw
+make auto-play-defensive-raw
+```
 
 ### Analyze Features
 
@@ -351,21 +451,17 @@ The analysis tool automatically:
 
 See [roadmap.md](./roadmap.md) for detailed implementation plan.
 
-### Phase 5: Validation and Training
+### Phase 5: Validation (Current Phase)
 
-1. Train evaluator with table-based KM features
-2. Compare KM-based evaluator vs. raw-based baseline
-3. Analyze correlation between features and survival time
-4. Validate that KM transform captures non-linear relationships
-5. Measure learned weights for interpretability
-6. Document findings and decide on feature set for production
+**See "Phase 5: Validation" section above for detailed validation tasks and success criteria.**
 
-### Success Criteria
+Key validation tasks:
 
-- Survival-based evaluator achieves ≥ current heuristic evaluator survival time
-- Survival features show strong correlation with survival (|r| > 0.5)
-- Learned weights are interpretable (correlate with feature survival ranges)
-- KM transform demonstrates measurable improvement over raw transform
+1. Model performance comparison (KM vs. Raw)
+2. Feature correlation analysis
+3. Weight interpretability analysis
+4. Training convergence analysis
+5. Documentation and decision
 
 ## Documentation
 

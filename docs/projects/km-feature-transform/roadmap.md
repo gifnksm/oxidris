@@ -149,13 +149,14 @@ This roadmap outlines the development of KM-based normalization for **survival f
 
 ## Phase 4: Survival Features with KM Normalization ✅
 
-**Status:** Completed (2026-01-08)
+**Status:** Implementation Complete (2026-01-09), Validation Pending (Phase 5)
 
 **Objectives:**
 
 1. ✅ Apply KM-based normalization to survival features (holes, height)
-2. 📋 Train and validate evaluator using KM-normalized survival features (Phase 5)
-3. 📋 Demonstrate that KM normalization improves survival prediction (Phase 5)
+2. ✅ Implement training infrastructure for KM/Raw comparison
+3. 📋 Train and validate evaluator using KM-normalized survival features (→ Phase 5)
+4. 📋 Demonstrate that KM normalization improves survival prediction (→ Phase 5)
 
 **Completed:**
 
@@ -198,6 +199,19 @@ This roadmap outlines the development of KM-based normalization for **survival f
   - Interactive TUI displays all features
   - Side-by-side comparison enabled
 
+- [x] Extend training infrastructure for KM/Raw comparison
+  - Add `FeatureSet::Km` for KM-only feature sets
+  - Extend `AiType` to support 4 model types (AggroKm, DefensiveKm, AggroRaw, DefensiveRaw)
+  - Add `build_km_features()` to `FeatureBuilder`
+  - Update Makefile targets for 4 model variants
+  - Generate 4 baseline models for validation
+
+- [x] Generate baseline models for comparison
+  - `aggro-km.json` (fitness=2.56, trained 2026-01-09)
+  - `defensive-km.json` (trained 2026-01-09)
+  - `aggro-raw.json` (fitness=2.51, trained 2026-01-09)
+  - `defensive-raw.json` (trained 2026-01-09)
+
 **Implementation Details:**
 
 - **Table Structure**: `Vec<f32>` covering P05-P95 feature value range
@@ -219,48 +233,73 @@ This roadmap outlines the development of KM-based normalization for **survival f
 - ✅ KM-based survival features integrated with trait system
 - ✅ Both raw and table feature sets available
 - ✅ CLI tools updated for feature set selection
-- 📋 Training validation (moved to Phase 5)
+- ✅ 4 baseline models generated (aggro-km, defensive-km, aggro-raw, defensive-raw)
+- ✅ Training infrastructure supports KM/Raw comparison
+- 📋 Training validation (→ Phase 5)
 
 ---
 
 ## Phase 5: Validation and Training 📋
 
-**Status:** Not Started
+**Status:** Ready to Start (Implementation Complete 2026-01-09)
+
+**Baseline Models Available:**
+
+- `models/ai/aggro-km.json` (fitness=2.56, trained 2026-01-09)
+- `models/ai/defensive-km.json` (trained 2026-01-09)
+- `models/ai/aggro-raw.json` (fitness=2.51, trained 2026-01-09)
+- `models/ai/defensive-raw.json` (trained 2026-01-09)
 
 **Objectives:**
 
-1. Train evaluator using KM-based survival features
-2. Validate that KM transform captures non-linear relationships
-3. Compare KM-based evaluator performance vs. raw baseline
-4. Measure feature correlation with survival time
-5. Analyze learned weights for interpretability
+1. Validate that KM transform captures non-linear relationships
+2. Compare KM-based evaluator performance vs. raw baseline
+3. Measure feature correlation with survival time
+4. Analyze learned weights for interpretability
+5. Document results and make recommendation
 
 **Tasks:**
 
-- [ ] Train KM-based evaluator
-  - Modify `train-ai` to support `FeatureSet::All` option
-  - Train with table-based KM features
-  - Save trained model for comparison
+- [ ] **Benchmark Model Performance**
+  - Run auto-play for each model (≥100 games per model)
+  - Record survival times for each game
+  - Calculate statistics (mean, median, P25, P75, std dev)
+  - Compare KM-based vs. Raw-based for both aggro and defensive
 
-- [ ] Benchmark and compare
-  - Compare survival time: KM-based vs. raw-based evaluator
-  - Measure training convergence speed
-  - Analyze feature weight distributions
+- [ ] **Feature Correlation Analysis**
+  - Extract feature values and survival times from validation games
+  - Calculate Pearson correlation for each feature
+  - Compare correlation strength: KM features vs. Raw features
+  - Verify |r| > 0.5 for survival features
+  - Identify features with strongest survival correlation
 
-- [ ] Validate feature effectiveness
-  - Measure correlation between features and survival time
-  - Verify non-linear transformation captures actual relationships
-  - Compare KM transform vs. raw transform for each feature
+- [ ] **Weight Interpretability Analysis**
+  - Compare learned weights between models:
+    - aggro-km vs. aggro-raw
+    - defensive-km vs. defensive-raw
+  - Check if weights correlate with feature survival ranges
+  - Analyze weight stability (variation between runs)
+  - Verify higher weights for features with larger survival impact
 
-- [ ] Analyze interpretability
-  - Check if learned weights correlate with survival ranges
-  - Verify that features with larger survival impact get higher weights
-  - Document findings and insights
+- [ ] **Training Convergence Analysis**
+  - Compare fitness progression over generations
+  - Analyze convergence speed (generations to stable fitness)
+  - Check for overfitting patterns
+  - Compare training stability (KM vs. Raw)
 
-- [ ] Document results
-  - Record performance metrics
-  - Document lessons learned
-  - Decide on feature set for production use
+- [ ] **Document Results and Make Decision**
+  - Create validation report with all metrics
+  - Summarize findings (what worked, what didn't)
+  - Make recommendation: adopt KM features, keep Raw, or iterate
+  - If KM features succeed, plan Phase 6 (refinement)
+  - If KM features fail, document lessons and pivot
+
+**Validation Criteria:**
+
+- KM-based models achieve ≥ Raw-based survival time (statistical significance)
+- Survival features show |r| > 0.5 correlation
+- KM transform demonstrates measurable improvement over Raw
+- Learned weights are interpretable and stable
 
 **Deliverables:**
 
@@ -288,6 +327,8 @@ This roadmap outlines the development of KM-based normalization for **survival f
 - ✅ CLI tools support feature set selection
 - ✅ Survival statistics pipeline working correctly
 - ✅ Interactive analysis tool displays all features
+- ✅ 4 baseline models generated for validation
+- ✅ Training infrastructure supports KM/Raw comparison
 
 ### Phase 5: Validation (Project Goal)
 
@@ -302,15 +343,15 @@ This roadmap outlines the development of KM-based normalization for **survival f
 ## Dependencies
 
 ```text
-Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 (In Progress)
+Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 (Ready to Start)
                                           ↓
                                      Future Work (separate projects)
 ```
 
 - Phase 1-2: Data generation and KM survival analysis (completed)
 - Phase 3: Infrastructure for KM normalization (completed 2026-01-06)
-- Phase 4: Implementation of table-based features (completed 2026-01-08)
-- Phase 5: Validation and training (project goal)
+- Phase 4: Implementation of table-based features (completed 2026-01-09)
+- Phase 5: Validation and training (ready to start, project goal)
 - Future Work: Structure features, score optimization, advanced techniques (out of scope)
 
 ---

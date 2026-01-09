@@ -166,6 +166,8 @@ where
 pub enum FeatureSet {
     /// All features including raw and table transforms
     All,
+    /// Only features with Kaplan-Meier normalization
+    Km,
     /// Only raw-transform features (penalty/risk)
     Raw,
 }
@@ -228,6 +230,7 @@ pub fn build_feature_from_session(
     let feature_builder = FeatureBuilder::new(norm_params);
     let features = match feature_set {
         FeatureSet::All => feature_builder.build_all_features()?,
+        FeatureSet::Km => feature_builder.build_km_features()?,
         FeatureSet::Raw => feature_builder.build_raw_features()?,
     };
     eprintln!("Built {} features", features.len());

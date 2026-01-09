@@ -1,11 +1,11 @@
 {
-  "name": "aggro",
-  "trained_at": "2026-01-08T04:55:41.718865243Z",
-  "final_fitness": 2.519111,
+  "name": "aggro-raw",
+  "trained_at": "2026-01-09T09:57:33.330686419Z",
+  "final_fitness": 2.5089998,
   "board_features": [
     {
       "id": "num_holes_raw_penalty",
-      "name": "Number of Holes (Linear Penalty)",
+      "name": "Number of Holes (Raw Penalty)",
       "source_id": "num_holes",
       "processing": {
         "raw_transform": {
@@ -14,11 +14,11 @@
           "normalize_max": 33.0
         }
       },
-      "weight": 0.25690237
+      "weight": 0.15822159
     },
     {
       "id": "sum_of_hole_depth_raw_penalty",
-      "name": "Sum of Hole Depth (Linear Penalty)",
+      "name": "Sum of Hole Depth (Raw Penalty)",
       "source_id": "sum_of_hole_depth",
       "processing": {
         "raw_transform": {
@@ -27,11 +27,11 @@
           "normalize_max": 259.0
         }
       },
-      "weight": 0.08745674
+      "weight": 0.12842225
     },
     {
       "id": "max_height_raw_penalty",
-      "name": "Max Height (Linear Penalty)",
+      "name": "Max Height (Raw Penalty)",
       "source_id": "max_height",
       "processing": {
         "raw_transform": {
@@ -40,11 +40,11 @@
           "normalize_max": 18.0
         }
       },
-      "weight": 0.093096726
+      "weight": 0.06634672
     },
     {
       "id": "max_height_raw_risk",
-      "name": "Max Height (Linear Risk)",
+      "name": "Max Height (Raw Risk)",
       "source_id": "max_height",
       "processing": {
         "raw_transform": {
@@ -53,11 +53,11 @@
           "normalize_max": 18.0
         }
       },
-      "weight": 0.09275745
+      "weight": 0.05247576
     },
     {
       "id": "center_column_max_height_raw_penalty",
-      "name": "Center Column Max Height (Linear Penalty)",
+      "name": "Center Column Max Height (Raw Penalty)",
       "source_id": "center_column_max_height",
       "processing": {
         "raw_transform": {
@@ -66,11 +66,11 @@
           "normalize_max": 18.0
         }
       },
-      "weight": 0.0
+      "weight": 0.008233372
     },
     {
       "id": "center_column_max_height_raw_risk",
-      "name": "Center Column Max Height (Linear Risk)",
+      "name": "Center Column Max Height (Raw Risk)",
       "source_id": "center_column_max_height",
       "processing": {
         "raw_transform": {
@@ -79,11 +79,11 @@
           "normalize_max": 18.0
         }
       },
-      "weight": 0.03388616
+      "weight": 0.11786861
     },
     {
       "id": "total_height_raw_penalty",
-      "name": "Total Height (Linear Penalty)",
+      "name": "Total Height (Raw Penalty)",
       "source_id": "total_height",
       "processing": {
         "raw_transform": {
@@ -92,11 +92,11 @@
           "normalize_max": 159.0
         }
       },
-      "weight": 0.031784434
+      "weight": 0.04721338
     },
     {
       "id": "surface_bumpiness_raw_penalty",
-      "name": "Surface Bumpiness (Linear Penalty)",
+      "name": "Surface Bumpiness (Raw Penalty)",
       "source_id": "surface_bumpiness",
       "processing": {
         "raw_transform": {
@@ -105,11 +105,11 @@
           "normalize_max": 32.0
         }
       },
-      "weight": 0.012104496
+      "weight": 0.009537262
     },
     {
       "id": "surface_roughness_raw_penalty",
-      "name": "Surface Roughness (Linear Penalty)",
+      "name": "Surface Roughness (Raw Penalty)",
       "source_id": "surface_roughness",
       "processing": {
         "raw_transform": {
@@ -118,11 +118,11 @@
           "normalize_max": 45.0
         }
       },
-      "weight": 0.0107726855
+      "weight": 0.01094618
     },
     {
       "id": "row_transitions_raw_penalty",
-      "name": "Row Transitions (Linear Penalty)",
+      "name": "Row Transitions (Raw Penalty)",
       "source_id": "row_transitions",
       "processing": {
         "raw_transform": {
@@ -131,11 +131,11 @@
           "normalize_max": 54.0
         }
       },
-      "weight": 0.067743376
+      "weight": 0.05690786
     },
     {
       "id": "column_transitions_raw_penalty",
-      "name": "Column Transitions (Linear Penalty)",
+      "name": "Column Transitions (Raw Penalty)",
       "source_id": "column_transitions",
       "processing": {
         "raw_transform": {
@@ -144,11 +144,11 @@
           "normalize_max": 54.0
         }
       },
-      "weight": 0.1779663
+      "weight": 0.17218389
     },
     {
       "id": "sum_of_well_depth_raw_penalty",
-      "name": "Sum of Well Depth (Linear Penalty)",
+      "name": "Sum of Well Depth (Raw Penalty)",
       "source_id": "sum_of_well_depth",
       "processing": {
         "raw_transform": {
@@ -157,11 +157,11 @@
           "normalize_max": 15.0
         }
       },
-      "weight": 0.010597029
+      "weight": 0.006457158
     },
     {
       "id": "sum_of_well_depth_raw_risk",
-      "name": "Sum of Well Depth (Linear Risk)",
+      "name": "Sum of Well Depth (Raw Risk)",
       "source_id": "sum_of_well_depth",
       "processing": {
         "raw_transform": {
@@ -170,21 +170,21 @@
           "normalize_max": 15.0
         }
       },
-      "weight": 0.055294137
+      "weight": 0.12858813
     },
     {
       "id": "line_clear_bonus",
       "name": "Line Clear Bonus",
       "source_id": "num_cleared_lines",
       "processing": "line_clear_bonus",
-      "weight": 0.05026228
+      "weight": 0.021573849
     },
     {
       "id": "i_well_reward",
       "name": "I-Well Reward",
       "source_id": "edge_i_well_depth",
       "processing": "i_well_reward",
-      "weight": 0.019375812
+      "weight": 0.015023942
     }
   ]
 }

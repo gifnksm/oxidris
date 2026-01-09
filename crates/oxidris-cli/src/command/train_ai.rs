@@ -16,10 +16,13 @@ use crate::{
 };
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, derive_more::FromStr)]
+#[from_str(rename_all = "kebab-case")]
 pub enum AiType {
     #[default]
-    Aggro,
-    Defensive,
+    AggroKm,
+    DefensiveKm,
+    AggroRaw,
+    DefensiveRaw,
 }
 
 const GAMES_PER_INDIVIDUAL: usize = 3;
@@ -101,16 +104,30 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
     let sessions = util::read_boards_file(boards_file)?.sessions;
     eprintln!("Loaded {} sessions", sessions.len());
 
-    let session_evaluator = match ai {
-        AiType::Aggro => &DefaultSessionEvaluator::new(TURN_LIMIT, AggroSessionEvaluator::new())
-            as &dyn SessionEvaluator,
-        AiType::Defensive => {
+    let (session_evaluator, feature_set) = match ai {
+        AiType::AggroKm => (
+            &DefaultSessionEvaluator::new(TURN_LIMIT, AggroSessionEvaluator::new())
+                as &dyn SessionEvaluator,
+            FeatureSet::Km,
+        ),
+        AiType::DefensiveKm => (
             &DefaultSessionEvaluator::new(TURN_LIMIT, DefensiveSessionEvaluator::new())
-                as &dyn SessionEvaluator
-        }
+                as &dyn SessionEvaluator,
+            FeatureSet::Km,
+        ),
+        AiType::AggroRaw => (
+            &DefaultSessionEvaluator::new(TURN_LIMIT, AggroSessionEvaluator::new())
+                as &dyn SessionEvaluator,
+            FeatureSet::Raw,
+        ),
+        AiType::DefensiveRaw => (
+            &DefaultSessionEvaluator::new(TURN_LIMIT, DefensiveSessionEvaluator::new())
+                as &dyn SessionEvaluator,
+            FeatureSet::Raw,
+        ),
     };
 
-    let features = util::build_feature_from_session(FeatureSet::Raw, &sessions)?;
+    let features = util::build_feature_from_session(feature_set, &sessions)?;
 
     let mut rng = rand::rng();
     let mut population = Population::random(
@@ -139,8 +156,10 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
     eprintln!("{ai:?} AI learning completed.");
 
     let model_name = match ai {
-        AiType::Aggro => "aggro",
-        AiType::Defensive => "defensive",
+        AiType::AggroKm => "aggro-km",
+        AiType::DefensiveKm => "defensive-km",
+        AiType::AggroRaw => "aggro-raw",
+        AiType::DefensiveRaw => "defensive-raw",
     };
     let best_individual = population.individuals().first().unwrap();
     save_model(output.as_ref(), model_name, &features, best_individual)?;

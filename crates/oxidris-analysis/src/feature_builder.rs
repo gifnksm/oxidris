@@ -189,6 +189,14 @@ impl FeatureBuilder {
         Self { params }
     }
 
+    pub fn build_km_features(&self) -> Result<Vec<BoxedBoardFeature>, BuildFeatureError> {
+        let mut features = vec![];
+        features.extend_from_slice(&self.build_survival_features(false, true)?);
+        features.extend_from_slice(&self.build_structure_raw_features()?);
+        features.extend_from_slice(&self.build_score_features());
+        Ok(features)
+    }
+
     /// Build all raw board features with runtime normalization
     ///
     /// Constructs only raw-transform features (no table-based transforms).

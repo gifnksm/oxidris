@@ -10,11 +10,16 @@ This document describes the target architecture for KM-based feature normalizati
 - **Related documents**: [roadmap.md](./roadmap.md) (implementation status)
 
 > [!IMPORTANT]
-> **Status:** Design document - describes target architecture, not current implementation.
+> **Status:** Design document - describes target architecture.
 > See [roadmap.md](./roadmap.md) for implementation status.
 >
-> **Recent Changes (2026-01-06):** The evaluator system migrated from static feature constants
-> to dynamic runtime construction via `FeatureBuilder`. This design reflects that architecture.
+> **Recent Changes:**
+>
+> - **2026-01-09:** Phase 4 implementation complete. Four baseline models
+>   (aggro-km, defensive-km, aggro-raw, defensive-raw) have been generated for validation.
+>   Phase 5 validation is ready to start. See [roadmap.md](./roadmap.md) for details.
+> - **2026-01-06:** The evaluator system migrated from static feature constants
+>   to dynamic runtime construction via `FeatureBuilder`. This design reflects that architecture.
 
 ## Overview
 

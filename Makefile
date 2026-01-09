@@ -52,15 +52,25 @@ play:
 build:
 	cargo build --release
 
-## Let the computer play the game automatically with aggressive AI
-.PHONY: auto-play-aggro
-auto-play-aggro:
-	cargo run --release -- auto-play $(MODELS_DIR)/ai/aggro.json
+## Let the computer play the game automatically with aggro-km AI
+.PHONY: auto-play-aggro-km
+auto-play-aggro-km: $(MODELS_DIR)/ai/aggro-km.json
+	cargo run --release -- auto-play $(MODELS_DIR)/ai/aggro-km.json
 
-## Let the computer play the game automatically with defensive AI
-.PHONY: auto-play-defensive
-auto-play-defensive:
-	cargo run --release -- auto-play $(MODELS_DIR)/ai/defensive.json
+## Let the computer play the game automatically with defensive-km AI
+.PHONY: auto-play-defensive-km
+auto-play-defensive-km: $(MODELS_DIR)/ai/defensive-km.json
+	cargo run --release -- auto-play $(MODELS_DIR)/ai/defensive-km.json
+
+## Let the computer play the game automatically with aggro-raw AI
+.PHONY: auto-play-aggro-raw
+auto-play-aggro-raw: $(MODELS_DIR)/ai/aggro-raw.json
+	cargo run --release -- auto-play $(MODELS_DIR)/ai/aggro-raw.json
+
+## Let the computer play the game automatically with defensive-raw AI
+.PHONY: auto-play-defensive-raw
+auto-play-defensive-raw: $(MODELS_DIR)/ai/defensive-raw.json
+	cargo run --release -- auto-play $(MODELS_DIR)/ai/defensive-raw.json
 
 ## Generate board data JSON file (if missing)
 .PHONY: generate-board-data
@@ -71,15 +81,28 @@ generate-board-data: $(BOARDS_DATA)
 regenerate-board-data: REGENERATE_BOARDS_JSON=1
 regenerate-board-data: $(BOARDS_DATA)
 
+.PHONY: train-ai-all
+train-ai-all: train-ai-aggro-km train-ai-defensive-km train-ai-aggro-raw train-ai-defensive-raw
+
 ## Train an aggressive AI using genetic algorithms
-.PHONY: train-ai-aggro
-train-ai-aggro: REGENERATE_AI_MODEL_JSON=1
-train-ai-aggro: $(MODELS_DIR)/ai/aggro.json
+.PHONY: train-ai-aggro-km
+train-ai-aggro-km: REGENERATE_AI_MODEL_JSON=1
+train-ai-aggro-km: $(MODELS_DIR)/ai/aggro-km.json
 
 ## Train a defensive AI using genetic algorithms
-.PHONY: train-ai-defensive
-train-ai-defensive: REGENERATE_AI_MODEL_JSON=1
-train-ai-defensive: $(MODELS_DIR)/ai/defensive.json
+.PHONY: train-ai-defensive-km
+train-ai-defensive-km: REGENERATE_AI_MODEL_JSON=1
+train-ai-defensive-km: $(MODELS_DIR)/ai/defensive-km.json
+
+## Train an aggressive AI using genetic algorithms
+.PHONY: train-ai-aggro-raw
+train-ai-aggro-raw: REGENERATE_AI_MODEL_JSON=1
+train-ai-aggro-raw: $(MODELS_DIR)/ai/aggro-raw.json
+
+## Train a defensive AI using genetic algorithms
+.PHONY: train-ai-defensive-raw
+train-ai-defensive-raw: REGENERATE_AI_MODEL_JSON=1
+train-ai-defensive-raw: $(MODELS_DIR)/ai/defensive-raw.json
 
 ## Start the TUI for analyzing board features
 .PHONY: analyze-board-features
