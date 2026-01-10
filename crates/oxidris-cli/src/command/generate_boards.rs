@@ -28,14 +28,20 @@ type BoxedPlacementEvaluator = Box<dyn PlacementEvaluator>;
 struct PlacementEvaluatorFactory {
     name: &'static str,
     factory: fn() -> BoxedPlacementEvaluator,
+    weight: u32,
 }
 
 impl PlacementEvaluatorFactory {
     pub fn new(
         name: &'static str,
         factory: fn() -> BoxedPlacementEvaluator,
+        weight: u32,
     ) -> PlacementEvaluatorFactory {
-        PlacementEvaluatorFactory { name, factory }
+        PlacementEvaluatorFactory {
+            name,
+            factory,
+            weight,
+        }
     }
 }
 
@@ -152,13 +158,30 @@ impl AdaptiveSampler {
 
 const CAPTURE_INTERVAL: usize = 5;
 
+/// Select an evaluator index based on weighted probabilities
+fn select_weighted_evaluator<R: Rng>(
+    evaluators: &[PlacementEvaluatorFactory],
+    rng: &mut R,
+) -> usize {
+    let total_weight: u32 = evaluators.iter().map(|e| e.weight).sum();
+    let random_value = rng.random_range(0..total_weight);
+    let mut cumulative_weight = 0;
+    for (i, evaluator) in evaluators.iter().enumerate() {
+        cumulative_weight += evaluator.weight;
+        if random_value < cumulative_weight {
+            return i;
+        }
+    }
+    evaluators.len() - 1
+}
+
 pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
     let GenerateBoardsArg { num_boards, output } = arg;
     let placement_evaluators: &[PlacementEvaluatorFactory] = &[
-        PlacementEvaluatorFactory::new("random", RandomPlacementEvaluator::boxed),
-        PlacementEvaluatorFactory::new("height_only", HeightOnlyEvaluator::boxed),
-        PlacementEvaluatorFactory::new("heuristic", HeuristicEvaluator::boxed),
-        PlacementEvaluatorFactory::new("noisy_heuristic", NoisyHeuristicEvaluator::boxed),
+        PlacementEvaluatorFactory::new("random", RandomPlacementEvaluator::boxed, 1),
+        PlacementEvaluatorFactory::new("height_only", HeightOnlyEvaluator::boxed, 1),
+        PlacementEvaluatorFactory::new("heuristic", HeuristicEvaluator::boxed, 6),
+        PlacementEvaluatorFactory::new("noisy_heuristic", NoisyHeuristicEvaluator::boxed, 2),
     ];
 
     eprintln!("Generating boards for training data...");
@@ -175,9 +198,10 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         let mut field = GameField::new();
         let mut stats = GameStats::new();
 
-        // Uniform selection of independent evaluators to avoid circular dependency
-        // Each evaluator has 25% probability
-        let evaluator_index = rng.random_range(0..placement_evaluators.len());
+        // Weighted selection of independent evaluators to avoid circular dependency
+        // Weights: random(1), height_only(1), heuristic(6), noisy_heuristic(2)
+        // = 10%, 10%, 60%, 20%
+        let evaluator_index = select_weighted_evaluator(placement_evaluators, &mut rng);
         let placement_evaluator = &placement_evaluators[evaluator_index];
         let turn_evaluator = TurnEvaluator::new((placement_evaluator.factory)());
         let mut session_data = SessionData {
