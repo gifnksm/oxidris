@@ -263,7 +263,7 @@ impl AggroSessionEvaluator {
 impl EvaluateSessionStats for AggroSessionEvaluator {
     type Stats = DefaultSessionStats;
 
-    #[expect(clippy::cast_precision_loss, clippy::manual_midpoint)]
+    #[expect(clippy::cast_precision_loss)]
     fn evaluate_session_stats(
         &self,
         _field: &GameField,
@@ -305,7 +305,16 @@ impl EvaluateSessionStats for AggroSessionEvaluator {
         let worst_max_height = (max_height_max - max_height_cutoff).powi(2) * turn_limit;
         let max_height_penalty = max_height_square_sum / worst_max_height;
 
-        (efficiency + (1.0 - max_height_penalty)) / 2.0
+        let peak_max_height = stats
+            .max_height_map
+            .last_key_value()
+            .map_or(0.0, |(h, _c)| {
+                let h = f32::from(*h) - max_height_cutoff;
+                if h < 0.0 { 0.0 } else { h }
+            });
+        let peak_max_height_penalty = peak_max_height.powi(2) / max_height_max.powi(2);
+
+        (efficiency + (1.0 - max_height_penalty) + (1.0 - peak_max_height_penalty)) / 3.0
     }
 }
 
@@ -334,7 +343,7 @@ impl DefensiveSessionEvaluator {
 impl EvaluateSessionStats for DefensiveSessionEvaluator {
     type Stats = DefaultSessionStats;
 
-    #[expect(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss, clippy::manual_midpoint)]
     fn evaluate_session_stats(
         &self,
         _field: &GameField,
@@ -367,6 +376,15 @@ impl EvaluateSessionStats for DefensiveSessionEvaluator {
         let worst_max_height = (max_height_max - max_height_cutoff).powi(2) * turn_limit;
         let max_height_penalty = max_height_square_sum / worst_max_height;
 
-        1.0 - max_height_penalty
+        let peak_max_height = stats
+            .max_height_map
+            .last_key_value()
+            .map_or(0.0, |(h, _c)| {
+                let h = f32::from(*h) - max_height_cutoff;
+                if h < 0.0 { 0.0 } else { h }
+            });
+        let peak_max_height_penalty = peak_max_height.powi(2) / max_height_max.powi(2);
+
+        ((1.0 - max_height_penalty) + (1.0 - peak_max_height_penalty)) / 2.0
     }
 }

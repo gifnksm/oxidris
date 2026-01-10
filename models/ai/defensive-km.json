@@ -1,7 +1,7 @@
 {
   "name": "defensive-km",
-  "trained_at": "2026-01-10T06:18:54.102527692Z",
-  "final_fitness": 0.9838925,
+  "trained_at": "2026-01-10T06:50:42.611540048Z",
+  "final_fitness": 0.95559543,
   "board_features": [
     {
       "id": "num_holes_table_km",
@@ -37,7 +37,7 @@
           ]
         }
       },
-      "weight": 0.19682333
+      "weight": 0.20999901
     },
     {
       "id": "sum_of_hole_depth_table_km",
@@ -191,7 +191,7 @@
           ]
         }
       },
-      "weight": 0.09624185
+      "weight": 0.041579645
     },
     {
       "id": "max_height_table_km",
@@ -224,7 +224,7 @@
           ]
         }
       },
-      "weight": 0.25724158
+      "weight": 0.20998617
     },
     {
       "id": "center_column_max_height_table_km",
@@ -255,7 +255,7 @@
           ]
         }
       },
-      "weight": 0.053185172
+      "weight": 0.034985807
     },
     {
       "id": "total_height_table_km",
@@ -397,7 +397,7 @@
           ]
         }
       },
-      "weight": 0.023223534
+      "weight": 0.05900062
     },
     {
       "id": "surface_bumpiness_raw_penalty",
@@ -410,7 +410,7 @@
           "normalize_max": 33.0
         }
       },
-      "weight": 0.0
+      "weight": 0.03570827
     },
     {
       "id": "surface_roughness_raw_penalty",
@@ -423,7 +423,7 @@
           "normalize_max": 45.0
         }
       },
-      "weight": 0.022899674
+      "weight": 0.02109165
     },
     {
       "id": "row_transitions_raw_penalty",
@@ -436,7 +436,7 @@
           "normalize_max": 48.0
         }
       },
-      "weight": 0.09858535
+      "weight": 0.07219789
     },
     {
       "id": "column_transitions_raw_penalty",
@@ -449,7 +449,7 @@
           "normalize_max": 37.0
         }
       },
-      "weight": 0.007488233
+      "weight": 0.03568775
     },
     {
       "id": "sum_of_well_depth_raw_penalty",
@@ -462,7 +462,7 @@
           "normalize_max": 16.0
         }
       },
-      "weight": 0.064891145
+      "weight": 0.12359753
     },
     {
       "id": "sum_of_well_depth_raw_risk",
@@ -475,21 +475,21 @@
           "normalize_max": 16.0
         }
       },
-      "weight": 0.14209269
+      "weight": 0.118036896
     },
     {
       "id": "line_clear_bonus",
       "name": "Line Clear Bonus",
       "source_id": "num_cleared_lines",
       "processing": "line_clear_bonus",
-      "weight": 0.035310708
+      "weight": 0.03707351
     },
     {
       "id": "i_well_reward",
       "name": "I-Well Reward",
       "source_id": "edge_i_well_depth",
       "processing": "i_well_reward",
-      "weight": 0.0020167863
+      "weight": 0.001055363
     }
   ]
 }
