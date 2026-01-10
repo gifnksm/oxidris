@@ -107,7 +107,7 @@
 //! Session evaluators are used by the genetic algorithm (see `oxidris-training` crate)
 //! to evolve feature weights that maximize fitness.
 
-use std::{fmt, iter};
+use std::{collections::BTreeMap, fmt, iter};
 
 use oxidris_engine::{GameField, GameStats};
 
@@ -211,29 +211,30 @@ where
 #[derive(Debug)]
 pub struct DefaultSessionStats {
     game_stats: GameStats,
-    worst_max_height: u8,
+    max_height_map: BTreeMap<u8, usize>,
+    total_height_map: BTreeMap<u8, usize>,
 }
 
 impl SessionStats for DefaultSessionStats {
     fn new() -> Self {
         Self {
             game_stats: GameStats::new(),
-            worst_max_height: 0,
+            max_height_map: BTreeMap::new(),
+            total_height_map: BTreeMap::new(),
         }
     }
 
     fn complete_piece_drop(&mut self, analysis: &PlacementAnalysis) {
         self.game_stats
             .complete_piece_drop(analysis.cleared_lines());
-        let max_height = *analysis
-            .board_analysis()
-            .column_heights()
-            .iter()
-            .max()
-            .unwrap();
-        if max_height > self.worst_max_height {
-            self.worst_max_height = max_height;
-        }
+        *self
+            .max_height_map
+            .entry(analysis.board_analysis().max_height())
+            .or_default() += 1;
+        *self
+            .total_height_map
+            .entry(analysis.board_analysis().total_height())
+            .or_default() += 1;
     }
 }
 
@@ -262,7 +263,7 @@ impl AggroSessionEvaluator {
 impl EvaluateSessionStats for AggroSessionEvaluator {
     type Stats = DefaultSessionStats;
 
-    #[expect(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss, clippy::manual_midpoint)]
     fn evaluate_session_stats(
         &self,
         _field: &GameField,
@@ -270,18 +271,41 @@ impl EvaluateSessionStats for AggroSessionEvaluator {
         turn_limit: usize,
     ) -> f32 {
         const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
+        let survived_turns = stats.game_stats.completed_pieces() as f32;
+        let turn_limit = turn_limit as f32;
 
-        let survived = stats.game_stats.completed_pieces() as f32;
-        let max_pieces = turn_limit as f32;
-        let survived_ratio = survived / max_pieces;
-        let survival_bonus = 2.0 * survived_ratio * survived_ratio;
+        let block_count = turn_limit * 4.0;
         let weighted_line_count =
             iter::zip(LINE_CLEAR_WEIGHT, stats.game_stats.line_cleared_counter())
                 .map(|(w, c)| f32::from(w) * (*c as f32))
                 .sum::<f32>();
-        let efficiency = weighted_line_count / survived.max(1.0);
-        let height_penalty = f32::from(u8::max(stats.worst_max_height, 10) - 10) / 5.0;
-        survival_bonus + efficiency * survived_ratio - height_penalty
+        let max_line_score = 8.0 * block_count / 40.0;
+        let efficiency = weighted_line_count / max_line_score;
+
+        let max_height_max: f32 = 20.0;
+        let max_height_cutoff = 4.0;
+        let mut max_height_square_sum = stats
+            .max_height_map
+            .iter()
+            .map(|(h, c)| {
+                let h = f32::from(*h) - max_height_cutoff;
+                if h < 0.0 {
+                    0.0
+                } else {
+                    h.powi(2) * (*c as f32)
+                }
+            })
+            .sum::<f32>();
+        if survived_turns < turn_limit {
+            // Penalize unfinished games by assuming max height for remaining turns
+            let remaining_turns = turn_limit - survived_turns;
+            max_height_square_sum += (max_height_max - max_height_cutoff).powi(2) * remaining_turns;
+        }
+
+        let worst_max_height = (max_height_max - max_height_cutoff).powi(2) * turn_limit;
+        let max_height_penalty = max_height_square_sum / worst_max_height;
+
+        (efficiency + (1.0 - max_height_penalty)) / 2.0
     }
 }
 
@@ -317,13 +341,32 @@ impl EvaluateSessionStats for DefensiveSessionEvaluator {
         stats: &Self::Stats,
         turn_limit: usize,
     ) -> f32 {
-        let survived = stats.game_stats.completed_pieces() as f32;
-        let max_pieces = turn_limit as f32;
-        let survived_ratio = survived / max_pieces;
-        let survival_bonus = 2.0 * survived_ratio * survived_ratio;
-        let line_count = stats.game_stats.total_cleared_lines() as f32;
-        let efficiency = line_count / survived.max(1.0);
-        let height_penalty = f32::from(stats.worst_max_height) / 20.0;
-        survival_bonus + efficiency * survived_ratio - height_penalty
+        let survived_turns = stats.game_stats.completed_pieces() as f32;
+        let turn_limit = turn_limit as f32;
+
+        let max_height_max: f32 = 20.0;
+        let max_height_cutoff = 0.0;
+        let mut max_height_square_sum = stats
+            .max_height_map
+            .iter()
+            .map(|(h, c)| {
+                let h = f32::from(*h) - max_height_cutoff;
+                if h < 0.0 {
+                    0.0
+                } else {
+                    h.powi(2) * (*c as f32)
+                }
+            })
+            .sum::<f32>();
+        if survived_turns < turn_limit {
+            // Penalize unfinished games by assuming max height for remaining turns
+            let remaining_turns = turn_limit - survived_turns;
+            max_height_square_sum += (max_height_max - max_height_cutoff).powi(2) * remaining_turns;
+        }
+
+        let worst_max_height = (max_height_max - max_height_cutoff).powi(2) * turn_limit;
+        let max_height_penalty = max_height_square_sum / worst_max_height;
+
+        1.0 - max_height_penalty
     }
 }
