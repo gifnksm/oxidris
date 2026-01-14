@@ -58,7 +58,7 @@ pub struct GameSession {
     field: GameField,
     stats: GameStats,
     hold_used: bool,
-    render_board: BlockBoard,
+    block_board: BlockBoard,
     session_state: SessionState,
     fps: u64,
     total_frames: u64,
@@ -90,7 +90,7 @@ impl GameSession {
             field: GameField::new(),
             stats: GameStats::new(),
             hold_used: false,
-            render_board: BlockBoard::INITIAL,
+            block_board: BlockBoard::INITIAL,
             session_state: SessionState::Playing,
             fps,
             total_frames: 0,
@@ -144,8 +144,8 @@ impl GameSession {
 
     /// Returns the board with pieces rendered for display.
     #[must_use]
-    pub fn render_board(&self) -> &BlockBoard {
-        &self.render_board
+    pub fn block_board(&self) -> &BlockBoard {
+        &self.block_board
     }
 
     /// Returns the currently falling piece.
@@ -297,7 +297,7 @@ impl GameSession {
 
     /// Internal method to complete a piece drop: lock, clear lines, spawn next piece.
     fn complete_piece_drop(&mut self) {
-        self.render_board.fill_piece(self.field.falling_piece());
+        self.block_board.fill_piece(self.field.falling_piece());
         let (cleared_lines, result) = self.field.complete_piece_drop();
         self.stats.complete_piece_drop(cleared_lines);
         self.hold_used = false;
@@ -306,6 +306,6 @@ impl GameSession {
             self.session_state = SessionState::GameOver;
             return;
         }
-        assert_eq!(self.render_board.clear_lines(), cleared_lines);
+        assert_eq!(self.block_board.clear_lines(), cleared_lines);
     }
 }

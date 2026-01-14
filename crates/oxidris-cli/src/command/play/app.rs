@@ -1,0 +1,67 @@
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
+
+use crossterm::event;
+use oxidris_evaluator::turn_evaluator::TurnEvaluator;
+use ratatui::{DefaultTerminal, Frame};
+
+use crate::command::play::screens::Screen;
+
+const FPS: u64 = 60;
+
+#[derive(Debug)]
+pub struct App {
+    screen: Screen,
+}
+
+impl App {
+    pub fn manual() -> Self {
+        Self {
+            screen: Screen::manual(FPS),
+        }
+    }
+
+    pub fn auto(turn_evaluator: TurnEvaluator<'static>) -> Self {
+        Self {
+            screen: Screen::auto(FPS, turn_evaluator),
+        }
+    }
+
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
+        let tick_rate = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
+
+        while !self.screen.is_exiting() {
+            let now = Instant::now();
+            terminal.draw(|f| self.draw(f))?;
+            self.handle_events()?;
+
+            if self.screen.is_playing() {
+                self.update_game();
+            }
+
+            let elapsed = now.elapsed();
+            if let Some(rest) = tick_rate.checked_sub(elapsed) {
+                thread::sleep(rest);
+            }
+        }
+        Ok(())
+    }
+
+    fn draw(&self, frame: &mut Frame<'_>) {
+        self.screen.draw(frame);
+    }
+
+    fn handle_events(&mut self) -> anyhow::Result<()> {
+        while event::poll(Duration::ZERO)? {
+            let event = event::read()?;
+            self.screen.handle_event(&event);
+        }
+        Ok(())
+    }
+
+    fn update_game(&mut self) {
+        self.screen.update_game();
+    }
+}

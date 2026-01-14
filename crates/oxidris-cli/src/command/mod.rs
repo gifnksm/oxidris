@@ -1,11 +1,10 @@
 use clap::{Parser, Subcommand};
 
+use crate::command::play::ManualPlayArg;
+
 use self::{
-    analyze_board_features::AnalyzeBoardFeaturesArg,
-    analyze_censoring::AnalyzeCensoringArg,
-    generate_boards::GenerateBoardsArg,
-    play::{AutoPlayArg, ManualPlayArg},
-    train_ai::TrainAiArg,
+    analyze_board_features::AnalyzeBoardFeaturesArg, analyze_censoring::AnalyzeCensoringArg,
+    generate_boards::GenerateBoardsArg, train_ai::TrainAiArg,
 };
 
 mod analyze_board_features;
@@ -24,11 +23,10 @@ pub struct CommandArgs {
 
 #[derive(Debug, Clone, Subcommand)]
 enum Mode {
-    /// Run normal play
     #[command(name = "play")]
-    ManualPlay(#[clap(flatten)] ManualPlayArg),
-    /// Run auto play
-    AutoPlay(#[clap(flatten)] AutoPlayArg),
+    ManualPlay(#[clap(flatten)] play::ManualPlayArg),
+    #[command(name = "auto-play")]
+    AutoPlay(#[clap(flatten)] play::AutoPlayArg),
     /// Train AI using genetic algorithm
     TrainAi(#[clap(flatten)] TrainAiArg),
     /// Generate boards for training data
@@ -45,8 +43,8 @@ pub fn run() -> anyhow::Result<()> {
         .mode
         .unwrap_or(Mode::ManualPlay(ManualPlayArg::default()))
     {
-        Mode::ManualPlay(arg) => play::manual(&arg)?,
-        Mode::AutoPlay(arg) => play::auto(&arg)?,
+        Mode::ManualPlay(arg) => play::run_manual(&arg)?,
+        Mode::AutoPlay(arg) => play::run_auto(&arg)?,
         Mode::TrainAi(arg) => train_ai::run(&arg)?,
         Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
         Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,

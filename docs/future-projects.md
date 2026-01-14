@@ -55,38 +55,28 @@ The limited search space may prevent the AI from reaching beneficial board state
 
 ## UI Improvements
 
-### Migration to Ratatui
+### Interactive Replay Viewer
 
-**Problem:** Current UI implementation for `play` and `auto-play` subcommands uses custom crossterm-based rendering (`crates/oxidris-cli/src/ui/`), which has several issues:
+**Problem:** Currently there's no way to review and analyze past game sessions. Understanding how and why games ended requires re-running sessions and watching in real-time. This makes it difficult to:
 
-- Screen rendering corruption after terminal resize
-- Fixed numeric layout positions with low flexibility
-- Layout changes require manual coordinate recalculation
-- Maintenance burden of custom terminal handling code
-- Inconsistent with `analyze-board-features` which already uses ratatui
+- Debug unexpected AI behavior in specific game situations
+- Learn from AI mistakes or successes
+- Compare different AI models on the same game sequence
+- Share interesting game sessions with others
 
-The project already depends on ratatui for the analysis TUI, so using it for game rendering would unify the UI stack and eliminate custom terminal code.
+**Improvement:** Add a replay viewer subcommand that can load saved game sessions and provide interactive playback:
 
-**Improvement:** Migrate `play` and `auto-play` subcommands to use ratatui for rendering:
+- Load game session from file (serialize/deserialize game state history)
+- Playback controls: play/pause, speed control, frame-by-frame stepping
+- Visual display of current board state, statistics, and upcoming pieces
+- Optional: feature value overlays, placement decision explanations
+- Save game sessions during play/auto-play for later review
 
-- Replace custom `ui/terminal.rs` and `ui/renderer.rs` with ratatui widgets
-- Use ratatui's layout system for flexible, responsive layouts
-- Proper handling of terminal resize events
-- Maintain existing gameplay functionality (manual play, auto-play, pause, controls)
-- Keep same visual appearance where possible (game board, next pieces, hold, score, controls)
+This would reuse existing ratatui widgets (BoardDisplay, SessionDisplay, etc.) but add playback control UI.
 
-**Out of Scope:** Training and data generation CLIs don't need UI changes. Future projects could enhance them with TUI if needed.
+**Dependencies:** None (uses existing widget infrastructure)
 
-**Benefits:**
-
-- Eliminates screen corruption bugs
-- Easier layout modifications and improvements
-- Reduced maintenance (no custom terminal code)
-- Consistent UI stack across the project
-
-**Dependencies:** None (ratatui already in dependencies)
-
-**Effort:** Medium (UI reimplementation + testing both play modes)
+**Effort:** Medium (session serialization + playback UI + controls)
 
 ---
 
