@@ -15,6 +15,7 @@ use crate::ui::widgets::{
 pub struct SessionDisplay<'a> {
     session: &'a GameSession,
     show_ghost: bool,
+    turbo: bool,
     horizontal_padding: u16,
     vertical_padding: u16,
     next_pieces: usize,
@@ -25,10 +26,15 @@ impl<'a> SessionDisplay<'a> {
         Self {
             session,
             show_ghost,
+            turbo: false,
             horizontal_padding: 1,
             vertical_padding: 0,
             next_pieces: 7,
         }
+    }
+
+    pub fn turbo(self, turbo: bool) -> Self {
+        Self { turbo, ..self }
     }
 }
 
@@ -48,11 +54,17 @@ impl Widget for &SessionDisplay<'_> {
     {
         let style = style::DEFAULT;
         let block_padding = Padding::symmetric(self.horizontal_padding, self.vertical_padding);
+        let border_style = match self.session.session_state() {
+            SessionState::Playing if self.turbo => color::MAGENTA,
+            SessionState::Playing => color::WHITE,
+            SessionState::Paused => color::YELLOW,
+            SessionState::GameOver => color::RED,
+        };
 
         let game_board = {
             let widget = BoardDisplay::new(self.session.block_board())
                 .falling_piece(self.session.falling_piece())
-                .block(Block::bordered().style(style));
+                .block(Block::bordered().border_style(border_style).style(style));
             if self.show_ghost {
                 widget.ghost(self.session.simulate_drop_position())
             } else {
@@ -64,6 +76,7 @@ impl Widget for &SessionDisplay<'_> {
                 Block::bordered()
                     .title(Line::from("HOLD").centered())
                     .padding(block_padding)
+                    .border_style(border_style)
                     .style(style::DEFAULT),
             );
             if let Some(piece) = self.session.held_piece() {
@@ -77,12 +90,14 @@ impl Widget for &SessionDisplay<'_> {
                 Block::bordered()
                     .title(Line::from("NEXT").centered())
                     .padding(block_padding)
+                    .border_style(border_style)
                     .style(style::DEFAULT),
             );
         let session_stats = SessionStatsDisplay::new(self.session).block(
             Block::bordered()
                 .title(Line::from("STATS").centered())
                 .padding(block_padding)
+                .border_style(border_style)
                 .style(style::DEFAULT),
         );
 

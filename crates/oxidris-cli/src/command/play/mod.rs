@@ -16,6 +16,9 @@ pub(crate) struct ManualPlayArg {}
 pub(crate) struct AutoPlayArg {
     /// Path to the model file (JSON format)
     model_path: PathBuf,
+    /// Run in turbo mode
+    #[clap(long, default_value_t = false)]
+    turbo: bool,
 }
 
 pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
@@ -28,7 +31,7 @@ pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
 }
 
 pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
-    let AutoPlayArg { model_path } = arg;
+    let AutoPlayArg { model_path, turbo } = arg;
 
     let model = util::read_ai_model_file(model_path)?;
     let (features, weights) = model.to_feature_weights()?;
@@ -36,7 +39,7 @@ pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
     let turn_evaluator = TurnEvaluator::new(Box::new(placement_evaluator));
 
     let mut terminal = ratatui::init();
-    let app_result = App::auto(turn_evaluator).run(&mut terminal);
+    let app_result = App::auto(turn_evaluator, *turbo).run(&mut terminal);
     ratatui::restore();
     app_result
 }

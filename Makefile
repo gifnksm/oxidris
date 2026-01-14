@@ -55,22 +55,42 @@ build:
 ## Let the computer play the game automatically with aggro-km AI
 .PHONY: auto-play-aggro-km
 auto-play-aggro-km: $(MODELS_DIR)/ai/aggro-km.json
-	cargo run --release -- auto-play $(MODELS_DIR)/ai/aggro-km.json
+	cargo run --release -- auto-play $<
+
+## Let the computer play the game automatically with aggro-km AI in turbo mode
+.PHONY: auto-play-aggro-km-turbo
+auto-play-aggro-km-turbo: $(MODELS_DIR)/ai/aggro-km.json
+	cargo run --release -- auto-play $< --turbo
 
 ## Let the computer play the game automatically with defensive-km AI
 .PHONY: auto-play-defensive-km
 auto-play-defensive-km: $(MODELS_DIR)/ai/defensive-km.json
-	cargo run --release -- auto-play $(MODELS_DIR)/ai/defensive-km.json
+	cargo run --release -- auto-play $<
+
+## Let the computer play the game automatically with defensive-km AI in turbo mode
+.PHONY: auto-play-defensive-km-turbo
+auto-play-defensive-km-turbo: $(MODELS_DIR)/ai/defensive-km.json
+	cargo run --release -- auto-play $< --turbo
 
 ## Let the computer play the game automatically with aggro-raw AI
 .PHONY: auto-play-aggro-raw
 auto-play-aggro-raw: $(MODELS_DIR)/ai/aggro-raw.json
-	cargo run --release -- auto-play $(MODELS_DIR)/ai/aggro-raw.json
+	cargo run --release -- auto-play $<
+
+## Let the computer play the game automatically with aggro-raw AI in turbo mode
+.PHONY: auto-play-aggro-raw-turbo
+auto-play-aggro-raw-turbo: $(MODELS_DIR)/ai/aggro-raw.json
+	cargo run --release -- auto-play $< --turbo
 
 ## Let the computer play the game automatically with defensive-raw AI
 .PHONY: auto-play-defensive-raw
 auto-play-defensive-raw: $(MODELS_DIR)/ai/defensive-raw.json
-	cargo run --release -- auto-play $(MODELS_DIR)/ai/defensive-raw.json
+	cargo run --release -- auto-play $<
+
+## Let the computer play the game automatically with defensive-raw AI in turbo mode
+.PHONY: auto-play-defensive-raw-turbo
+auto-play-defensive-raw-turbo: $(MODELS_DIR)/ai/defensive-raw.json
+	cargo run --release -- auto-play $< --turbo
 
 ## Generate board data JSON file (if missing)
 .PHONY: generate-board-data

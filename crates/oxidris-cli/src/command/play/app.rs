@@ -23,9 +23,9 @@ impl App {
         }
     }
 
-    pub fn auto(turn_evaluator: TurnEvaluator<'static>) -> Self {
+    pub fn auto(turn_evaluator: TurnEvaluator<'static>, turbo: bool) -> Self {
         Self {
-            screen: Screen::auto(FPS, turn_evaluator),
+            screen: Screen::auto(FPS, turn_evaluator, turbo),
         }
     }
 

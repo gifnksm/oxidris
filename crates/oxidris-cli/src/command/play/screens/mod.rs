@@ -18,8 +18,8 @@ impl Screen {
         Screen::Manual(ManualPlayScreen::new(fps))
     }
 
-    pub fn auto(fps: u64, turn_evaluator: TurnEvaluator<'static>) -> Self {
-        Screen::Auto(AutoPlayScreen::new(fps, turn_evaluator))
+    pub fn auto(fps: u64, turn_evaluator: TurnEvaluator<'static>, turbo: bool) -> Self {
+        Screen::Auto(AutoPlayScreen::new(fps, turn_evaluator, turbo))
     }
 
     pub fn is_playing(&self) -> bool {
