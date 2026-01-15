@@ -63,12 +63,10 @@ const ROWS: &[Row] = &[
     Row::Empty,
     Row::LabelValue("LEVEL:", &|session| session.stats().level().to_string()),
     Row::LabelValue("LINES:", &|session| {
-        session.stats().total_cleared_lines().to_string()
+        session.stats().cleared_lines().to_string()
     }),
     Row::Empty,
-    Row::LabelValue("PIECES:", &|session| {
-        session.stats().completed_pieces().to_string()
-    }),
+    Row::LabelValue("TURN:", &|session| session.stats().turn().to_string()),
     Row::LabelValue("SINGLES:", &|session| {
         session.stats().line_cleared_counter()[1].to_string()
     }),

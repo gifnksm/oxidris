@@ -8,13 +8,13 @@
 /// - 4 lines: 800 points
 const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 
-/// Game statistics tracking score, lines cleared, and piece count.
+/// Game statistics tracking score, lines cleared, and turn count.
 ///
 /// Tracks various metrics during a game session:
 ///
 /// - **Score**: Points earned from line clears
 /// - **Level**: Derived from total lines cleared (1 level per 10 lines)
-/// - **Completed pieces**: Total number of pieces locked
+/// - **Turn**: Number of pieces locked (each piece placement is one turn)
 /// - **Line clear distribution**: Count of single, double, triple, quad line clears
 ///
 /// # Scoring
@@ -35,14 +35,14 @@ const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 /// stats.complete_piece_drop(4); // Tetris (4 lines)
 ///
 /// assert_eq!(stats.score(), 800);
-/// assert_eq!(stats.total_cleared_lines(), 4);
+/// assert_eq!(stats.cleared_lines(), 4);
 /// assert_eq!(stats.line_cleared_counter()[4], 1);
 /// ```
 #[derive(Debug, Clone)]
 pub struct GameStats {
     score: usize,
-    completed_pieces: usize,
-    total_cleared_lines: usize,
+    turn: usize,
+    cleared_lines: usize,
     line_cleared_counter: [usize; 5],
 }
 
@@ -58,8 +58,8 @@ impl GameStats {
     pub const fn new() -> Self {
         Self {
             score: 0,
-            completed_pieces: 0,
-            total_cleared_lines: 0,
+            turn: 0,
+            cleared_lines: 0,
             line_cleared_counter: [0; 5],
         }
     }
@@ -75,19 +75,21 @@ impl GameStats {
     /// Level increases by 1 for every 10 lines cleared (integer division).
     #[must_use]
     pub fn level(&self) -> usize {
-        self.total_cleared_lines / 10
+        self.cleared_lines / 10
     }
 
-    /// Returns the total number of pieces that have been locked into place.
+    /// Returns the current turn number.
+    ///
+    /// Each piece placement increments the turn counter by 1.
     #[must_use]
-    pub const fn completed_pieces(&self) -> usize {
-        self.completed_pieces
+    pub const fn turn(&self) -> usize {
+        self.turn
     }
 
-    /// Returns the total number of lines cleared across all line clears.
+    /// Returns the total number of lines cleared.
     #[must_use]
-    pub const fn total_cleared_lines(&self) -> usize {
-        self.total_cleared_lines
+    pub const fn cleared_lines(&self) -> usize {
+        self.cleared_lines
     }
 
     /// Returns a histogram of line clears by count.
@@ -111,8 +113,8 @@ impl GameStats {
     ///
     /// * `cleared_lines` - Number of lines cleared (0-4)
     pub const fn complete_piece_drop(&mut self, cleared_lines: usize) {
-        self.completed_pieces += 1;
-        self.total_cleared_lines += cleared_lines;
+        self.turn += 1;
+        self.cleared_lines += cleared_lines;
         if cleared_lines < self.line_cleared_counter.len() {
             self.line_cleared_counter[cleared_lines] += 1;
         }

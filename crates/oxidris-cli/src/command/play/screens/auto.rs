@@ -173,9 +173,9 @@ impl AutoPlay {
         // Check if a piece was completed during this frame.
         // increment_frame() may trigger auto_drop_and_complete(), which spawns a new piece.
         // If that happens, we need to discard the old plan and select a new one.
-        let turn = self.session.stats().completed_pieces();
+        let turn = self.session.stats().turn();
         self.session.increment_frame();
-        let piece_completed = turn != self.session.stats().completed_pieces();
+        let piece_completed = turn != self.session.stats().turn();
 
         // Reselect plan if:
         // - A piece was completed (new piece spawned)

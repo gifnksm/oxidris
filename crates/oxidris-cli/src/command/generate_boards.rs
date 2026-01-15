@@ -119,7 +119,7 @@ impl AdaptiveSampler {
         // (4, 3) -> (7/7)^2.5 * 3 = 3.0
         capture_prob += difficulty_bonus;
 
-        let turns = stats.completed_pieces();
+        let turns = stats.turn();
         let turn_multiplier = if turns < 30 {
             0.5
         } else if turns < 100 {
@@ -212,7 +212,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
         };
         let mut capture_interval = CAPTURE_INTERVAL;
         while let Some((turn_plan, analysis)) = turn_evaluator.select_best_turn(&field, true) {
-            let turn = stats.completed_pieces();
+            let turn = stats.turn();
             let capture_board = BoardAndPlacement {
                 turn,
                 before_placement: field.board().clone(),
@@ -241,7 +241,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             } else {
                 capture_interval -= 1;
             }
-            let next_turn = stats.completed_pieces();
+            let next_turn = stats.turn();
             if next_turn >= MAX_TURNS {
                 break;
             }

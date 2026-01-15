@@ -271,7 +271,7 @@ impl EvaluateSessionStats for AggroSessionEvaluator {
         turn_limit: usize,
     ) -> f32 {
         const LINE_CLEAR_WEIGHT: [u16; 5] = [0, 1, 3, 5, 8];
-        let survived_turns = stats.game_stats.completed_pieces() as f32;
+        let survived_turns = stats.game_stats.turn() as f32;
         let turn_limit = turn_limit as f32;
 
         let block_count = turn_limit * 4.0;
@@ -350,7 +350,7 @@ impl EvaluateSessionStats for DefensiveSessionEvaluator {
         stats: &Self::Stats,
         turn_limit: usize,
     ) -> f32 {
-        let survived_turns = stats.game_stats.completed_pieces() as f32;
+        let survived_turns = stats.game_stats.turn() as f32;
         let turn_limit = turn_limit as f32;
 
         let max_height_max: f32 = 20.0;
