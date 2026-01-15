@@ -16,7 +16,7 @@ use oxidris_evaluator::board_feature::{self, BoxedBoardFeatureSource};
 
 use crate::{
     command::analyze_censoring::table::SurvivalTableRow,
-    model::km_normalization::{
+    schema::km_normalization::{
         FeatureNormalization, NormalizationParams, NormalizationRange, NormalizationStats,
     },
     util,

@@ -11,7 +11,7 @@ use oxidris_evaluator::{
 use oxidris_training::genetic::{Individual, Population, PopulationEvolver};
 
 use crate::{
-    model::ai_model::{AiModel, TrainedBoardFeature},
+    schema::ai_model::{AiModel, TrainedBoardFeature},
     util::{self, FeatureSet, Output},
 };
 

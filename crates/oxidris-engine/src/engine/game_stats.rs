@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// Score values for line clears.
 ///
 /// Index corresponds to number of lines cleared simultaneously:
@@ -38,7 +40,7 @@ const SCORE_TABLE: [usize; 5] = [0, 100, 300, 500, 800];
 /// assert_eq!(stats.cleared_lines(), 4);
 /// assert_eq!(stats.line_cleared_counter()[4], 1);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameStats {
     score: usize,
     turn: usize,

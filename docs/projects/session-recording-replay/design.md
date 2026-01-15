@@ -54,7 +54,7 @@ oxidris-cli/src/record/
 
 ```rust
 use oxidris_analysis::session::SessionData;
-use oxidris_cli::model::AiModel;
+use oxidris_cli::schema::AiModel;
 use oxidris_engine::GameStats;
 use serde::{Deserialize, Serialize};
 

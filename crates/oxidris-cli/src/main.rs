@@ -1,5 +1,5 @@
 mod command;
-mod model;
+mod schema;
 mod ui;
 mod util;
 

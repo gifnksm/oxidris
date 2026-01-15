@@ -15,7 +15,7 @@ use oxidris_analysis::{
 };
 use oxidris_evaluator::board_feature::{self, BoxedBoardFeature};
 
-use crate::model::ai_model::AiModel;
+use crate::schema::ai_model::AiModel;
 
 #[derive(Debug)]
 pub enum Output {
