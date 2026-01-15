@@ -3,7 +3,7 @@
 //! This module provides functions for analyzing individual features,
 //! including data collection, KM curve calculation, display, and CSV export.
 
-use std::{fmt::Write as _, path::Path};
+use std::{fmt::Write as _, fs, path::Path};
 
 use anyhow::Context;
 use oxidris_analysis::survival::SurvivalStatsMap;
@@ -66,7 +66,7 @@ pub(super) fn save_feature_km_curves(
     feature_id: &str,
     all_stats: &SurvivalStatsMap<u32>,
 ) -> anyhow::Result<()> {
-    std::fs::create_dir_all(dir)?;
+    fs::create_dir_all(dir)?;
     let csv_path = dir.join(format!("{feature_id}_km.csv"));
     let mut csv_content = String::from("value,time,survival_prob,at_risk,events\n");
 
@@ -82,7 +82,7 @@ pub(super) fn save_feature_km_curves(
         }
     }
 
-    std::fs::write(&csv_path, csv_content)
+    fs::write(&csv_path, csv_content)
         .with_context(|| format!("Failed to write CSV file: {}", csv_path.display()))?;
     println!("  KM curves saved to: {}", csv_path.display());
 

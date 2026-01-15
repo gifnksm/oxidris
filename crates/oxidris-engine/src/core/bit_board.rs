@@ -1,6 +1,6 @@
 use std::{fmt::Write, ops::Range};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::core::piece::Piece;
 
@@ -146,7 +146,7 @@ pub struct BitBoard {
 impl Serialize for BitBoard {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         // Format: "3003,3003,3003,..." (comma-separated hex values)
         let mut hex_string = String::with_capacity(TOTAL_HEIGHT * 5); // 4 chars + comma
@@ -163,7 +163,7 @@ impl Serialize for BitBoard {
 impl<'de> Deserialize<'de> for BitBoard {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
 

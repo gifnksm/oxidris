@@ -7,7 +7,7 @@ use crossterm::event;
 use oxidris_evaluator::turn_evaluator::TurnEvaluator;
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::command::play::screens::Screen;
+use crate::{command::play::screens::Screen, record::SessionHistory};
 
 const FPS: u64 = 60;
 
@@ -17,9 +17,9 @@ pub struct App {
 }
 
 impl App {
-    pub fn manual() -> Self {
+    pub fn manual(history_size: usize) -> Self {
         Self {
-            screen: Screen::manual(FPS),
+            screen: Screen::manual(FPS, history_size),
         }
     }
 
@@ -47,6 +47,10 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    pub fn into_history(self) -> Option<SessionHistory> {
+        self.screen.into_history()
     }
 
     fn draw(&self, frame: &mut Frame<'_>) {

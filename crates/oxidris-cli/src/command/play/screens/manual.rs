@@ -1,5 +1,5 @@
 use crossterm::event::{Event, KeyCode};
-use oxidris_engine::{GameSession, SessionState};
+use oxidris_engine::SessionState;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
@@ -7,18 +7,22 @@ use ratatui::{
     text::Text,
 };
 
-use crate::ui::widgets::SessionDisplay;
+use crate::{
+    record::{RecordingSession, SessionHistory},
+    schema::record::PlayerInfo,
+    ui::widgets::SessionDisplay,
+};
 
 #[derive(Debug)]
 pub struct ManualPlayScreen {
-    session: GameSession,
+    session: RecordingSession,
     is_exiting: bool,
 }
 
 impl ManualPlayScreen {
-    pub fn new(fps: u64) -> Self {
+    pub fn new(fps: u64, history_size: usize) -> Self {
         Self {
-            session: GameSession::new(fps),
+            session: RecordingSession::new(fps, PlayerInfo::Manual, history_size),
             is_exiting: false,
         }
     }
@@ -35,7 +39,7 @@ impl ManualPlayScreen {
         let session_display = SessionDisplay::new(&self.session, true);
         let help_text = match self.session.session_state() {
             SessionState::Playing => {
-                "Controls: ← → (Move) | ↓ (Soft Drop) | ↑ (Hard Drop) | Z X (Rotate) | Space (Hold) | P (Pause) | Q (Quit)"
+                "Controls: ← → (Move) | ↓ (Soft Drop) | ↑ (Hard Drop) | z x (Rotate) | Space (Hold) | p (Pause) | q (Quit)"
             }
             SessionState::Paused => "Controls: P (Resume) | Q (Quit)",
             SessionState::GameOver => "Controls: Q (Quit)",
@@ -74,5 +78,9 @@ impl ManualPlayScreen {
 
     pub fn update_game(&mut self) {
         self.session.increment_frame();
+    }
+
+    pub fn into_history(self) -> SessionHistory {
+        self.session.into_history()
     }
 }

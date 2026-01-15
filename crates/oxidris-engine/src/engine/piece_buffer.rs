@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fmt::Write as _};
 
 use rand::{
     Rng, SeedableRng as _,
@@ -6,6 +6,7 @@ use rand::{
     seq::SliceRandom,
 };
 use rand_pcg::Pcg32;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::PieceKind;
 
@@ -82,6 +83,36 @@ impl Default for PieceBuffer {
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct PieceSeed([u8; 16]);
+
+impl Serialize for PieceSeed {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let num = u128::from_be_bytes(self.0);
+        let mut hex_str = String::with_capacity(2 * self.0.len());
+        write!(&mut hex_str, "{num:032x}").unwrap();
+        serializer.serialize_str(&hex_str)
+    }
+}
+
+impl<'de> Deserialize<'de> for PieceSeed {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let hex_str = String::deserialize(deserializer)?;
+        if hex_str.len() != 32 {
+            return Err(serde::de::Error::custom(format!(
+                "invalid hex: expected 32 characters, got {}",
+                hex_str.len()
+            )));
+        }
+        let num = u128::from_str_radix(&hex_str, 16)
+            .map_err(|e| serde::de::Error::custom(format!("invalid hex: {hex_str} ({e})")))?;
+        Ok(Self(num.to_be_bytes()))
+    }
+}
 
 /// Allows generating random `PieceSeed` values using the standard random distribution.
 ///
@@ -191,5 +222,169 @@ impl PieceBuffer {
     #[must_use]
     pub fn held_piece(&self) -> Option<PieceKind> {
         self.held
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod piece_seed_serialization {
+        use super::*;
+
+        /// Helper to create a `PieceSeed` from a byte array
+        fn seed_from_bytes(bytes: [u8; 16]) -> PieceSeed {
+            PieceSeed(bytes)
+        }
+
+        #[test]
+        fn test_roundtrip_random_seed() {
+            // Generate a random seed and verify roundtrip
+            let seed: PieceSeed = rand::rng().random();
+            let serialized = serde_json::to_string(&seed).unwrap();
+            let deserialized: PieceSeed = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(seed.0, deserialized.0);
+        }
+
+        #[test]
+        fn test_format_is_32_char_hex_string() {
+            let seed: PieceSeed = rand::rng().random();
+            let serialized = serde_json::to_string(&seed).unwrap();
+
+            // Remove quotes from JSON string
+            let hex_str = serialized.trim_matches('"');
+
+            // Should be exactly 32 hex characters (128 bits / 4 bits per char)
+            assert_eq!(hex_str.len(), 32);
+
+            // All characters should be valid hex
+            assert!(hex_str.chars().all(|c| c.is_ascii_hexdigit()));
+        }
+
+        #[test]
+        fn test_known_value_all_zeros() {
+            let seed = seed_from_bytes([0u8; 16]);
+            let serialized = serde_json::to_string(&seed).unwrap();
+
+            assert_eq!(serialized, "\"00000000000000000000000000000000\"");
+
+            let deserialized: PieceSeed = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized.0, [0u8; 16]);
+        }
+
+        #[test]
+        fn test_known_value_all_ones() {
+            let seed = seed_from_bytes([0xFFu8; 16]);
+            let serialized = serde_json::to_string(&seed).unwrap();
+
+            assert_eq!(serialized, "\"ffffffffffffffffffffffffffffffff\"");
+
+            let deserialized: PieceSeed = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized.0, [0xFFu8; 16]);
+        }
+
+        #[test]
+        fn test_known_value_sequential_bytes() {
+            // Test big-endian ordering: first byte should appear first in hex string
+            let seed = seed_from_bytes([
+                0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54,
+                0x32, 0x10,
+            ]);
+            let serialized = serde_json::to_string(&seed).unwrap();
+
+            // Big-endian: bytes appear in order as hex pairs
+            assert_eq!(serialized, "\"0123456789abcdeffedcba9876543210\"");
+
+            let deserialized: PieceSeed = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized.0, seed.0);
+        }
+
+        #[test]
+        fn test_deserialize_uppercase_hex() {
+            // Should accept uppercase hex characters
+            let json = "\"0123456789ABCDEFFEDCBA9876543210\"";
+            let deserialized: PieceSeed = serde_json::from_str(json).unwrap();
+
+            assert_eq!(
+                deserialized.0,
+                [
+                    0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0xFE, 0xDC, 0xBA, 0x98, 0x76,
+                    0x54, 0x32, 0x10
+                ]
+            );
+        }
+
+        #[test]
+        fn test_error_invalid_hex_characters() {
+            let json = "\"ghijklmnopqrstuvwxyzghijklmnopqr\""; // 32 chars but not hex
+            let result: Result<PieceSeed, _> = serde_json::from_str(json);
+
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("invalid hex"));
+        }
+
+        #[test]
+        fn test_error_too_short() {
+            let json = "\"0123456789abcdef0123456789abcde\""; // 31 chars
+            let result: Result<PieceSeed, _> = serde_json::from_str(json);
+
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("invalid hex"));
+        }
+
+        #[test]
+        fn test_error_too_long() {
+            let json = "\"0123456789abcdef0123456789abcdef0\""; // 33 chars
+            let result: Result<PieceSeed, _> = serde_json::from_str(json);
+
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("invalid hex"));
+        }
+
+        #[test]
+        fn test_error_empty_string() {
+            let json = "\"\"";
+            let result: Result<PieceSeed, _> = serde_json::from_str(json);
+
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("invalid hex"));
+        }
+
+        #[test]
+        fn test_deterministic_piece_generation() {
+            // Same seed should produce same piece sequence
+            let seed = seed_from_bytes([
+                0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+                0x77, 0x88,
+            ]);
+
+            let mut buffer1 = PieceBuffer::with_seed(seed);
+            let mut buffer2 = PieceBuffer::with_seed(seed);
+
+            // First 20 pieces should be identical
+            for _ in 0..20 {
+                assert_eq!(buffer1.pop_next(), buffer2.pop_next());
+            }
+        }
+
+        #[test]
+        fn test_serialize_deserialize_preserves_piece_generation() {
+            // Serialize and deserialize a seed, then verify piece sequence is preserved
+            let original_seed: PieceSeed = rand::rng().random();
+            let serialized = serde_json::to_string(&original_seed).unwrap();
+            let deserialized_seed: PieceSeed = serde_json::from_str(&serialized).unwrap();
+
+            let mut buffer1 = PieceBuffer::with_seed(original_seed);
+            let mut buffer2 = PieceBuffer::with_seed(deserialized_seed);
+
+            // First 20 pieces should be identical
+            for _ in 0..20 {
+                assert_eq!(buffer1.pop_next(), buffer2.pop_next());
+            }
+        }
     }
 }

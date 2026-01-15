@@ -10,7 +10,17 @@ mod app;
 mod screens;
 
 #[derive(Default, Debug, Clone, clap::Args)]
-pub(crate) struct ManualPlayArg {}
+pub(crate) struct ManualPlayArg {
+    /// Save the game recording to a file when the session ends
+    #[clap(long)]
+    save_recording: bool,
+    /// Directory to save recording files
+    #[clap(long, default_value = "./data/recordings/")]
+    record_dir: PathBuf,
+    /// Maximum number of turns to keep in memory (oldest are discarded)
+    #[clap(long, default_value_t = 10000)]
+    history_size: usize,
+}
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub(crate) struct AutoPlayArg {
@@ -22,12 +32,22 @@ pub(crate) struct AutoPlayArg {
 }
 
 pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
-    let ManualPlayArg {} = arg;
+    let ManualPlayArg {
+        save_recording,
+        record_dir,
+        history_size,
+    } = arg;
 
-    let mut terminal = ratatui::init();
-    let app_result = App::manual().run(&mut terminal);
-    ratatui::restore();
-    app_result
+    let mut app = App::manual(*history_size);
+
+    ratatui::run(|terminal| app.run(terminal))?;
+
+    if *save_recording {
+        let history = app.into_history().unwrap();
+        history.save(record_dir)?;
+    }
+
+    Ok(())
 }
 
 pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {

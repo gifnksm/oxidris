@@ -60,9 +60,9 @@ impl AutoPlayScreen {
             "T (Turbo: OFF)"
         };
         let help_text = match self.session.session_state() {
-            SessionState::Playing => format!("Controls: {turbo_text} | P (Pause) | Q (Quit)"),
-            SessionState::Paused => "Controls: P (Resume) | Q (Quit)".to_owned(),
-            SessionState::GameOver => "Controls: Q (Quit)".to_owned(),
+            SessionState::Playing => format!("Controls: {turbo_text} | p (Pause) | q (Quit)"),
+            SessionState::Paused => "Controls: p (Resume) | q (Quit)".to_owned(),
+            SessionState::GameOver => "Controls: q (Quit)".to_owned(),
         };
         let help_text = Text::from(help_text)
             .style(Style::default().fg(Color::DarkGray))

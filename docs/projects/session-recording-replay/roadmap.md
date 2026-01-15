@@ -17,19 +17,21 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Goal**: Establish the foundation for recording functionality.
 
-**Status**: Not Started
+**Status**: Complete
 
 **Tasks:**
 
-- Create `oxidris-cli/src/record/` module with `RecordedSession`, `RecordMetadata`, `PlayerInfo` types
-- Implement `SessionHistory` ring buffer for memory-efficient history storage
-- Write unit tests for ring buffer and metadata generation
+- [x] Create `RecordedSession`, `TurnRecord`, `PlayerInfo` types in `schema/record.rs`
+- [x] Implement `SessionHistory` with ring buffer for memory-efficient history storage
+- [x] Implement `RecordingSession` wrapper for automatic piece placement recording
+- [x] Add `PieceSeed` serialize/deserialize support
+- [x] Write unit tests for ring buffer
 
 **Validation:**
 
-- Unit tests pass
-- Ring buffer overwrites oldest entries when full
-- JSON serialization works correctly
+- [x] Unit tests pass
+- [x] Ring buffer overwrites oldest entries when full
+- [x] JSON serialization works correctly
 
 ---
 
@@ -37,23 +39,24 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Goal**: Implement basic recording functionality in manual play mode.
 
-**Status**: Not Started
+**Status**: Complete
 
 **Dependencies**: Step 1 complete
 
 **Tasks:**
 
-- Add `--record`, `--record-dir`, `--history-size` options to `play` command
-- Integrate `SessionHistory` into `ManualPlayScreen`
-- Capture board states after each piece placement
-- Save recording to file on game end with filename `manual_YYYYMMDD_HHMMSS.json`
-- Add recording indicator in UI
+- [x] Add `--save-recording`, `--recording-dir`, `--history-size` options to `play` command
+- [x] Integrate `RecordingSession` into `ManualPlayScreen`
+- [x] Capture board states after each piece placement
+- [x] Save recording to file on game end with filename `manual_YYYYMMDD_HHMMSS.json`
+- [x] Fix keyboard control display (lowercase for non-Shift keys)
+- ~~Add recording indicator in UI~~ (Not needed: recording is always active in memory)
 
 **Validation:**
 
-- `play --record` creates recording file on game end
-- File contains valid JSON and can be loaded
-- `--history-size` option works correctly
+- [x] `play --save-recording` creates recording file on game end
+- [x] File contains valid JSON and can be loaded
+- [x] `--history-size` option works correctly
 
 ---
 
@@ -67,15 +70,15 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Tasks:**
 
-- Add recording options to `auto-play` command
-- Integrate `SessionHistory` into `AutoPlayScreen`
+- Add `--save-recording`, `--recording-dir`, `--history-size` options to `auto-play` command
+- Integrate `RecordingSession` into `AutoPlayScreen`
 - Include full `AiModel` data in `PlayerInfo::Auto` metadata
 - Save recording with filename `ai_{model_name}_YYYYMMDD_HHMMSS.json`
 - Ensure `--turbo` mode works with recording
 
 **Validation:**
 
-- `auto-play MODEL --record` creates recording with AI model data
+- `auto-play MODEL --save-recording` creates recording with AI model data
 - Turbo mode recording works without performance issues
 
 ---
@@ -175,18 +178,18 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 ### Current Status
 
-**Overall Progress**: 0% (Planning phase)
+**Overall Progress**: ~30% (Steps 1-2 complete)
 
-**Completed Steps**: None
+**Completed Steps**: Step 1, Step 2
 
-**Current Step**: Step 1 (Not Started)
+**Current Step**: Step 3 (Not Started)
 
-**Next Milestone**: Complete Step 1 (Data Structures)
+**Next Milestone**: Complete Step 3 (Auto-Play Recording)
 
 ### Step Status
 
-- [ ] **Step 1**: Data Structures and Memory Management
-- [ ] **Step 2**: Manual Play Recording
+- [x] **Step 1**: Data Structures and Memory Management
+- [x] **Step 2**: Manual Play Recording
 - [ ] **Step 3**: Auto-Play Recording
 - [ ] **Step 4**: Replay Command (Basic Playback)
 - [ ] **Step 5**: In-Game Playback (History Browsing)

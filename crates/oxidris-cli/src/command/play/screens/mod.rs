@@ -2,7 +2,10 @@ use crossterm::event::Event;
 use oxidris_evaluator::turn_evaluator::TurnEvaluator;
 use ratatui::Frame;
 
-use crate::command::play::screens::{auto::AutoPlayScreen, manual::ManualPlayScreen};
+use crate::{
+    command::play::screens::{auto::AutoPlayScreen, manual::ManualPlayScreen},
+    record::SessionHistory,
+};
 
 pub mod auto;
 pub mod manual;
@@ -14,8 +17,8 @@ pub enum Screen {
 }
 
 impl Screen {
-    pub fn manual(fps: u64) -> Self {
-        Screen::Manual(ManualPlayScreen::new(fps))
+    pub fn manual(fps: u64, history_size: usize) -> Self {
+        Screen::Manual(ManualPlayScreen::new(fps, history_size))
     }
 
     pub fn auto(fps: u64, turn_evaluator: TurnEvaluator<'static>, turbo: bool) -> Self {
@@ -54,6 +57,13 @@ impl Screen {
         match self {
             Screen::Manual(screen) => screen.update_game(),
             Screen::Auto(screen) => screen.update_game(),
+        }
+    }
+
+    pub fn into_history(self) -> Option<SessionHistory> {
+        match self {
+            Screen::Manual(screen) => Some(screen.into_history()),
+            Screen::Auto(_screen) => None,
         }
     }
 }

@@ -235,15 +235,6 @@ Note: Lowercase = no Shift needed; Uppercase (e.g., `G`, `H`) = Shift required.
 Note: `H` (entering history) and `G` (last turn) require Shift. `h`/`l` (10-turn jumps within history) do not.
 ```
 
-> **TODO**: Existing play/auto-play UI displays all keybindings in uppercase (e.g., `Z X`, `P`, `Q`, `T`)
-> even though they require lowercase input. This inconsistency should be fixed to follow the convention:
-> lowercase display for lowercase input, uppercase display for Shift-required input.
->
-> Files to update:
->
-> - `crates/oxidris-cli/src/command/play/screens/manual.rs`
-> - `crates/oxidris-cli/src/command/play/screens/auto.rs`
-
 **History Mode Controls:**
 
 - `j` / `k` or `↓` / `↑`: Step backward/forward (1 turn)

@@ -78,6 +78,8 @@ impl Output {
                 self.display_path()
             )
         })?;
+        self.flush()
+            .with_context(|| format!("Failed to flush output to {}", self.display_path()))?;
         Ok(())
     }
 }
