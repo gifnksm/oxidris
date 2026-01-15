@@ -55,9 +55,9 @@ impl AutoPlayScreen {
     pub fn draw(&self, frame: &mut Frame<'_>) {
         let session_display = SessionDisplay::new(&self.session, false).turbo(self.turbo);
         let turbo_text = if self.turbo {
-            "T (Turbo: OFF)"
-        } else {
             "T (Turbo: ON)"
+        } else {
+            "T (Turbo: OFF)"
         };
         let help_text = match self.session.session_state() {
             SessionState::Playing => format!("Controls: {turbo_text} | P (Pause) | Q (Quit)"),
