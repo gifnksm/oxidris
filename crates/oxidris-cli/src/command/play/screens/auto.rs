@@ -128,7 +128,7 @@ fn ai_thread(
                 auto_play.session.toggle_pause();
             }
             Request::Run | Request::TurboRun => {
-                auto_play.session.increment_frame();
+                auto_play.increment_frame();
             }
         }
         tx.send(auto_play.session.clone()).unwrap();
