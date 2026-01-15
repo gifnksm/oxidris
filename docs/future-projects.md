@@ -57,26 +57,9 @@ The limited search space may prevent the AI from reaching beneficial board state
 
 ### Interactive Replay Viewer
 
-**Problem:** Currently there's no way to review and analyze past game sessions. Understanding how and why games ended requires re-running sessions and watching in real-time. This makes it difficult to:
+**Status:** Active project - See [Session Recording & Replay](./projects/session-recording-replay/)
 
-- Debug unexpected AI behavior in specific game situations
-- Learn from AI mistakes or successes
-- Compare different AI models on the same game sequence
-- Share interesting game sessions with others
-
-**Improvement:** Add a replay viewer subcommand that can load saved game sessions and provide interactive playback:
-
-- Load game session from file (serialize/deserialize game state history)
-- Playback controls: play/pause, speed control, frame-by-frame stepping
-- Visual display of current board state, statistics, and upcoming pieces
-- Optional: feature value overlays, placement decision explanations
-- Save game sessions during play/auto-play for later review
-
-This would reuse existing ratatui widgets (BoardDisplay, SessionDisplay, etc.) but add playback control UI.
-
-**Dependencies:** None (uses existing widget infrastructure)
-
-**Effort:** Medium (session serialization + playback UI + controls)
+This project has been moved to active development. See the project documentation for details.
 
 ---
 

@@ -36,6 +36,10 @@ Time-limited projects currently in progress.
   - [Overview](./projects/km-feature-transform/README.md) - Goals and approach
   - [Design](./projects/km-feature-transform/design.md) - Architecture details
   - [Roadmap](./projects/km-feature-transform/roadmap.md) - Phase-by-phase plan
+- **[Session Recording & Replay](./projects/session-recording-replay/)** - Record gameplay sessions and replay them with full playback controls
+  - [Overview](./projects/session-recording-replay/README.md) - Goals and scope
+  - [Design](./projects/session-recording-replay/design.md) - Data structures and architecture
+  - [Roadmap](./projects/session-recording-replay/roadmap.md) - Step-by-step implementation plan
 
 ### Future Improvements
 
@@ -43,7 +47,12 @@ Time-limited projects currently in progress.
 
 ## Current Development Status
 
-**Active Project**: KM-Based Feature Transform (Phase 3-4)
+**Active Projects**:
+
+1. KM-Based Feature Transform (Phase 3-4)
+2. Session Recording & Replay (Planning/Design)
+
+### KM-Based Feature Transform
 
 The project is currently integrating Kaplan-Meier survival analysis for feature normalization:
 
@@ -52,6 +61,17 @@ The project is currently integrating Kaplan-Meier survival analysis for feature 
 - Validating improvements over linear normalization
 
 See the [KM Feature Transform Roadmap](./projects/km-feature-transform/roadmap.md) for detailed phase-by-phase status.
+
+### Session Recording & Replay
+
+Implementing gameplay session recording and replay functionality for debugging and analysis:
+
+- Recording board states during manual and AI play
+- Saving recordings to disk with metadata
+- Replay viewer with playback controls
+- In-game history browsing (rewind during pause/game-over)
+
+See the [Session Recording & Replay Roadmap](./projects/session-recording-replay/roadmap.md) for detailed implementation plan.
 
 ## Getting Started
 

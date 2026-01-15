@@ -99,15 +99,22 @@ See [Design Principles in README](README.md#design-principles) for the project p
 
 ## Current Focus
 
-**Active Project:** KM-Based Survival Feature Normalization (Phase 4)
+**Active Projects:**
 
-- ✅ Phase 1-2: Data generation and KM survival analysis (completed)
-- ✅ Phase 3: Infrastructure and trait integration (completed 2026-01-06)
-- 📋 Phase 4: Implementation and validation (next)
+1. **KM-Based Survival Feature Normalization (Phase 4)**
+   - ✅ Phase 1-2: Data generation and KM survival analysis (completed)
+   - ✅ Phase 3: Infrastructure and trait integration (completed 2026-01-06)
+   - 📋 Phase 4: Implementation and validation (next)
+   - **Scope:** Survival features (holes, height) only. Other improvements are separate future projects.
+   - See `docs/projects/km-feature-transform/` for details.
 
-**Scope:** Survival features (holes, height) only. Other improvements are separate future projects.
-
-See `docs/projects/km-feature-transform/` for details on the current active project.
+2. **Session Recording & Replay (Planning/Design)**
+   - 📋 Step 1: Data structures and memory management (next)
+   - Recording gameplay sessions for debugging and analysis
+   - Replay viewer with playback controls
+   - In-game history browsing
+   - **Scope:** Recording, saving, and replaying gameplay sessions with metadata.
+   - See `docs/projects/session-recording-replay/` for details.
 
 ## Guidelines for AI Assistants
 
@@ -222,21 +229,34 @@ See `docs/projects/km-feature-transform/` for details on the current active proj
 - **KM estimator**: `crates/oxidris-stats/src/survival.rs`
 - **Normalization generation**: `crates/oxidris-cli/src/command/analyze_censoring/mod.rs`
 
+### Recording and Replay
+
+- **Manual play screen**: `crates/oxidris-cli/src/command/play/screens/manual.rs`
+- **Auto-play screen**: `crates/oxidris-cli/src/command/play/screens/auto.rs`
+
 ### Models and Data
 
 - **Trained models**: `models/ai/aggro.json`, `models/ai/defensive.json`
 - **Training data**: `data/boards.json` (generated, not in repo)
 - **Normalization params**: `data/normalization_params.json` (generated, not in repo)
+- **Recordings**: `data/recordings/` (generated during play, not in repo)
 
 ## Quick Reference
 
 ### Current Project Status
 
-- **Active:** KM-Based Survival Feature Normalization (Phase 4)
+**Active Project 1:** KM-Based Survival Feature Normalization (Phase 4)
+
 - **Phase 3:** Design complete (2026-01-06) - `TableTransform<S>` type, feature naming, coexistence strategy
 - **Phase 4:** Implementation - type, FeatureBuilder integration, training tools
 - **Focus:** Survival features (holes, height) only
 - See [KM Project Docs](docs/projects/km-feature-transform/) for details
+
+**Active Project 2:** Session Recording & Replay (Planning/Design)
+
+- **Current:** Step 1 (Data structures and memory management)
+- **Scope:** Recording gameplay, replay viewer, in-game history browsing
+- See [Recording & Replay Docs](docs/projects/session-recording-replay/) for details
 
 ### Feature Categories
 
