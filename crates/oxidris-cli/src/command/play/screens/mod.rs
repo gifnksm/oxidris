@@ -1,10 +1,10 @@
 use crossterm::event::Event;
-use oxidris_evaluator::turn_evaluator::TurnEvaluator;
 use ratatui::Frame;
 
 use crate::{
     command::play::screens::{auto::AutoPlayScreen, manual::ManualPlayScreen},
     record::SessionHistory,
+    schema::ai_model::AiModel,
 };
 
 pub mod auto;
@@ -21,8 +21,14 @@ impl Screen {
         Screen::Manual(ManualPlayScreen::new(fps, history_size))
     }
 
-    pub fn auto(fps: u64, turn_evaluator: TurnEvaluator<'static>, turbo: bool) -> Self {
-        Screen::Auto(AutoPlayScreen::new(fps, turn_evaluator, turbo))
+    pub fn auto(
+        fps: u64,
+        model: &AiModel,
+        history_size: usize,
+        turbo: bool,
+    ) -> anyhow::Result<Self> {
+        let screen = AutoPlayScreen::new(fps, model, history_size, turbo)?;
+        Ok(Screen::Auto(screen))
     }
 
     pub fn is_playing(&self) -> bool {
@@ -60,10 +66,10 @@ impl Screen {
         }
     }
 
-    pub fn into_history(self) -> Option<SessionHistory> {
+    pub fn into_history(self) -> SessionHistory {
         match self {
-            Screen::Manual(screen) => Some(screen.into_history()),
-            Screen::Auto(_screen) => None,
+            Screen::Manual(screen) => screen.into_history(),
+            Screen::Auto(screen) => screen.into_history(),
         }
     }
 }

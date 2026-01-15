@@ -8,6 +8,7 @@ use crossterm::event::{Event, KeyCode};
 use oxidris_engine::{GameSession, SessionState};
 use oxidris_evaluator::{
     placement_analysis::PlacementAnalysis,
+    placement_evaluator::FeatureBasedPlacementEvaluator,
     turn_evaluator::{TurnEvaluator, TurnPlan},
 };
 use ratatui::{
@@ -17,31 +18,52 @@ use ratatui::{
     text::Text,
 };
 
-use crate::ui::widgets::SessionDisplay;
+use crate::{
+    record::{RecordingSession, SessionHistory},
+    schema::{ai_model::AiModel, record::PlayerInfo},
+    ui::widgets::SessionDisplay,
+};
 
 #[derive(Debug)]
 pub struct AutoPlayScreen {
     session: GameSession,
     turbo: bool,
     is_exiting: bool,
-    tx: mpsc::Sender<Request>,
-    rx: mpsc::Receiver<GameSession>,
+    tx_request: mpsc::Sender<Request>,
+    rx_session: mpsc::Receiver<GameSession>,
+    rx_history: mpsc::Receiver<SessionHistory>,
 }
 
 impl AutoPlayScreen {
-    pub fn new(fps: u64, turn_evaluator: TurnEvaluator<'static>, turbo: bool) -> Self {
-        let session = GameSession::new(fps);
-        let auto_play = AutoPlay::new(session.clone(), turn_evaluator);
+    pub fn new(
+        fps: u64,
+        model: &AiModel,
+        history_size: usize,
+        turbo: bool,
+    ) -> anyhow::Result<Self> {
+        let rec_session = RecordingSession::new(
+            fps,
+            PlayerInfo::Auto {
+                model: model.clone(),
+            },
+            history_size,
+        );
+        let session = (*rec_session).clone();
+        let auto_play = AutoPlay::new(rec_session, model)?;
         let (tx_request, mut rx_request) = mpsc::channel();
         let (mut tx_session, rx_session) = mpsc::channel();
-        thread::spawn(move || ai_thread(auto_play, &mut tx_session, &mut rx_request));
-        Self {
+        let (mut tx_history, rx_history) = mpsc::channel();
+        thread::spawn(move || {
+            ai_thread(auto_play, &mut tx_session, &mut tx_history, &mut rx_request);
+        });
+        Ok(Self {
             session,
             turbo,
             is_exiting: false,
-            tx: tx_request,
-            rx: rx_session,
-        }
+            tx_request,
+            rx_session,
+            rx_history,
+        })
     }
 
     pub fn is_playing(&self) -> bool {
@@ -100,8 +122,15 @@ impl AutoPlayScreen {
                 Request::Run
             }
         };
-        self.tx.send(req).unwrap();
-        self.session = self.rx.recv().unwrap();
+        self.tx_request.send(req).unwrap();
+        self.session = self.rx_session.recv().unwrap();
+    }
+
+    pub fn into_history(self) -> SessionHistory {
+        self.tx_request
+            .send(Request::SessionHistoryAndExit)
+            .unwrap();
+        self.rx_history.recv().unwrap()
     }
 }
 
@@ -110,59 +139,75 @@ enum Request {
     TogglePause,
     Run,
     TurboRun,
+    SessionHistoryAndExit,
 }
 
 fn ai_thread(
     auto_play: AutoPlay,
-    tx: &mut mpsc::Sender<GameSession>,
-    rx: &mut mpsc::Receiver<Request>,
+    tx_session: &mut mpsc::Sender<GameSession>,
+    tx_history: &mut mpsc::Sender<SessionHistory>,
+    rx_request: &mut mpsc::Receiver<Request>,
 ) {
     let mut auto_play = auto_play;
-    let Ok(mut req) = rx.recv() else {
+    let Ok(mut req) = rx_request.recv() else {
         return;
     };
 
     loop {
-        match req {
+        let is_turbo = match req {
             Request::TogglePause => {
                 auto_play.session.toggle_pause();
+                false
             }
-            Request::Run | Request::TurboRun => {
+            Request::Run => {
                 auto_play.increment_frame();
+                false
             }
-        }
-        tx.send(auto_play.session.clone()).unwrap();
+            Request::TurboRun => {
+                auto_play.increment_frame();
+                true
+            }
+            Request::SessionHistoryAndExit => {
+                tx_history.send(auto_play.session.into_history()).unwrap();
+                return;
+            }
+        };
+        tx_session.send(auto_play.session.clone()).unwrap();
 
-        req = match req {
-            Request::TogglePause | Request::Run => match rx.recv() {
-                Ok(r) => r,
-                Err(RecvError) => return,
-            },
-            Request::TurboRun => loop {
-                match rx.try_recv() {
+        req = if is_turbo {
+            loop {
+                match rx_request.try_recv() {
                     Ok(r) => break r,
                     Err(TryRecvError::Disconnected) => return,
                     Err(TryRecvError::Empty) => auto_play.increment_frame(),
                 }
-            },
-        };
+            }
+        } else {
+            match rx_request.recv() {
+                Ok(r) => r,
+                Err(RecvError) => return,
+            }
+        }
     }
 }
 
 #[derive(Debug)]
 struct AutoPlay {
-    session: GameSession,
+    session: RecordingSession,
     turn_evaluator: TurnEvaluator<'static>,
     best_turn: Option<(TurnPlan, PlacementAnalysis)>,
 }
 
 impl AutoPlay {
-    fn new(session: GameSession, turn_evaluator: TurnEvaluator<'static>) -> Self {
-        Self {
+    fn new(session: RecordingSession, model: &AiModel) -> anyhow::Result<Self> {
+        let (features, weights) = model.to_feature_weights()?;
+        let placement_evaluator = FeatureBasedPlacementEvaluator::new(features, weights);
+        let turn_evaluator = TurnEvaluator::new(Box::new(placement_evaluator));
+        Ok(Self {
             session,
             turn_evaluator,
             best_turn: None,
-        }
+        })
     }
 
     fn increment_frame(&mut self) {

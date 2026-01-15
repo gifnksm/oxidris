@@ -4,10 +4,9 @@ use std::{
 };
 
 use crossterm::event;
-use oxidris_evaluator::turn_evaluator::TurnEvaluator;
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::{command::play::screens::Screen, record::SessionHistory};
+use crate::{command::play::screens::Screen, record::SessionHistory, schema::ai_model::AiModel};
 
 const FPS: u64 = 60;
 
@@ -23,10 +22,10 @@ impl App {
         }
     }
 
-    pub fn auto(turn_evaluator: TurnEvaluator<'static>, turbo: bool) -> Self {
-        Self {
-            screen: Screen::auto(FPS, turn_evaluator, turbo),
-        }
+    pub fn auto(model: &AiModel, history_size: usize, turbo: bool) -> anyhow::Result<Self> {
+        Ok(Self {
+            screen: Screen::auto(FPS, model, history_size, turbo)?,
+        })
     }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
@@ -49,7 +48,7 @@ impl App {
         Ok(())
     }
 
-    pub fn into_history(self) -> Option<SessionHistory> {
+    pub fn into_history(self) -> SessionHistory {
         self.screen.into_history()
     }
 
