@@ -1,6 +1,11 @@
 use std::collections::VecDeque;
 
-use rand::{SeedableRng as _, prelude::StdRng, seq::SliceRandom};
+use rand::{
+    Rng, SeedableRng as _,
+    distr::{Distribution, StandardUniform},
+    seq::SliceRandom,
+};
+use rand_pcg::Pcg32;
 
 use crate::PieceKind;
 
@@ -39,7 +44,7 @@ use crate::PieceKind;
 /// ```
 #[derive(Debug, Clone)]
 pub struct PieceBuffer {
-    rng: StdRng,
+    rng: Pcg32,
     bag: VecDeque<PieceKind>,
     held: Option<PieceKind>,
 }
@@ -50,13 +55,59 @@ impl Default for PieceBuffer {
     }
 }
 
+/// Seed for deterministic piece generation.
+///
+/// This is a 128-bit (16-byte) seed used to initialize the random number
+/// generator for piece generation. Using the same seed will produce the same
+/// sequence of pieces, enabling:
+///
+/// - Reproducible gameplay for debugging
+/// - Session recording and replay
+/// - Deterministic testing
+///
+/// # Example
+///
+/// ```
+/// use oxidris_engine::{GameSession, PieceSeed};
+/// use rand::Rng as _;
+///
+/// // Generate a random seed
+/// let seed: PieceSeed = rand::rng().random();
+///
+/// // Create two sessions with the same seed
+/// let session1 = GameSession::with_seed(60, seed);
+/// let session2 = GameSession::with_seed(60, seed);
+///
+/// // Both sessions will have the same piece sequence
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct PieceSeed([u8; 16]);
+
+/// Allows generating random `PieceSeed` values using the standard random distribution.
+///
+/// This implementation enables idiomatic seed generation with `rng.random()`.
+impl Distribution<PieceSeed> for StandardUniform {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> PieceSeed {
+        let mut seed = [0; 16];
+        rng.fill(&mut seed);
+        PieceSeed(seed)
+    }
+}
+
 impl PieceBuffer {
-    /// Creates a new piece buffer with OS-seeded randomization.
+    /// Creates a new piece buffer with a random seed.
     ///
     /// The bag is immediately filled with the first shuffled set of 7 pieces.
+    /// For deterministic piece generation, use [`Self::with_seed`] instead.
     #[must_use]
     pub fn new() -> Self {
-        let rng = StdRng::from_os_rng();
+        Self::with_seed(rand::rng().random())
+    }
+
+    /// Like [`Self::new`], but with a specific seed for deterministic piece generation.
+    #[must_use]
+    pub fn with_seed(seed: PieceSeed) -> Self {
+        let rng = Pcg32::from_seed(seed.0);
         let bag = VecDeque::with_capacity(PieceKind::LEN * 2);
         let mut this = Self {
             rng,

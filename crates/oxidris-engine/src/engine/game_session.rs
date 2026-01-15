@@ -1,7 +1,9 @@
 use std::time::Duration;
 
+use rand::Rng as _;
+
 use crate::{
-    HoldError, PieceCollisionError,
+    HoldError, PieceCollisionError, PieceSeed,
     core::{
         block_board::BlockBoard,
         piece::{Piece, PieceKind},
@@ -79,15 +81,23 @@ fn drop_frames(level: u64, fps: u64) -> u64 {
 }
 
 impl GameSession {
-    /// Creates a new game session with the specified frame rate.
+    /// Creates a new game session with the specified frame rate and a random seed.
+    ///
+    /// For deterministic piece generation, use [`Self::with_seed`] instead.
     ///
     /// # Arguments
     ///
     /// * `fps` - Frames per second for timing calculations (typically 60)
     #[must_use]
     pub fn new(fps: u64) -> Self {
+        Self::with_seed(fps, rand::rng().random())
+    }
+
+    /// Like [`Self::new`], but with a specific seed for deterministic piece generation.
+    #[must_use]
+    pub fn with_seed(fps: u64, seed: PieceSeed) -> Self {
         Self {
-            field: GameField::new(),
+            field: GameField::with_seed(seed),
             stats: GameStats::new(),
             hold_used: false,
             block_board: BlockBoard::INITIAL,

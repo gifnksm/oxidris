@@ -1,5 +1,7 @@
+use rand::Rng as _;
+
 use crate::{
-    CompletePieceDropError, PieceCollisionError,
+    CompletePieceDropError, PieceCollisionError, PieceSeed,
     core::{
         bit_board::BitBoard,
         piece::{Piece, PieceKind},
@@ -54,10 +56,17 @@ impl GameField {
     /// Creates a new game field with an empty board and first piece spawned.
     ///
     /// The piece buffer is initialized with a random seed, and the first piece
-    /// is drawn from the 7-bag system.
+    /// is drawn from the 7-bag system. For deterministic piece generation, use
+    /// [`Self::with_seed`] instead.
     #[must_use]
     pub fn new() -> Self {
-        let mut piece_buffer = PieceBuffer::new();
+        Self::with_seed(rand::rng().random())
+    }
+
+    /// Like [`Self::new`], but with a specific seed for deterministic piece generation.
+    #[must_use]
+    pub fn with_seed(seed: PieceSeed) -> Self {
+        let mut piece_buffer = PieceBuffer::with_seed(seed);
         let falling_piece = Piece::new(piece_buffer.pop_next());
         Self {
             board: BitBoard::INITIAL,

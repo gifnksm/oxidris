@@ -7,6 +7,7 @@
 //! - [`GameSession`] - Multi-turn game session with statistics tracking
 //! - [`GameStats`] - Game statistics (lines cleared, score, survival time)
 //! - [`PieceBuffer`] - 7-bag piece generation system
+//! - [`PieceSeed`] - Seed for deterministic piece generation
 //!
 //! # Game Flow
 //!

@@ -55,7 +55,7 @@ oxidris-cli/src/record/
 ```rust
 use oxidris_analysis::session::SessionData;
 use oxidris_cli::schema::AiModel;
-use oxidris_engine::GameStats;
+use oxidris_engine::{GameStats, PieceSeed};
 use serde::{Deserialize, Serialize};
 
 /// Recorded play session with metadata for replay functionality
@@ -72,8 +72,8 @@ pub struct RecordedSession {
 pub struct RecordMetadata {
     /// Timestamp when recording was created (ISO 8601 format)
     pub recorded_at: String,
-    /// Random seed used for piece generation
-    pub seed: u64,
+    /// Random seed used for deterministic piece generation
+    pub seed: PieceSeed,
     /// Player information (manual or AI with model data)
     pub player: PlayerInfo,
     /// Final game statistics at the time of recording
@@ -93,7 +93,7 @@ pub enum PlayerInfo {
 **Field Descriptions:**
 
 - `recorded_at`: ISO 8601 timestamp (e.g., `"2026-01-06T15:30:45Z"`) for sorting and identification
-- `seed`: Random seed for reproducibility (future: regenerate exact same piece sequence)
+- `seed`: `PieceSeed` for deterministic piece generation. Enables exact replay of piece sequences.
 - `player`: Enum distinguishing manual vs AI play, with full `AiModel` data for AI (preserves model even if file is modified/deleted)
 - `final_stats`: Score, lines cleared, etc. at recording time
 - `session_data`: Reuses existing `SessionData` type from analysis layer
