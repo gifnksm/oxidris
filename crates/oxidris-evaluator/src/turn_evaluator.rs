@@ -168,15 +168,20 @@ impl<'a> TurnEvaluator<'a> {
     ///
     /// # Arguments
     /// * `field` - Current game field state
+    /// * `hold_available` - Whether hold is available for this turn
     ///
     /// # Returns
     /// `Some((turn_plan, analysis))` if a valid placement exists, `None` if game over
     #[must_use]
-    pub fn select_best_turn(&self, field: &GameField) -> Option<(TurnPlan, PlacementAnalysis)> {
+    pub fn select_best_turn(
+        &self,
+        field: &GameField,
+        hold_available: bool,
+    ) -> Option<(TurnPlan, PlacementAnalysis)> {
         let mut best_score = f32::MIN;
         let mut best_result = None;
 
-        for turn in available_turns(field).into_iter().flatten() {
+        for turn in available_turns(field, hold_available).into_iter().flatten() {
             let analysis = PlacementAnalysis::from_board(field.board(), turn.placement());
             let score = self.placement_evaluator.evaluate_placement(&analysis);
             if score > best_score {
@@ -195,7 +200,7 @@ impl<'a> TurnEvaluator<'a> {
     {
         let mut stats = S::new();
         for _ in 0..turn_limit {
-            let Some((turn, analysis)) = self.select_best_turn(field) else {
+            let Some((turn, analysis)) = self.select_best_turn(field, true) else {
                 return stats;
             };
             let (_cleared_lines, result) = turn.apply(&analysis, field, &mut stats);
@@ -207,7 +212,10 @@ impl<'a> TurnEvaluator<'a> {
     }
 }
 
-fn available_turns(field: &GameField) -> ArrayVec<impl Iterator<Item = TurnPlan>, 2> {
+fn available_turns(
+    field: &GameField,
+    hold_available: bool,
+) -> ArrayVec<impl Iterator<Item = TurnPlan>, 2> {
     let mut result = ArrayVec::new();
     let placement2turn = |use_hold| {
         move |placement| TurnPlan {
@@ -220,7 +228,10 @@ fn available_turns(field: &GameField) -> ArrayVec<impl Iterator<Item = TurnPlan>
     let p1 = field.falling_piece();
     result.push(available_placement(p1, board).map(placement2turn(false)));
 
-    if field.can_hold() {
+    let hold_effective =
+        field.falling_piece().kind() != field.peek_falling_piece_after_hold().kind();
+
+    if hold_available && hold_effective && field.can_hold() {
         let p2 = field.peek_falling_piece_after_hold();
         result.push(available_placement(p2, board).map(placement2turn(true)));
     }

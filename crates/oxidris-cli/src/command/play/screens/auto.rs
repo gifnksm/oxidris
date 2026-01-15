@@ -1,4 +1,5 @@
 use std::{
+    ops::ControlFlow,
     sync::mpsc::{self, RecvError, TryRecvError},
     thread,
 };
@@ -169,42 +170,88 @@ impl AutoPlay {
             return;
         }
 
+        // Check if a piece was completed during this frame.
+        // increment_frame() may trigger auto_drop_and_complete(), which spawns a new piece.
+        // If that happens, we need to discard the old plan and select a new one.
+        let turn = self.session.stats().completed_pieces();
         self.session.increment_frame();
-        if self.best_turn.is_none() {
-            self.best_turn = self.turn_evaluator.select_best_turn(self.session.field());
+        let piece_completed = turn != self.session.stats().completed_pieces();
+
+        // Reselect plan if:
+        // - A piece was completed (new piece spawned)
+        // - No plan exists (previous operation failed or completed)
+        if piece_completed || self.best_turn.is_none() {
+            let hold_available = !self.session.hold_used();
+            self.best_turn = self
+                .turn_evaluator
+                .select_best_turn(self.session.field(), hold_available);
         }
 
-        if self.operate_game() {
+        if self.operate_game().is_break() {
             self.best_turn = None;
         }
     }
 
-    pub fn operate_game(&mut self) -> bool {
-        let Some((target, _)) = self.best_turn else {
-            return true;
-        };
-
-        assert!(target.use_hold() || !self.session.hold_used());
-        if target.use_hold() && !self.session.hold_used() {
-            return self.session.try_hold().is_err();
+    /// Executes one step of the current plan.
+    ///
+    /// Operations are executed in order: hold → rotation → horizontal movement → drop.
+    /// Each operation that fails will cause the plan to be discarded and reselected.
+    ///
+    /// # Returns
+    ///
+    /// - `ControlFlow::Continue(())` - Plan step executed successfully, continue in next frame
+    /// - `ControlFlow::Break(())` - Plan is complete or failed, needs reselection
+    pub fn operate_game(&mut self) -> ControlFlow<()> {
+        fn ret<E>(res: Result<(), E>) -> ControlFlow<()> {
+            match res {
+                Ok(()) => ControlFlow::Continue(()),
+                Err(_err) => ControlFlow::Break(()),
+            }
         }
 
+        let Some((target, _)) = self.best_turn else {
+            return ControlFlow::Break(());
+        };
+
+        // Step 1: Use hold if the plan requires it and hold is available
+        //
+        // Note: target.use_hold() and self.session.hold_used() can be inconsistent
+        // in the following scenario:
+        //
+        //   1. A plan with use_hold=true is selected and hold is executed
+        //   2. hold_used() becomes true
+        //   3. Subsequent operations (rotation/movement) fail
+        //   4. The plan is discarded (best_turn = None)
+        //   5. A new plan is selected with hold_available=false (since hold_used=true)
+        //   6. The new plan has use_hold=false, but hold_used is still true
+        //
+        // This is valid - the evaluator provides the best plan for the current state.
+        // So we only attempt to use hold if the plan requires it and hold is available.
+        if target.use_hold() && !self.session.hold_used() {
+            return ret(self.session.try_hold());
+        }
+
+        // Step 2: Rotate to target orientation
         let falling_piece = self.session.field().falling_piece();
         assert_eq!(target.placement().kind(), falling_piece.kind());
         if falling_piece.rotation() != target.placement().rotation() {
-            return self.session.try_rotate_right().is_err();
+            return ret(self.session.try_rotate_right());
         }
 
+        // Step 3: Move horizontally to target position
         if falling_piece.position().x() < target.placement().position().x() {
-            return self.session.try_move_right().is_err();
-        } else if falling_piece.position().x() > target.placement().position().x() {
-            return self.session.try_move_left().is_err();
+            return ret(self.session.try_move_right());
+        }
+        if falling_piece.position().x() > target.placement().position().x() {
+            return ret(self.session.try_move_left());
         }
         assert_eq!(
             falling_piece.position().x(),
             target.placement().position().x()
         );
+
+        // Step 4: Drop and complete placement
         self.session.hard_drop_and_complete();
-        true
+        ControlFlow::Break(())
     }
 }

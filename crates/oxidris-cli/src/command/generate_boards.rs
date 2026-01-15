@@ -211,7 +211,7 @@ pub(crate) fn run(arg: &GenerateBoardsArg) -> anyhow::Result<()> {
             boards: vec![],
         };
         let mut capture_interval = CAPTURE_INTERVAL;
-        while let Some((turn_plan, analysis)) = turn_evaluator.select_best_turn(&field) {
+        while let Some((turn_plan, analysis)) = turn_evaluator.select_best_turn(&field, true) {
             let turn = stats.completed_pieces();
             let capture_board = BoardAndPlacement {
                 turn,
