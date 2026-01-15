@@ -195,23 +195,38 @@ Each model optimizes a single fitness function that manually combines multiple o
 
 ### Fitness Function Design
 
-**Problem:** Current fitness functions are ad-hoc formulas with manually-chosen coefficients and formulas:
+**Problem:** Current fitness functions use manually-chosen formulas and coefficients without formal justification:
 
-- `AggroSessionEvaluator`: `2.0 * survival_ratio^2 + efficiency * survival_ratio - height_penalty`
-- `DefensiveSessionEvaluator`: Similar but slightly different weights and penalties
-- Coefficients (2.0, weights for line clears [0,1,3,5,8]) chosen without justification
-- Unclear if these formulas properly balance survival vs score trade-offs
+**Aggro Evaluator:**
 
-The fitness function defines "what is good play", which directly affects what the AI learns. Poor fitness design leads to suboptimal behavior regardless of how well the GA optimizes.
+- Formula: `(efficiency + (1 - max_height_penalty) + (1 - peak_max_height_penalty)) / 3`
+- Efficiency: weighted line clears (weights `[0,1,3,5,8]` for 0-4 lines) normalized by theoretical maximum
+- Height penalties: quadratic penalties for average and peak max height above cutoff (4.0)
+- Survival time: indirectly penalized (early termination assumes worst-case height for remaining turns)
 
-**Improvement:** Systematically design fitness functions based on desired play style. Consider different approaches:
+**Defensive Evaluator:**
 
-- Analyze current fitness function behavior (what does it reward/penalize?)
+- Formula: `((1 - max_height_penalty) + (1 - peak_max_height_penalty)) / 2`
+- No efficiency component (pure height minimization)
+- Height penalties: same quadratic approach but with cutoff 0.0 (penalizes all height)
+- Survival time: indirectly penalized (same mechanism as Aggro)
+
+**Issues:**
+
+- Coefficients (line clear weights `[0,1,3,5,8]`, height cutoffs, penalty scaling) chosen by intuition
+- Unclear if these formulas effectively capture desired play styles (aggressive vs defensive)
+- No theoretical or empirical validation of formula design
+- Different evaluators use inconsistent design principles
+
+The fitness function defines "what is good play", directly affecting what the AI learns. Better fitness design could significantly improve play quality.
+
+**Improvement:** Systematically design fitness functions based on desired play style:
+
+- Analyze current fitness behavior (what does it actually reward/penalize in practice?)
 - Design principled formulas based on game theory or domain knowledge
 - Use data-driven approach (fit formula to human play or desired outcomes)
-- Explore multi-objective optimization (Pareto fronts for survival vs score)
 
-**Dependencies:** Related to "Score Optimization and Multi-Objective Training" but focuses on fitness formula design rather than score feature normalization.
+**Dependencies:** None (can be done independently, though may relate to "Score Optimization and Multi-Objective Training").
 
 **Effort:** Medium (requires experimentation and analysis)
 

@@ -20,43 +20,46 @@
 //!
 //! ## Aggro Session Evaluator
 //!
-//! Balances survival time with line clearing efficiency:
+//! Balances line clearing efficiency with height management:
 //!
 //! ```text
-//! fitness = survival_bonus + efficiency × survival_ratio - height_penalty
+//! fitness = (efficiency + (1 - max_height_penalty) + (1 - peak_max_height_penalty)) / 3
 //!
 //! where:
-//!   survival_bonus = 2.0 × (survived / turn_limit)²
-//!   efficiency = weighted_lines / survived_pieces
-//!   height_penalty = max(worst_height - 10, 0) / 5.0
+//!   efficiency = weighted_lines / max_possible_weighted_lines
+//!   weighted_lines = Σ(line_clear_weight[i] × cleared_count[i])
+//!   line_clear_weight = [0, 1, 3, 5, 8] for 0-4 line clears
+//!   max_height_penalty = avg_squared_height_excess / worst_case_squared_height
+//!   peak_max_height_penalty = peak_height_excess² / max_height²
+//!   height_excess = max(height - cutoff, 0) where cutoff = 4.0
 //! ```
 //!
 //! **Characteristics:**
 //!
-//! - Quadratic survival bonus (surviving longer is exponentially better)
 //! - Rewards efficient line clearing with exponential weights (4-line Tetris gets 8× value)
-//! - Penalizes risky high stacks above height 10
-//! - Efficiency scaled by survival ratio (rewards sustained performance)
+//! - Penalizes both average and peak height above cutoff (4.0)
+//! - Survival time indirectly penalized: early termination assumes worst-case height for remaining turns
+//! - Equal weight given to efficiency, average height quality, and peak height quality
 //!
 //! ## Defensive Session Evaluator
 //!
-//! Prioritizes survival time above all else:
+//! Prioritizes height minimization above all else:
 //!
 //! ```text
-//! fitness = survival_bonus + efficiency × survival_ratio - height_penalty
+//! fitness = ((1 - max_height_penalty) + (1 - peak_max_height_penalty)) / 2
 //!
 //! where:
-//!   survival_bonus = 2.0 × (survived / turn_limit)²
-//!   efficiency = total_lines / survived_pieces (unweighted, unlike Aggro)
-//!   height_penalty = worst_height / 20.0
+//!   max_height_penalty = avg_squared_height / worst_case_squared_height
+//!   peak_max_height_penalty = peak_height² / max_height²
+//!   (no cutoff: all height is penalized)
 //! ```
 //!
 //! **Characteristics:**
 //!
-//! - Same quadratic survival bonus (primary objective)
-//! - Efficiency uses unweighted line count (all clears valued equally, unlike Aggro)
-//! - Smaller height penalty (more tolerant of height)
-//! - Focus: maximize survival time, clear lines as secondary goal
+//! - No efficiency component (line clearing not directly rewarded)
+//! - Penalizes all height (cutoff = 0.0) for both average and peak
+//! - Survival time indirectly penalized (same mechanism as Aggro)
+//! - Focus: minimize height, clear lines only as means to reduce height
 //!
 //! # Design: Defining "Good Play"
 //!
@@ -70,16 +73,21 @@
 //!
 //! ## Design Rationale and Limitations
 //!
-//! **Current Approach:** The fitness formulas and coefficients (e.g., `2.0 × survival_ratio²`,
-//! line clear weights `[0,1,3,5,8]`, height penalty thresholds) were chosen manually based on
-//! intuition about what "good play" means. The quadratic survival bonus emphasizes consistency,
-//! and the line clear weights encourage multi-line clears (especially 4-line Tetrises).
+//! **Current Approach:** The fitness formulas and coefficients (line clear weights `[0,1,3,5,8]`,
+//! height cutoffs, quadratic penalties) were chosen manually based on intuition about what "good
+//! play" means. The line clear weights encourage multi-line clears (especially 4-line Tetrises),
+//! and quadratic height penalties emphasize avoiding dangerous stacks.
+//!
+//! **Survival Time Consideration:** Survival time is indirectly penalized through a worst-case
+//! mechanism: if a game ends before `turn_limit`, remaining turns are counted as having maximum
+//! height (20.0), which increases the height penalty. This approach penalizes early termination
+//! without requiring explicit survival tracking.
 //!
 //! **Limitations:**
 //!
 //! - **No formal justification**: Coefficients and formulas lack theoretical or empirical validation
 //! - **Unknown optimality**: It's unclear if these formulas effectively capture desired play styles
-//! - **Survival vs score balance**: The trade-off between survival and score is not systematically explored
+//! - **Indirect survival penalty**: Worst-case height assumption may not optimally balance survival vs other objectives
 //! - **Ad-hoc design**: Different evaluators use different formulas without consistent design principles
 //!
 //! The fitness function defines what the AI learns, so improvements to fitness design could
