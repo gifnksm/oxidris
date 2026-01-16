@@ -4,7 +4,7 @@ use std::{
     thread,
 };
 
-use crossterm::event::{Event, KeyCode};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use oxidris_engine::{GameSession, SessionState};
 use oxidris_evaluator::{
     placement_analysis::PlacementAnalysis,
@@ -21,6 +21,78 @@ use crate::{
     schema::{ai_model::AiModel, record::PlayerInfo},
     view::widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlayingAction {
+    ToggleTurbo,
+    Pause,
+    Quit,
+}
+
+impl PlayingAction {
+    fn from_key_event(event: &KeyEvent) -> Option<Self> {
+        match event.code {
+            KeyCode::Char('t') => Some(Self::ToggleTurbo),
+            KeyCode::Char('p') => Some(Self::Pause),
+            KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
+            _ => None,
+        }
+    }
+
+    fn bindings(turbo: bool) -> &'static [KeyBinding<'static>] {
+        if turbo {
+            &[
+                (&["t"], "Toggle Turbo (current:ON) "),
+                (&["p"], "Pause"),
+                (&["q", "Esc"], "Quit"),
+            ]
+        } else {
+            &[
+                (&["t"], "Toggle Turbo (current:OFF)"),
+                (&["p"], "Pause"),
+                (&["q", "Esc"], "Quit"),
+            ]
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PausedAction {
+    Resume,
+    Quit,
+}
+
+impl PausedAction {
+    fn from_key_event(event: &KeyEvent) -> Option<Self> {
+        match event.code {
+            KeyCode::Char('p') => Some(Self::Resume),
+            KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
+            _ => None,
+        }
+    }
+
+    fn bindings() -> &'static [KeyBinding<'static>] {
+        &[(&["p"], "Resume"), (&["q", "Esc"], "Quit")]
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GameOverAction {
+    Quit,
+}
+
+impl GameOverAction {
+    fn from_key_event(event: &KeyEvent) -> Option<Self> {
+        match event.code {
+            KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
+            _ => None,
+        }
+    }
+
+    fn bindings() -> &'static [KeyBinding<'static>] {
+        &[(&["q", "Esc"], "Quit")]
+    }
+}
 
 #[derive(Debug)]
 pub struct AutoPlayScreen {
@@ -74,18 +146,10 @@ impl AutoPlayScreen {
 
     pub fn draw(&self, frame: &mut Frame<'_>) {
         let session_display = SessionDisplay::new(&self.session, false).turbo(self.turbo);
-        let bindings: &[KeyBinding] = {
-            let turbo: KeyBinding = if self.turbo {
-                (&["t"], "Toggle Turbo (current:ON) ")
-            } else {
-                (&["t"], "Toggle Turbo (current:OFF)")
-            };
-            let quit: KeyBinding = (&["q", "Esc"], "Quit");
-            match self.session.session_state() {
-                SessionState::Playing => &[turbo, (&["p"], "Pause"), quit],
-                SessionState::Paused => &[(&["p"][..], "Resume"), quit],
-                SessionState::GameOver => &[quit],
-            }
+        let bindings = match self.session.session_state() {
+            SessionState::Playing => PlayingAction::bindings(self.turbo),
+            SessionState::Paused => PausedAction::bindings(),
+            SessionState::GameOver => GameOverAction::bindings(),
         };
         let help_text = KeyBindingDisplay::new(bindings);
 
@@ -97,16 +161,32 @@ impl AutoPlayScreen {
     }
 
     pub fn handle_event(&mut self, event: &Event) {
-        let is_playing = self.session.session_state().is_playing();
-        let is_paused = self.session.session_state().is_paused();
-        let can_toggle_pause = is_playing || is_paused;
-
         if let Some(event) = event.as_key_event() {
-            match event.code {
-                KeyCode::Char('t') if is_playing => self.turbo = !self.turbo,
-                KeyCode::Char('p') if can_toggle_pause => self.session.toggle_pause(),
-                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
-                _ => {}
+            match self.session.session_state() {
+                SessionState::Playing => {
+                    if let Some(action) = PlayingAction::from_key_event(&event) {
+                        match action {
+                            PlayingAction::ToggleTurbo => self.turbo = !self.turbo,
+                            PlayingAction::Pause => self.session.toggle_pause(),
+                            PlayingAction::Quit => self.should_exit = true,
+                        }
+                    }
+                }
+                SessionState::Paused => {
+                    if let Some(action) = PausedAction::from_key_event(&event) {
+                        match action {
+                            PausedAction::Resume => self.session.toggle_pause(),
+                            PausedAction::Quit => self.should_exit = true,
+                        }
+                    }
+                }
+                SessionState::GameOver => {
+                    if let Some(action) = GameOverAction::from_key_event(&event) {
+                        match action {
+                            GameOverAction::Quit => self.should_exit = true,
+                        }
+                    }
+                }
             }
         }
     }

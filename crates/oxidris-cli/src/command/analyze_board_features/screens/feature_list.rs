@@ -1,4 +1,4 @@
-use crossterm::event::{Event, KeyCode};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use oxidris_analysis::sample::BoardSample;
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use oxidris_stats::comprehensive::ComprehensiveStats;
@@ -20,6 +20,42 @@ use crate::{
     command::analyze_board_features::app::AppData,
     view::widgets::{KeyBinding, KeyBindingDisplay},
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Action {
+    SelectPrev,
+    SelectNext,
+    ToggleClip,
+    Quit,
+}
+
+impl Action {
+    fn from_key_event(event: &KeyEvent) -> Option<Self> {
+        match event.code {
+            KeyCode::Up => Some(Self::SelectPrev),
+            KeyCode::Down => Some(Self::SelectNext),
+            KeyCode::Char('c') => Some(Self::ToggleClip),
+            KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
+            _ => None,
+        }
+    }
+
+    fn bindings(clip_scatter_plot: bool) -> &'static [KeyBinding<'static>] {
+        if clip_scatter_plot {
+            &[
+                (&["↑", "↓"], "Select"),
+                (&["c"], "Toggle Clip (current:P95)"),
+                (&["q", "Esc"], "Quit"),
+            ]
+        } else {
+            &[
+                (&["↑", "↓"], "Select"),
+                (&["c"], "Toggle Clip (current:MAX)"),
+                (&["q", "Esc"], "Quit"),
+            ]
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct FeatureListScreen {
@@ -175,37 +211,30 @@ impl FeatureListScreen {
         frame.render_widget(normalized_stats_widget, normalized_stats_pane);
 
         // Render help line
-        let bindings = {
-            let select: KeyBinding = (&["↑", "↓"], "Select");
-            let clip: KeyBinding = if self.clip_scatter_plot {
-                (&["c"], "Toggle Clip (P95)")
-            } else {
-                (&["c"], "Toggle Clip (MAX)")
-            };
-            let quit: KeyBinding = (&["q", "Esc"], "Quit");
-            &[select, clip, quit]
-        };
-        let help_text = KeyBindingDisplay::new(bindings);
+        let help_text = KeyBindingDisplay::new(Action::bindings(self.clip_scatter_plot));
         frame.render_widget(help_text, help_area);
     }
 
     pub(crate) fn handle_event(&mut self, event: &Event) {
-        if let Some(event) = event.as_key_event() {
-            match event.code {
-                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
-                KeyCode::Char('c') => {
-                    self.clip_scatter_plot = !self.clip_scatter_plot;
+        if let Some(event) = event.as_key_event()
+            && let Some(action) = Action::from_key_event(&event)
+        {
+            match action {
+                Action::SelectPrev => {
+                    if !self.features.is_empty() {
+                        self.selected_feature = self
+                            .selected_feature
+                            .checked_sub(1)
+                            .unwrap_or(self.features.len() - 1);
+                    }
                 }
-                KeyCode::Up if !self.features.is_empty() => {
-                    self.selected_feature = self
-                        .selected_feature
-                        .checked_sub(1)
-                        .unwrap_or(self.features.len() - 1);
+                Action::SelectNext => {
+                    if !self.features.is_empty() {
+                        self.selected_feature = (self.selected_feature + 1) % self.features.len();
+                    }
                 }
-                KeyCode::Down if !self.features.is_empty() => {
-                    self.selected_feature = (self.selected_feature + 1) % self.features.len();
-                }
-                _ => {}
+                Action::ToggleClip => self.clip_scatter_plot = !self.clip_scatter_plot,
+                Action::Quit => self.should_exit = true,
             }
         }
     }

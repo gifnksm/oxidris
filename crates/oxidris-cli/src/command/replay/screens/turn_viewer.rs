@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crossterm::event::{Event, KeyCode};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use oxidris_engine::{Block, BlockBoard};
 use ratatui::{
     Frame,
@@ -15,6 +15,42 @@ use crate::{
     schema::record::{RecordedSession, TurnRecord},
     view::widgets::{BoardDisplay, KeyBinding, KeyBindingDisplay},
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Action {
+    Prev(usize),
+    Next(usize),
+    First,
+    Last,
+    Quit,
+}
+
+impl Action {
+    fn from_key_event(event: &KeyEvent) -> Option<Self> {
+        match event.code {
+            KeyCode::Char('k') | KeyCode::Up => Some(Self::Prev(1)),
+            KeyCode::Char('j') | KeyCode::Down => Some(Self::Next(1)),
+            KeyCode::Char('h') | KeyCode::Left => Some(Self::Prev(10)),
+            KeyCode::Char('l') | KeyCode::Right => Some(Self::Next(10)),
+            KeyCode::Char('g') | KeyCode::Home => Some(Self::First),
+            KeyCode::Char('G') | KeyCode::End => Some(Self::Last),
+            KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
+            _ => None,
+        }
+    }
+
+    fn bindings() -> &'static [KeyBinding<'static>] {
+        &[
+            (&["k", "↑"], "Prev"),
+            (&["j", "↓"], "Next"),
+            (&["h", "←"], "Prev 10"),
+            (&["l", "→"], "Next 10"),
+            (&["g", "Home"], "First"),
+            (&["G", "End"], "Last"),
+            (&["q", "Esc"], "Quit"),
+        ]
+    }
+}
 
 #[derive(Debug)]
 pub struct TurnViewerScreen {
@@ -87,16 +123,7 @@ impl TurnViewerScreen {
                 .merge_borders(MergeStrategy::Exact),
         );
 
-        let bindings: &[KeyBinding] = &[
-            (&["k", "↑"], "Prev"),
-            (&["j", "↓"], "Next"),
-            (&["h", "←"], "Prev 10"),
-            (&["l", "→"], "Next 10"),
-            (&["g", "Home"], "First"),
-            (&["G", "End"], "Last"),
-            (&["q", "Esc"], "Quit"),
-        ];
-        let help = KeyBindingDisplay::new(bindings)
+        let help = KeyBindingDisplay::new(Action::bindings())
             .block(BlockWidget::bordered().merge_borders(MergeStrategy::Exact));
 
         frame.render_widget(stats, top_area);
@@ -105,16 +132,15 @@ impl TurnViewerScreen {
     }
 
     pub fn handle_event(&mut self, event: &Event) {
-        if let Some(event) = event.as_key_event() {
-            match event.code {
-                KeyCode::Char('j') | KeyCode::Down => self.step_forward(1),
-                KeyCode::Char('k') | KeyCode::Up => self.step_backward(1),
-                KeyCode::Char('h') | KeyCode::Left => self.step_backward(10),
-                KeyCode::Char('l') | KeyCode::Right => self.step_forward(10),
-                KeyCode::Char('g') | KeyCode::Home => self.jump_to_first(),
-                KeyCode::Char('G') | KeyCode::End => self.jump_to_last(),
-                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
-                _ => {}
+        if let Some(event) = event.as_key_event()
+            && let Some(action) = Action::from_key_event(&event)
+        {
+            match action {
+                Action::Prev(amount) => self.step_backward(amount),
+                Action::Next(amount) => self.step_forward(amount),
+                Action::First => self.jump_to_first(),
+                Action::Last => self.jump_to_last(),
+                Action::Quit => self.should_exit = true,
             }
         }
     }
