@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block as BlockWidget, BlockExt as _, Widget},
 };
 
-use crate::ui::widgets::style;
+use crate::view::widgets::style;
 
 pub struct SessionStatsDisplay<'a> {
     session: &'a GameSession,

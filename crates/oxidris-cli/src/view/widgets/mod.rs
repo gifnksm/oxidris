@@ -31,7 +31,7 @@ mod color {
 pub mod style {
     use ratatui::style::{Color, Style};
 
-    use crate::ui::widgets::color;
+    use crate::view::widgets::color;
 
     const fn fg_bg(fg: Color, bg: Color) -> Style {
         Style::new().fg(fg).bg(bg)

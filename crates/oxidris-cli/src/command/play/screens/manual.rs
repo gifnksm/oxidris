@@ -10,7 +10,7 @@ use ratatui::{
 use crate::{
     record::{RecordingSession, SessionHistory},
     schema::record::PlayerInfo,
-    ui::widgets::SessionDisplay,
+    view::widgets::SessionDisplay,
 };
 
 #[derive(Debug)]

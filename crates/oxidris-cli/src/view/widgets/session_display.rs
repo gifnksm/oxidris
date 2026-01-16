@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Widget},
 };
 
-use crate::ui::widgets::{
+use crate::view::widgets::{
     BoardDisplay, PieceDisplay, PieceStackDisplay, SessionStatsDisplay, color, style,
 };
 

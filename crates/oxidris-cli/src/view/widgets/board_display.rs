@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block as BlockWidget, BlockExt, Widget},
 };
 
-use crate::ui::widgets::BlockDisplay;
+use crate::view::widgets::BlockDisplay;
 
 #[derive(Debug)]
 pub struct BoardDisplay<'a> {

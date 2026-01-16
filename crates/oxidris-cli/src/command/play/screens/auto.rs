@@ -21,7 +21,7 @@ use ratatui::{
 use crate::{
     record::{RecordingSession, SessionHistory},
     schema::{ai_model::AiModel, record::PlayerInfo},
-    ui::widgets::SessionDisplay,
+    view::widgets::SessionDisplay,
 };
 
 #[derive(Debug)]

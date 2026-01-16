@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Paragraph, Widget},
 };
 
-use crate::ui::widgets::style;
+use crate::view::widgets::style;
 
 #[derive(Debug)]
 pub struct BlockDisplay {

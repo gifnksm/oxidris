@@ -13,7 +13,7 @@ use ratatui::{
 
 use crate::{
     schema::record::{RecordedSession, TurnRecord},
-    ui::widgets::BoardDisplay,
+    view::widgets::BoardDisplay,
 };
 
 #[derive(Debug)]

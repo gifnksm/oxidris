@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block as BlockWidget, BlockExt as _, Widget},
 };
 
-use crate::ui::widgets::{BlockDisplay, PieceDisplay};
+use crate::view::widgets::{BlockDisplay, PieceDisplay};
 
 #[derive(Debug)]
 pub struct PieceStackDisplay<'a> {
