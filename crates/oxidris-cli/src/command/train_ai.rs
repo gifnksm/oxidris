@@ -33,14 +33,14 @@ const POPULATION_COUNT: usize = 30;
 const MAX_GENERATIONS: usize = 200;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-enum EvolutaionPhase {
+enum EvolutionPhase {
     #[default]
     Exploration,
     Transition,
     Convergence,
 }
 
-impl EvolutaionPhase {
+impl EvolutionPhase {
     fn from_generation(generation: usize) -> Self {
         match generation {
             0..30 => Self::Exploration,
@@ -52,26 +52,26 @@ impl EvolutaionPhase {
 const ELITE_COUNT: usize = 2;
 const TOURNAMENT_SIZE: usize = 2;
 
-const fn max_weight_by_phase(phase: EvolutaionPhase) -> f32 {
+const fn max_weight_by_phase(phase: EvolutionPhase) -> f32 {
     match phase {
-        EvolutaionPhase::Exploration => 0.5,
-        EvolutaionPhase::Transition => 0.8,
-        EvolutaionPhase::Convergence => 1.0,
+        EvolutionPhase::Exploration => 0.5,
+        EvolutionPhase::Transition => 0.8,
+        EvolutionPhase::Convergence => 1.0,
     }
 }
 
 const MUTATION_RATE: f32 = 0.3;
-const fn mutation_sigma_by_phase(phase: EvolutaionPhase) -> f32 {
+const fn mutation_sigma_by_phase(phase: EvolutionPhase) -> f32 {
     match phase {
-        EvolutaionPhase::Exploration => 0.05,
-        EvolutaionPhase::Transition => 0.02,
-        EvolutaionPhase::Convergence => 0.01,
+        EvolutionPhase::Exploration => 0.05,
+        EvolutionPhase::Transition => 0.02,
+        EvolutionPhase::Convergence => 0.01,
     }
 }
 
 const BLX_ALPHA: f32 = 0.2;
 
-const fn evolver_by_phase(phase: EvolutaionPhase) -> PopulationEvolver {
+const fn evolver_by_phase(phase: EvolutionPhase) -> PopulationEvolver {
     PopulationEvolver {
         elite_count: ELITE_COUNT,
         tournament_size: TOURNAMENT_SIZE,
@@ -134,10 +134,10 @@ pub(crate) fn run(arg: &TrainAiArg) -> anyhow::Result<()> {
         features.clone(),
         POPULATION_COUNT,
         &mut rng,
-        max_weight_by_phase(EvolutaionPhase::default()),
+        max_weight_by_phase(EvolutionPhase::default()),
     );
     for generation in 0..MAX_GENERATIONS {
-        let phase = EvolutaionPhase::from_generation(generation);
+        let phase = EvolutionPhase::from_generation(generation);
         eprintln!("Generation #{generation} ({phase:?}):");
         let evolver = evolver_by_phase(phase);
         let fields: Vec<GameField> = (0..GAMES_PER_INDIVIDUAL)

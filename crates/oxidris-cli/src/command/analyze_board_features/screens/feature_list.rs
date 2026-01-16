@@ -9,7 +9,7 @@ use ratatui::{
     prelude::Direction,
     style::{Color, Modifier, Style},
     symbols::{Marker, merge::MergeStrategy},
-    text::Line,
+    text::{Line, Text},
     widgets::{
         Axis, Bar, BarChart, Block, Chart, Dataset, List, ListItem, ListState, Paragraph,
         StatefulWidget, Widget,
@@ -74,47 +74,34 @@ impl FeatureListScreen {
     pub fn draw(&self, frame: &mut Frame) {
         let feature_stats = &self.data.statistics[self.selected_feature];
 
-        // Split area to reserve bottom line for help
-        let main_layout =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(frame.area());
+        // Layout: main area + help line at bottom
+        let [main_area, help_area] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
 
-        let panes = Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
-            .spacing(Spacing::Overlap(1))
-            .split(main_layout[0]);
+        let [left_area, right_area] =
+            Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
+                .spacing(Spacing::Overlap(1))
+                .areas(main_area);
 
-        let left_panes = Layout::vertical([
+        let [feature_pane, trans_chart_pane, norm_chart_pane] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),
         ])
         .spacing(Spacing::Overlap(1))
-        .split(panes[0]);
+        .areas(left_area);
 
-        let right_panes = Layout::vertical([
+        let [
+            raw_stats_pane,
+            transformed_stats_pane,
+            normalized_stats_pane,
+        ] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),
         ])
         .spacing(Spacing::Overlap(1))
-        .split(panes[1]);
-
-        let feature_list_pane = FeatureSelector {
-            features: &self.features,
-            selected_feature: self.selected_feature,
-        };
-
-        let raw_pane = FeatureStatistics {
-            label: "Raw",
-            stats: &feature_stats.raw,
-        };
-        let transformed_pane = FeatureStatistics {
-            label: "Transformed",
-            stats: &feature_stats.transformed,
-        };
-        let normalized_pane = FeatureStatistics {
-            label: "Normalized",
-            stats: &feature_stats.normalized,
-        };
+        .areas(right_area);
 
         // Calculate X-axis range (clipped or full)
         let raw_max = if self.clip_scatter_plot {
@@ -134,11 +121,15 @@ impl FeatureListScreen {
         let raw_norm_data = self
             .build_scatter_data(|sample| sample.feature_vector[self.selected_feature].normalized);
 
-        // Calculate Y-axis ranges
+        // Calculate Y-axis range for transformed values
         let trans_range = Self::calculate_y_range_for_clipped_x(&raw_trans_data, raw_range[1]);
-        let norm_range = [0.0, 1.0];
 
-        // Create scatter plot widgets
+        // Create widgets
+        let feature_list_widget = FeatureSelector {
+            features: &self.features,
+            selected_feature: self.selected_feature,
+        };
+
         let raw_trans_chart = FeatureScatter {
             label: "Raw vs Transformed",
             data: &raw_trans_data,
@@ -154,22 +145,40 @@ impl FeatureListScreen {
             x_title: "Raw",
             x_bounds: raw_range,
             y_title: "Normalized",
-            y_bounds: norm_range,
+            y_bounds: [0.0, 1.0],
         };
 
-        frame.render_widget(feature_list_pane, left_panes[0]);
-        frame.render_widget(raw_trans_chart, left_panes[1]);
-        frame.render_widget(raw_norm_chart, left_panes[2]);
+        let raw_stats_widget = FeatureStatistics {
+            label: "Raw",
+            stats: &feature_stats.raw,
+        };
+        let transformed_stats_widget = FeatureStatistics {
+            label: "Transformed",
+            stats: &feature_stats.transformed,
+        };
+        let normalized_stats_widget = FeatureStatistics {
+            label: "Normalized",
+            stats: &feature_stats.normalized,
+        };
 
-        frame.render_widget(raw_pane, right_panes[0]);
-        frame.render_widget(transformed_pane, right_panes[1]);
-        frame.render_widget(normalized_pane, right_panes[2]);
+        // Render left panes: feature list and scatter plots
+        frame.render_widget(feature_list_widget, feature_pane);
+        frame.render_widget(raw_trans_chart, trans_chart_pane);
+        frame.render_widget(raw_norm_chart, norm_chart_pane);
 
-        // Render help line at bottom
+        // Render right panes: statistics for each transformation stage
+        frame.render_widget(raw_stats_widget, raw_stats_pane);
+        frame.render_widget(transformed_stats_widget, transformed_stats_pane);
+        frame.render_widget(normalized_stats_widget, normalized_stats_pane);
+
+        // Render help line
         let clip_status = if self.clip_scatter_plot { "P95" } else { "Max" };
-        let help_text = format!("↑/↓: Select | c: Toggle Clip ({clip_status}) | q/Esc: Quit");
-        let help_line = Paragraph::new(help_text).style(Style::default().fg(Color::DarkGray));
-        frame.render_widget(help_line, main_layout[1]);
+        let help_text = Text::from(format!(
+            "↑/↓: Select | c: Toggle Clip ({clip_status}) | q/Esc: Quit"
+        ))
+        .style(Style::default().fg(Color::DarkGray))
+        .centered();
+        frame.render_widget(help_text, help_area);
     }
 
     pub(crate) fn handle_event(&mut self, event: &Event) {
@@ -179,19 +188,14 @@ impl FeatureListScreen {
                 KeyCode::Char('c') => {
                     self.clip_scatter_plot = !self.clip_scatter_plot;
                 }
-                KeyCode::Up => {
-                    if self.selected_feature == 0 {
-                        self.selected_feature = self.features.len() - 1;
-                    } else {
-                        self.selected_feature -= 1;
-                    }
+                KeyCode::Up if !self.features.is_empty() => {
+                    self.selected_feature = self
+                        .selected_feature
+                        .checked_sub(1)
+                        .unwrap_or(self.features.len() - 1);
                 }
-                KeyCode::Down => {
-                    if self.selected_feature + 1 >= self.features.len() {
-                        self.selected_feature = 0;
-                    } else {
-                        self.selected_feature += 1;
-                    }
+                KeyCode::Down if !self.features.is_empty() => {
+                    self.selected_feature = (self.selected_feature + 1) % self.features.len();
                 }
                 _ => {}
             }
@@ -254,8 +258,9 @@ impl Widget for FeatureStatistics<'_> {
             .merge_borders(MergeStrategy::Exact)
             .title(self.label);
 
-        let panes = Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)])
-            .split(block.inner(area));
+        let [stats_area, chart_area] =
+            Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)])
+                .areas(block.inner(area));
 
         let stats = &self.stats.stats;
         let mut text = vec![
@@ -281,13 +286,11 @@ impl Widget for FeatureStatistics<'_> {
                 .bins
                 .iter()
                 .map(|bin| {
-                    {
-                        Bar::with_label(
-                            format!("{:8.2}-{:8.2}", bin.range.start, bin.range.end),
-                            bin.count,
-                        )
-                        .text_value(format!("{}", bin.count))
-                    }
+                    Bar::with_label(
+                        format!("{:8.2}-{:8.2}", bin.range.start, bin.range.end),
+                        bin.count,
+                    )
+                    .text_value(format!("{}", bin.count))
                 })
                 .collect::<Vec<_>>(),
         )
@@ -295,8 +298,8 @@ impl Widget for FeatureStatistics<'_> {
         .bar_gap(0);
 
         Widget::render(block, area, buf);
-        Widget::render(paragraph, panes[0], buf);
-        Widget::render(chart, panes[1], buf);
+        Widget::render(paragraph, stats_area, buf);
+        Widget::render(chart, chart_area, buf);
     }
 }
 
