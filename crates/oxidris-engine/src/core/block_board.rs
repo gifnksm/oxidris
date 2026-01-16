@@ -158,6 +158,14 @@ impl BlockBoard {
         }
     }
 
+    /// Fills a single cell on the board with the specified block.
+    ///
+    /// Coordinates use the internal coordinate system (including sentinel margins),
+    /// matching `BitBoard::occupied_cell_positions()` and `Piece::occupied_positions()`.
+    pub fn fill_block_at(&mut self, x: usize, y: usize, block: Block) {
+        self.rows[y].cells[x] = block;
+    }
+
     /// Fills the piece's cells on the board with a specific block type.
     ///
     /// Useful for rendering ghost pieces (drop preview) or other visual effects.

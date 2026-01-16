@@ -110,8 +110,8 @@ See [Design Principles in README](README.md#design-principles) for the project p
 
 2. **Session Recording & Replay (Step 4)**
    - ✅ Step 1-3: Data structures, manual/auto play recording (completed)
-   - 📋 Step 4: Replay command with basic playback (next)
-   - In-game history browsing
+   - 🔄 Step 4: Replay command (in progress - navigation done, play/pause deferred)
+   - 📋 Step 5: In-game history browsing (next)
    - **Scope:** Recording, saving, and replaying gameplay sessions with metadata.
    - See `docs/projects/session-recording-replay/` for details.
 
@@ -254,7 +254,7 @@ See [Design Principles in README](README.md#design-principles) for the project p
 **Active Project 2:** Session Recording & Replay (Step 4)
 
 - ✅ **Steps 1-3:** Data structures, manual/auto play recording (completed)
-- 📋 **Step 4:** Replay command with basic playback (next)
+- 🔄 **Step 4:** Replay command (in progress - navigation done, play/pause deferred)
 - **Scope:** Recording gameplay, replay viewer, in-game history browsing
 - See [Recording & Replay Docs](docs/projects/session-recording-replay/) for details
 

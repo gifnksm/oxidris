@@ -87,23 +87,23 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Goal**: Create a standalone replay viewer with basic playback controls.
 
-**Status**: Not Started
+**Status**: In Progress (play/pause deferred)
 
 **Dependencies**: Step 3 complete (need recording files to test)
 
 **Tasks:**
 
-- Create `replay` subcommand with file loading
-- Implement replay screen displaying board state and metadata
-- Add playback controls: j/k or ↓/↑ (1 turn), h/l or ←/→ (10 turns), g/Home (first), G/End (last), Space (play/pause), q/Esc (quit)
-- Auto-advance turns when playing (~60 FPS)
-- Display board only (no hold/next/score as they're not saved per-turn)
+- [x] Create `replay` subcommand with file loading
+- [x] Implement replay screen displaying board state and metadata
+- [x] Add playback controls: j/k or ↓/↑ (1 turn), h/l or ←/→ (10 turns), g/Home (first), G/End (last), q/Esc (quit)
+- [ ] Add play/pause with Space and auto-advance (~60 FPS) - deferred pending event loop refactoring
+- [x] Display board only (no hold/next/score as they're not saved per-turn)
 
 **Validation:**
 
-- Can load and replay recordings
-- All playback controls work correctly
-- Handles invalid files gracefully
+- [x] Can load and replay recordings
+- [x] All navigation controls work correctly
+- [x] Handles invalid files gracefully (serde error messages)
 
 ---
 
@@ -178,20 +178,20 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 ### Current Status
 
-**Overall Progress**: ~40% (Steps 1-3 complete)
+**Overall Progress**: ~50% (Steps 1-3 complete, Step 4 in progress)
 
 **Completed Steps**: Step 1, Step 2, Step 3
 
-**Current Step**: Step 4 (Not Started)
+**Current Step**: Step 4 (In Progress - play/pause deferred)
 
-**Next Milestone**: Complete Step 4 (Replay Command)
+**Next Milestone**: Complete Step 4 play/pause, then Step 5
 
 ### Step Status
 
 - [x] **Step 1**: Data Structures and Memory Management
 - [x] **Step 2**: Manual Play Recording
 - [x] **Step 3**: Auto-Play Recording
-- [ ] **Step 4**: Replay Command (Basic Playback)
+- [ ] **Step 4**: Replay Command (Basic Playback) - in progress, play/pause deferred
 - [ ] **Step 5**: In-Game Playback (History Browsing)
 - [ ] **Step 6**: Advanced Features (Feature Visualization)
 - [ ] **Step 7**: Documentation and Polish
@@ -207,8 +207,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 ### Internal Dependencies
 
-- `oxidris-analysis` for `SessionData` type
-- `oxidris-engine` for `GameStats` type
+- `oxidris-engine` for `BitBoard`, `Piece`, `GameStats` types
 - `oxidris-evaluator` for feature calculation (Step 6 only)
 - Existing TUI infrastructure (ratatui widgets)
 

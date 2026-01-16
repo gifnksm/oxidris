@@ -82,9 +82,9 @@ impl AutoPlayScreen {
             "T (Turbo: OFF)"
         };
         let help_text = match self.session.session_state() {
-            SessionState::Playing => format!("Controls: {turbo_text} | p (Pause) | q (Quit)"),
-            SessionState::Paused => "Controls: p (Resume) | q (Quit)".to_owned(),
-            SessionState::GameOver => "Controls: q (Quit)".to_owned(),
+            SessionState::Playing => format!("Controls: {turbo_text} | p (Pause) | q/Esc (Quit)"),
+            SessionState::Paused => "Controls: p (Resume) | q/Esc (Quit)".to_owned(),
+            SessionState::GameOver => "Controls: q/Esc (Quit)".to_owned(),
         };
         let help_text = Text::from(help_text)
             .style(Style::default().fg(Color::DarkGray))
@@ -106,7 +106,7 @@ impl AutoPlayScreen {
             match event.code {
                 KeyCode::Char('t') if is_playing => self.turbo = !self.turbo,
                 KeyCode::Char('p') if can_toggle_pause => self.session.toggle_pause(),
-                KeyCode::Char('q') => self.is_exiting = true,
+                KeyCode::Char('q') | KeyCode::Esc => self.is_exiting = true,
                 _ => {}
             }
         }

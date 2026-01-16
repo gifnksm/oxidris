@@ -160,7 +160,7 @@ impl FeatureListScreen {
 
         // Render help line at bottom
         let clip_status = if self.clip_scatter_plot { "P95" } else { "Max" };
-        let help_text = format!("↑/↓: Select | c: Toggle Clip ({clip_status}) | q/ESC: Quit");
+        let help_text = format!("↑/↓: Select | c: Toggle Clip ({clip_status}) | q/Esc: Quit");
         let help_line = Paragraph::new(help_text).style(Style::default().fg(Color::DarkGray));
         frame.render_widget(help_line, main_layout[1]);
     }

@@ -21,63 +21,55 @@ This document describes the detailed design decisions, data structures, and arch
 ### Module Organization
 
 ```text
-oxidris-cli/src/record/
-├── mod.rs                  # Module exports
-├── recorded_session.rs     # RecordedSession, RecordMetadata
-└── session_history.rs      # SessionHistory (ring buffer)
+oxidris-cli/src/
+├── schema/record.rs    # RecordedSession, TurnRecord, PlayerInfo (data types)
+└── record.rs           # RecordingSession, SessionHistory (runtime management)
 ```
 
 **Design Rationale:**
 
 - `RecordedSession` is CLI-specific (recording/replay functionality)
-- `SessionData` is analysis-specific (training data structure)
-- Both can coexist: CLI layer reuses `SessionData` for compatibility
-- Avoids circular dependency (analysis doesn't depend on CLI)
-
-### Data Type Hierarchy
-
-```text
-oxidris-analysis/src/session.rs
-├─ SessionCollection    # Training data (multiple sessions)
-├─ SessionData          # Shared: session information
-└─ BoardAndPlacement    # Shared: board state + piece
-
-oxidris-cli/src/record/
-├─ RecordedSession      # Recording (single session + metadata)
-├─ RecordMetadata       # CLI-specific metadata
-└─ SessionHistory       # Ring buffer for memory management
-```
+- `SessionData` (in oxidris-analysis) is training-specific and not reused here
+- Recording uses its own `TurnRecord` type which includes `hold_used` field
+- Avoids unnecessary dependency on analysis crate
 
 ### RecordedSession
 
-**Location**: `oxidris-cli/src/record/recorded_session.rs`
+**Location**: `oxidris-cli/src/schema/record.rs`
 
 ```rust
-use oxidris_analysis::session::SessionData;
-use oxidris_cli::schema::AiModel;
-use oxidris_engine::{GameStats, PieceSeed};
+use chrono::{DateTime, Utc};
+use oxidris_engine::{BitBoard, GameStats, Piece, PieceSeed};
 use serde::{Deserialize, Serialize};
+
+use crate::schema::ai_model::AiModel;
 
 /// Recorded play session with metadata for replay functionality
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordedSession {
-    /// Metadata about the recording
-    pub metadata: RecordMetadata,
-    /// The actual session data (reuses analysis layer's type)
-    pub session_data: SessionData,
-}
-
-/// Metadata for a recorded play session
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordMetadata {
     /// Timestamp when recording was created (ISO 8601 format)
-    pub recorded_at: String,
-    /// Random seed used for deterministic piece generation
+    pub recorded_at: DateTime<Utc>,
+    /// Random seed used for piece generation
     pub seed: PieceSeed,
     /// Player information (manual or AI with model data)
     pub player: PlayerInfo,
     /// Final game statistics at the time of recording
     pub final_stats: GameStats,
+    /// Sequence of board states and piece placements during the session
+    pub boards: Vec<TurnRecord>,
+}
+
+/// A single turn record capturing the board state before piece placement.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TurnRecord {
+    /// Turn number (0-indexed, increments with each piece placement)
+    pub turn: usize,
+    /// Board state before the piece was placed
+    pub before_placement: BitBoard,
+    /// The piece that was placed (includes position and rotation)
+    pub placement: Piece,
+    /// Whether hold was used during this turn
+    pub hold_used: bool,
 }
 
 /// Information about the player type
@@ -96,13 +88,14 @@ pub enum PlayerInfo {
 - `seed`: `PieceSeed` for deterministic piece generation. Enables exact replay of piece sequences.
 - `player`: Enum distinguishing manual vs AI play, with full `AiModel` data for AI (preserves model even if file is modified/deleted)
 - `final_stats`: Score, lines cleared, etc. at recording time
-- `session_data`: Reuses existing `SessionData` type from analysis layer
+- `boards`: Sequence of turn records capturing each piece placement
 
-**Why Separate from SessionCollection:**
+**Why Not Reuse SessionData:**
 
-- `SessionCollection` is for training data (multiple sessions, batch analysis)
-- `RecordedSession` is for gameplay recording (single session, playback)
-- Different use cases warrant different top-level structures
+- `SessionData` (in oxidris-analysis) is designed for training data collection
+- It lacks `hold_used` field needed for accurate replay
+- It includes fields irrelevant to recording (`placement_evaluator`, `is_game_over`)
+- Keeping recording types separate allows CLI-specific evolution
 
 ### SessionHistory (Ring Buffer)
 

@@ -196,7 +196,7 @@ impl BoardAnalysis {
         *self.row_transitions.get_or_init(|| {
             let mut transitions = 0;
             for row in self.board.playable_rows() {
-                let mut cells = row.iter_playable_cells();
+                let mut cells = row.playable_cells();
                 let mut prev_occupied = cells.next().unwrap();
                 for occupied in cells {
                     if occupied != prev_occupied {

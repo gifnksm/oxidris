@@ -1,6 +1,9 @@
 use clap::{Parser, Subcommand};
 
-use crate::command::play::ManualPlayArg;
+use crate::command::{
+    play::{AutoPlayArg, ManualPlayArg},
+    replay::ReplayArg,
+};
 
 use self::{
     analyze_board_features::AnalyzeBoardFeaturesArg, analyze_censoring::AnalyzeCensoringArg,
@@ -11,6 +14,7 @@ mod analyze_board_features;
 mod analyze_censoring;
 mod generate_boards;
 mod play;
+mod replay;
 mod train_ai;
 
 #[derive(Debug, Clone, Parser)]
@@ -24,9 +28,10 @@ pub struct CommandArgs {
 #[derive(Debug, Clone, Subcommand)]
 enum Mode {
     #[command(name = "play")]
-    ManualPlay(#[clap(flatten)] play::ManualPlayArg),
+    ManualPlay(#[clap(flatten)] ManualPlayArg),
     #[command(name = "auto-play")]
-    AutoPlay(#[clap(flatten)] play::AutoPlayArg),
+    AutoPlay(#[clap(flatten)] AutoPlayArg),
+    Replay(#[clap(flatten)] ReplayArg),
     /// Train AI using genetic algorithm
     TrainAi(#[clap(flatten)] TrainAiArg),
     /// Generate boards for training data
@@ -45,6 +50,7 @@ pub fn run() -> anyhow::Result<()> {
     {
         Mode::ManualPlay(arg) => play::run_manual(&arg)?,
         Mode::AutoPlay(arg) => play::run_auto(&arg)?,
+        Mode::Replay(arg) => replay::run(&arg)?,
         Mode::TrainAi(arg) => train_ai::run(&arg)?,
         Mode::GenerateBoards(arg) => generate_boards::run(&arg)?,
         Mode::AnalyzeBoardFeatures(arg) => analyze_board_features::run(&arg)?,

@@ -39,10 +39,10 @@ impl ManualPlayScreen {
         let session_display = SessionDisplay::new(&self.session, true);
         let help_text = match self.session.session_state() {
             SessionState::Playing => {
-                "Controls: ← → (Move) | ↓ (Soft Drop) | ↑ (Hard Drop) | z x (Rotate) | Space (Hold) | p (Pause) | q (Quit)"
+                "Controls: ←/→ (Move) | ↓ (Soft Drop) | ↑ (Hard Drop) | z/x (Rotate) | Space (Hold) | p (Pause) | q/Esc (Quit)"
             }
-            SessionState::Paused => "Controls: P (Resume) | Q (Quit)",
-            SessionState::GameOver => "Controls: Q (Quit)",
+            SessionState::Paused => "Controls: p (Resume) | q/Esc (Quit)",
+            SessionState::GameOver => "Controls: q/Esc (Quit)",
         };
         let help_text = Text::from(help_text)
             .style(Style::default().fg(Color::DarkGray))
@@ -70,7 +70,7 @@ impl ManualPlayScreen {
                 KeyCode::Char('x') if is_playing => _ = self.session.try_rotate_right(),
                 KeyCode::Char(' ') if is_playing => _ = self.session.try_hold(),
                 KeyCode::Char('p') if can_toggle_pause => self.session.toggle_pause(),
-                KeyCode::Char('q') => self.is_exiting = true,
+                KeyCode::Char('q') | KeyCode::Esc => self.is_exiting = true,
                 _ => {}
             }
         }

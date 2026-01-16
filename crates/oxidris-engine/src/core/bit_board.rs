@@ -81,8 +81,23 @@ impl BitRow {
 
     /// Iterates over all playable cells in the row, returning their occupied status.
     #[inline]
-    pub fn iter_playable_cells(self) -> impl Iterator<Item = bool> {
+    pub fn playable_cells(self) -> impl Iterator<Item = bool> {
         (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH).map(move |x| {
+            let bit = 1 << x;
+            (self.bits & bit) != 0
+        })
+    }
+
+    /// Iterates over all occupied playable cells in the row, returning their x coordinate.
+    ///
+    /// The returned x coordinates are in the internal coordinate system (including sentinel
+    /// margins), matching the coordinate system used by [`Piece`] and [`BlockBoard`].
+    ///
+    /// [`Piece`]: crate::Piece
+    /// [`BlockBoard`]: crate::BlockBoard
+    #[inline]
+    pub fn occupied_cell_positions(self) -> impl Iterator<Item = usize> {
+        (SENTINEL_MARGIN_LEFT..SENTINEL_MARGIN_LEFT + PLAYABLE_WIDTH).filter(move |x| {
             let bit = 1 << x;
             (self.bits & bit) != 0
         })
@@ -239,11 +254,24 @@ impl BitBoard {
         self.rows[y + SENTINEL_MARGIN_TOP]
     }
 
-    /// Returns an iterator over the playable rows.
+    /// Iterates over the playable rows.
     pub fn playable_rows(&self) -> impl Iterator<Item = BitRow> + '_ {
         self.rows[SENTINEL_MARGIN_TOP..][..PLAYABLE_HEIGHT]
             .iter()
             .copied()
+    }
+
+    /// Iterates over all occupied playable cells, returning their coordinates.
+    ///
+    /// The returned coordinates are in internal format (including sentinel margins),
+    /// which is the same coordinate system used by [`Piece`] and [`BlockBoard`].
+    ///
+    /// [`Piece`]: crate::Piece
+    /// [`BlockBoard`]: crate::BlockBoard
+    #[inline]
+    pub fn occupied_cell_positions(&self) -> impl Iterator<Item = (usize, usize)> {
+        (SENTINEL_MARGIN_TOP..SENTINEL_MARGIN_TOP + PLAYABLE_HEIGHT)
+            .flat_map(move |y| self.rows[y].occupied_cell_positions().map(move |x| (x, y)))
     }
 
     /// Checks if the piece collides with occupied cells.

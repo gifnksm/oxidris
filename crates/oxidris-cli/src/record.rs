@@ -66,15 +66,19 @@ impl RecordingSession {
     /// This method captures the final game statistics before returning.
     /// The returned [`SessionHistory`] can be saved to a file using [`SessionHistory::save`].
     pub fn into_history(mut self) -> SessionHistory {
+        // record current turn
+        let snapshot = self.capture_snapshot();
+        self.history.record(snapshot);
         self.history.set_stats(self.session.stats().clone());
         self.history
     }
 
     fn capture_snapshot(&self) -> TurnRecord {
+        let placement = self.session.simulate_drop_position();
         TurnRecord {
             turn: self.session.stats().turn(),
             before_placement: self.session.field().board().clone(),
-            placement: self.session.falling_piece(),
+            placement,
             hold_used: self.session.hold_used(),
         }
     }
