@@ -3,6 +3,10 @@ name = "oxidris-cli"
 version.workspace = true
 edition.workspace = true
 
+[[bin]]
+name = "oxidris"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.100"
 chrono = { workspace = true, features = ["serde"] }
