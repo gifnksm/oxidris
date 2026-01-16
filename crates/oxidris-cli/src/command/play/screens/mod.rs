@@ -7,8 +7,8 @@ use crate::{
     schema::ai_model::AiModel,
 };
 
-pub mod auto;
-pub mod manual;
+mod auto;
+mod manual;
 
 #[derive(Debug)]
 pub enum Screen {
@@ -38,10 +38,10 @@ impl Screen {
         }
     }
 
-    pub fn is_exiting(&self) -> bool {
+    pub fn should_exit(&self) -> bool {
         match self {
-            Screen::Manual(screen) => screen.is_exiting(),
-            Screen::Auto(screen) => screen.is_exiting(),
+            Screen::Manual(screen) => screen.should_exit(),
+            Screen::Auto(screen) => screen.should_exit(),
         }
     }
 
@@ -59,10 +59,10 @@ impl Screen {
         }
     }
 
-    pub fn update_game(&mut self) {
+    pub fn update(&mut self) {
         match self {
-            Screen::Manual(screen) => screen.update_game(),
-            Screen::Auto(screen) => screen.update_game(),
+            Screen::Manual(screen) => screen.update(),
+            Screen::Auto(screen) => screen.update(),
         }
     }
 

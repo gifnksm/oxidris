@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
-use crate::{command::replay::app::App, schema::record::RecordedSession, util};
+use crate::{command::replay::app::ReplayApp, schema::record::RecordedSession, tui::Tui, util};
 
 mod app;
+mod screens;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct ReplayArg {
@@ -18,9 +19,8 @@ pub fn run(arg: &ReplayArg) -> anyhow::Result<()> {
 
     eprintln!("Loaded {:?} boards", session.boards.len());
 
-    let mut app = App::new(recording_file.clone(), session);
-
-    ratatui::run(|terminal| app.run(terminal))?;
+    let mut app = ReplayApp::new(recording_file.clone(), session);
+    Tui::new().run(&mut app)?;
 
     Ok(())
 }

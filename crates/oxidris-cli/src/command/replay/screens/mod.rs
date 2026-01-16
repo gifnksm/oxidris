@@ -4,7 +4,7 @@ use crossterm::event::Event;
 use ratatui::Frame;
 
 use crate::{
-    command::replay::app::screens::turn_viewer::TurnViewerScreen, schema::record::RecordedSession,
+    command::replay::screens::turn_viewer::TurnViewerScreen, schema::record::RecordedSession,
 };
 
 mod turn_viewer;
@@ -19,9 +19,9 @@ impl Screen {
         Self::TurnViewer(TurnViewerScreen::new(path, session))
     }
 
-    pub fn is_exiting(&self) -> bool {
+    pub fn should_exit(&self) -> bool {
         match self {
-            Screen::TurnViewer(screen) => screen.is_exiting(),
+            Screen::TurnViewer(screen) => screen.should_exit(),
         }
     }
 

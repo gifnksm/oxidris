@@ -1,21 +1,21 @@
-use std::{
-    thread,
-    time::{Duration, Instant},
+use crossterm::event::Event;
+use ratatui::Frame;
+
+use crate::{
+    command::play::screens::Screen,
+    record::SessionHistory,
+    schema::ai_model::AiModel,
+    tui::{App, Tui},
 };
-
-use crossterm::event;
-use ratatui::{DefaultTerminal, Frame};
-
-use crate::{command::play::screens::Screen, record::SessionHistory, schema::ai_model::AiModel};
 
 const FPS: u64 = 60;
 
 #[derive(Debug)]
-pub struct App {
+pub struct PlayApp {
     screen: Screen,
 }
 
-impl App {
+impl PlayApp {
     pub fn manual(history_size: usize) -> Self {
         Self {
             screen: Screen::manual(FPS, history_size),
@@ -28,43 +28,33 @@ impl App {
         })
     }
 
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
-        let tick_rate = Duration::from_secs(1) / u32::try_from(FPS).unwrap();
-
-        while !self.screen.is_exiting() {
-            let now = Instant::now();
-            terminal.draw(|f| self.draw(f))?;
-            self.handle_events()?;
-
-            if self.screen.is_playing() {
-                self.update_game();
-            }
-
-            let elapsed = now.elapsed();
-            if let Some(rest) = tick_rate.checked_sub(elapsed) {
-                thread::sleep(rest);
-            }
-        }
-        Ok(())
-    }
-
     pub fn into_history(self) -> SessionHistory {
         self.screen.into_history()
     }
+}
 
-    fn draw(&self, frame: &mut Frame<'_>) {
+impl App for PlayApp {
+    #[expect(clippy::cast_precision_loss)]
+    fn init(&mut self, tui: &mut Tui) {
+        tui.set_frame_rate(FPS as f64);
+        tui.set_tick_rate(FPS as f64);
+    }
+
+    fn should_exit(&self) -> bool {
+        self.screen.should_exit()
+    }
+
+    fn handle_event(&mut self, _tui: &mut Tui, event: Event) {
+        self.screen.handle_event(&event);
+    }
+
+    fn draw(&self, frame: &mut Frame) {
         self.screen.draw(frame);
     }
 
-    fn handle_events(&mut self) -> anyhow::Result<()> {
-        while event::poll(Duration::ZERO)? {
-            let event = event::read()?;
-            self.screen.handle_event(&event);
+    fn update(&mut self, _tui: &mut Tui) {
+        if self.screen.is_playing() {
+            self.screen.update();
         }
-        Ok(())
-    }
-
-    fn update_game(&mut self) {
-        self.screen.update_game();
     }
 }

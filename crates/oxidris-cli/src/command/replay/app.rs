@@ -1,39 +1,41 @@
 use std::path::PathBuf;
 
-use crossterm::event;
-use ratatui::{DefaultTerminal, Frame};
+use crossterm::event::Event;
+use ratatui::Frame;
 
-use crate::{command::replay::app::screens::Screen, schema::record::RecordedSession};
-
-mod screens;
+use crate::{
+    command::replay::screens::Screen,
+    schema::record::RecordedSession,
+    tui::{App, Tui},
+};
 
 #[derive(Debug)]
-pub struct App {
+pub struct ReplayApp {
     screen: Screen,
 }
 
-impl App {
+impl ReplayApp {
     pub fn new(path: PathBuf, session: RecordedSession) -> Self {
         Self {
             screen: Screen::turn_viewer(path, session),
         }
     }
+}
 
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
-        while !self.screen.is_exiting() {
-            terminal.draw(|f| self.draw(f))?;
-            self.handle_events()?;
-        }
-        Ok(())
+impl App for ReplayApp {
+    fn init(&mut self, _tui: &mut Tui) {}
+
+    fn should_exit(&self) -> bool {
+        self.screen.should_exit()
+    }
+
+    fn handle_event(&mut self, _tui: &mut Tui, event: Event) {
+        self.screen.handle_event(&event);
     }
 
     fn draw(&self, frame: &mut Frame) {
         self.screen.draw(frame);
     }
 
-    fn handle_events(&mut self) -> anyhow::Result<()> {
-        let event = event::read()?;
-        self.screen.handle_event(&event);
-        Ok(())
-    }
+    fn update(&mut self, _tui: &mut Tui) {}
 }

@@ -12,7 +12,7 @@ anyhow = "1.0.100"
 chrono = { workspace = true, features = ["serde"] }
 clap.workspace = true
 crossterm.workspace = true
-derive_more = { workspace = true, features = ["from_str"] }
+derive_more = { workspace = true, features = ["from", "from_str", "is_variant"] }
 oxidris-analysis = { version = "0.1.0", path = "../oxidris-analysis" }
 oxidris-engine.workspace = true
 oxidris-evaluator.workspace = true

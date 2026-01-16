@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode};
 use oxidris_analysis::sample::BoardSample;
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use oxidris_stats::comprehensive::ComprehensiveStats;
@@ -16,32 +16,41 @@ use ratatui::{
     },
 };
 
-use crate::command::analyze_board_features::ui::app::{AppData, Screen};
+use crate::command::analyze_board_features::app::AppData;
 
 #[derive(Debug)]
 pub struct FeatureListScreen {
+    data: AppData,
     features: Vec<BoxedBoardFeature>,
     selected_feature: usize,
     clip_scatter_plot: bool,
+    should_exit: bool,
 }
 
 impl FeatureListScreen {
     #[must_use]
-    pub fn new(features: Vec<BoxedBoardFeature>) -> Self {
+    pub fn new(data: AppData, features: Vec<BoxedBoardFeature>) -> Self {
         Self {
+            data,
             features,
             selected_feature: 0,
             clip_scatter_plot: true,
+            should_exit: false,
         }
+    }
+
+    pub(crate) fn should_exit(&self) -> bool {
+        self.should_exit
     }
 
     /// Extract raw feature values and pair them with a target value (transformed or normalized).
     #[expect(clippy::cast_precision_loss)]
-    fn build_scatter_data<F>(&self, data: &AppData, extract_y: F) -> Vec<(f64, f64)>
+    fn build_scatter_data<F>(&self, extract_y: F) -> Vec<(f64, f64)>
     where
         F: Fn(&BoardSample) -> f32,
     {
-        data.board_samples
+        self.data
+            .board_samples
             .iter()
             .map(|sample| {
                 let raw = f64::from(sample.feature_vector[self.selected_feature].raw as f32);
@@ -62,8 +71,8 @@ impl FeatureListScreen {
         [0.0, y_max]
     }
 
-    pub fn draw(&self, frame: &mut Frame, data: &AppData) {
-        let feature_stats = &data.statistics[self.selected_feature];
+    pub fn draw(&self, frame: &mut Frame) {
+        let feature_stats = &self.data.statistics[self.selected_feature];
 
         // Split area to reserve bottom line for help
         let main_layout =
@@ -120,12 +129,10 @@ impl FeatureListScreen {
         let raw_range = [0.0, f64::from(raw_max)];
 
         // Build scatter plot data
-        let raw_trans_data = self.build_scatter_data(data, |sample| {
-            sample.feature_vector[self.selected_feature].transformed
-        });
-        let raw_norm_data = self.build_scatter_data(data, |sample| {
-            sample.feature_vector[self.selected_feature].normalized
-        });
+        let raw_trans_data = self
+            .build_scatter_data(|sample| sample.feature_vector[self.selected_feature].transformed);
+        let raw_norm_data = self
+            .build_scatter_data(|sample| sample.feature_vector[self.selected_feature].normalized);
 
         // Calculate Y-axis ranges
         let trans_range = Self::calculate_y_range_for_clipped_x(&raw_trans_data, raw_range[1]);
@@ -165,29 +172,29 @@ impl FeatureListScreen {
         frame.render_widget(help_line, main_layout[1]);
     }
 
-    pub(crate) fn handle_input(&mut self, key_event: KeyEvent, screen: &mut Screen) {
-        match key_event.code {
-            KeyCode::Char('q') | KeyCode::Esc => {
-                *screen = Screen::Exiting;
-            }
-            KeyCode::Char('c') => {
-                self.clip_scatter_plot = !self.clip_scatter_plot;
-            }
-            KeyCode::Up => {
-                if self.selected_feature == 0 {
-                    self.selected_feature = self.features.len() - 1;
-                } else {
-                    self.selected_feature -= 1;
+    pub(crate) fn handle_event(&mut self, event: &Event) {
+        if let Some(event) = event.as_key_event() {
+            match event.code {
+                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
+                KeyCode::Char('c') => {
+                    self.clip_scatter_plot = !self.clip_scatter_plot;
                 }
-            }
-            KeyCode::Down => {
-                if self.selected_feature + 1 >= self.features.len() {
-                    self.selected_feature = 0;
-                } else {
-                    self.selected_feature += 1;
+                KeyCode::Up => {
+                    if self.selected_feature == 0 {
+                        self.selected_feature = self.features.len() - 1;
+                    } else {
+                        self.selected_feature -= 1;
+                    }
                 }
+                KeyCode::Down => {
+                    if self.selected_feature + 1 >= self.features.len() {
+                        self.selected_feature = 0;
+                    } else {
+                        self.selected_feature += 1;
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 }

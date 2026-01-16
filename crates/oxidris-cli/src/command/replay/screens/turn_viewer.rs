@@ -21,7 +21,7 @@ pub struct TurnViewerScreen {
     path: PathBuf,
     session: RecordedSession,
     board_index: usize,
-    is_exiting: bool,
+    should_exit: bool,
 }
 
 impl TurnViewerScreen {
@@ -30,12 +30,12 @@ impl TurnViewerScreen {
             path,
             session,
             board_index: 0,
-            is_exiting: false,
+            should_exit: false,
         }
     }
 
-    pub fn is_exiting(&self) -> bool {
-        self.is_exiting
+    pub fn should_exit(&self) -> bool {
+        self.should_exit
     }
 
     pub fn draw(&self, frame: &mut Frame<'_>) {
@@ -106,7 +106,7 @@ impl TurnViewerScreen {
                 KeyCode::Char('l') | KeyCode::Right => self.step_forward(10),
                 KeyCode::Char('g') | KeyCode::Home => self.jump_to_first(),
                 KeyCode::Char('G') | KeyCode::End => self.jump_to_last(),
-                KeyCode::Char('q') | KeyCode::Esc => self.is_exiting = true,
+                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
                 _ => {}
             }
         }

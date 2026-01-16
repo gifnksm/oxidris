@@ -30,9 +30,14 @@ use oxidris_analysis::{
     index::BoardIndex, sample::BoardSample, statistics::BoardFeatureStatistics,
 };
 
-use crate::util::{self, FeatureSet};
+use crate::{
+    command::analyze_board_features::app::AnalyzeBoardApp,
+    tui::Tui,
+    util::{self, FeatureSet},
+};
 
-mod ui;
+mod app;
+mod screens;
 
 /// Command-line arguments for analyze-board-features subcommand
 #[derive(Default, Debug, Clone, clap::Args)]
@@ -91,7 +96,8 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     let board_index = BoardIndex::from_samples(&features, &board_samples);
     eprintln!("Board index built");
 
-    ui::run_tui(features, board_samples, statistics, board_index)?;
+    let mut app = AnalyzeBoardApp::new(features, board_samples, statistics, board_index);
+    Tui::new().run(&mut app)?;
 
     Ok(())
 }

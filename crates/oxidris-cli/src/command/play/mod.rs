@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{command::play::app::App, util};
+use crate::{command::play::app::PlayApp, tui::Tui, util};
 
 mod app;
 mod screens;
@@ -45,9 +45,8 @@ pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
             },
     } = arg;
 
-    let mut app = App::manual(*history_size);
-
-    ratatui::run(|terminal| app.run(terminal))?;
+    let mut app = PlayApp::manual(*history_size);
+    Tui::new().run(&mut app)?;
 
     if *save_recording {
         app.into_history().save(record_dir)?;
@@ -69,8 +68,8 @@ pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
     } = arg;
 
     let model = util::read_ai_model_file(model_path)?;
-    let mut app = App::auto(&model, *history_size, *turbo)?;
-    ratatui::run(|terminal| app.run(terminal))?;
+    let mut app = PlayApp::auto(&model, *history_size, *turbo)?;
+    Tui::new().run(&mut app)?;
 
     if *save_recording {
         app.into_history().save(record_dir)?;

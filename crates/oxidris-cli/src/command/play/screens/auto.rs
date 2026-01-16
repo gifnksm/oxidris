@@ -28,7 +28,7 @@ use crate::{
 pub struct AutoPlayScreen {
     session: GameSession,
     turbo: bool,
-    is_exiting: bool,
+    should_exit: bool,
     tx_request: mpsc::Sender<Request>,
     rx_session: mpsc::Receiver<GameSession>,
     rx_history: mpsc::Receiver<SessionHistory>,
@@ -59,7 +59,7 @@ impl AutoPlayScreen {
         Ok(Self {
             session,
             turbo,
-            is_exiting: false,
+            should_exit: false,
             tx_request,
             rx_session,
             rx_history,
@@ -67,11 +67,11 @@ impl AutoPlayScreen {
     }
 
     pub fn is_playing(&self) -> bool {
-        !self.is_exiting && self.session.session_state().is_playing()
+        !self.should_exit && self.session.session_state().is_playing()
     }
 
-    pub fn is_exiting(&self) -> bool {
-        self.is_exiting
+    pub fn should_exit(&self) -> bool {
+        self.should_exit
     }
 
     pub fn draw(&self, frame: &mut Frame<'_>) {
@@ -106,13 +106,13 @@ impl AutoPlayScreen {
             match event.code {
                 KeyCode::Char('t') if is_playing => self.turbo = !self.turbo,
                 KeyCode::Char('p') if can_toggle_pause => self.session.toggle_pause(),
-                KeyCode::Char('q') | KeyCode::Esc => self.is_exiting = true,
+                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
                 _ => {}
             }
         }
     }
 
-    pub fn update_game(&mut self) {
+    pub fn update(&mut self) {
         let req = {
             if self.session.session_state().is_paused() {
                 Request::TogglePause

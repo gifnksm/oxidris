@@ -16,23 +16,23 @@ use crate::{
 #[derive(Debug)]
 pub struct ManualPlayScreen {
     session: RecordingSession,
-    is_exiting: bool,
+    should_exit: bool,
 }
 
 impl ManualPlayScreen {
     pub fn new(fps: u64, history_size: usize) -> Self {
         Self {
             session: RecordingSession::new(fps, PlayerInfo::Manual, history_size),
-            is_exiting: false,
+            should_exit: false,
         }
     }
 
     pub fn is_playing(&self) -> bool {
-        !self.is_exiting && self.session.session_state().is_playing()
+        !self.should_exit && self.session.session_state().is_playing()
     }
 
-    pub fn is_exiting(&self) -> bool {
-        self.is_exiting
+    pub fn should_exit(&self) -> bool {
+        self.should_exit
     }
 
     pub fn draw(&self, frame: &mut Frame<'_>) {
@@ -70,13 +70,13 @@ impl ManualPlayScreen {
                 KeyCode::Char('x') if is_playing => _ = self.session.try_rotate_right(),
                 KeyCode::Char(' ') if is_playing => _ = self.session.try_hold(),
                 KeyCode::Char('p') if can_toggle_pause => self.session.toggle_pause(),
-                KeyCode::Char('q') | KeyCode::Esc => self.is_exiting = true,
+                KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
                 _ => {}
             }
         }
     }
 
-    pub fn update_game(&mut self) {
+    pub fn update(&mut self) {
         self.session.increment_frame();
     }
 
