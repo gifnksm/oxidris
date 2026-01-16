@@ -9,14 +9,17 @@ use ratatui::{
     prelude::Direction,
     style::{Color, Modifier, Style},
     symbols::{Marker, merge::MergeStrategy},
-    text::{Line, Text},
+    text::Line,
     widgets::{
         Axis, Bar, BarChart, Block, Chart, Dataset, List, ListItem, ListState, Paragraph,
         StatefulWidget, Widget,
     },
 };
 
-use crate::command::analyze_board_features::app::AppData;
+use crate::{
+    command::analyze_board_features::app::AppData,
+    view::widgets::{KeyBinding, KeyBindingDisplay},
+};
 
 #[derive(Debug)]
 pub struct FeatureListScreen {
@@ -172,12 +175,17 @@ impl FeatureListScreen {
         frame.render_widget(normalized_stats_widget, normalized_stats_pane);
 
         // Render help line
-        let clip_status = if self.clip_scatter_plot { "P95" } else { "Max" };
-        let help_text = Text::from(format!(
-            "↑/↓: Select | c: Toggle Clip ({clip_status}) | q/Esc: Quit"
-        ))
-        .style(Style::default().fg(Color::DarkGray))
-        .centered();
+        let bindings = {
+            let select: KeyBinding = (&["↑", "↓"], "Select");
+            let clip: KeyBinding = if self.clip_scatter_plot {
+                (&["c"], "Toggle Clip (P95)")
+            } else {
+                (&["c"], "Toggle Clip (MAX)")
+            };
+            let quit: KeyBinding = (&["q", "Esc"], "Quit");
+            &[select, clip, quit]
+        };
+        let help_text = KeyBindingDisplay::new(bindings);
         frame.render_widget(help_text, help_area);
     }
 

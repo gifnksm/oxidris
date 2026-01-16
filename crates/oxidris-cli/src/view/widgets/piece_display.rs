@@ -53,7 +53,7 @@ impl Widget for PieceDisplay<'_> {
 impl Widget for &PieceDisplay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.block.as_ref().render(area, buf);
-        let inner_area = self.block.inner_if_some(area);
+        let area = self.block.inner_if_some(area);
 
         let mut piece_size = (0, 0);
         if let Some(piece) = self.piece {
@@ -61,7 +61,7 @@ impl Widget for &PieceDisplay<'_> {
             piece_size.0 = u16::from(w);
             piece_size.1 = u16::from(h);
         }
-        let piece_area = inner_area.centered(
+        let piece_area = area.centered(
             Constraint::Length(piece_size.0 * BlockDisplay::width()),
             Constraint::Length(piece_size.1 * BlockDisplay::height()),
         );

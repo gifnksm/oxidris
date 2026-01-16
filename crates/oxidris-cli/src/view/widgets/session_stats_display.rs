@@ -84,12 +84,12 @@ const ROWS: &[Row] = &[
 impl Widget for SessionStatsDisplay<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.block.as_ref().render(area, buf);
-        let inner_area = self.block.inner_if_some(area);
+        let area = self.block.inner_if_some(area);
 
         let style = style::DEFAULT;
 
         let rows_areas =
-            Layout::vertical((0..ROWS.len()).map(|_| Constraint::Length(1))).split(inner_area);
+            Layout::vertical((0..ROWS.len()).map(|_| Constraint::Length(1))).split(area);
 
         for (row, area) in iter::zip(ROWS.iter().copied(), rows_areas[..].iter().copied()) {
             match row {

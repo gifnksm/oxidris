@@ -61,12 +61,12 @@ impl Widget for &PieceStackDisplay<'_> {
         Self: Sized,
     {
         self.block.as_ref().render(area, buf);
-        let inner_area = self.block.inner_if_some(area);
+        let area = self.block.inner_if_some(area);
         let layout = Layout::vertical(
             (0..self.pieces.len()).map(|_| Constraint::Length(2 * BlockDisplay::height())),
         )
         .flex(Flex::SpaceBetween);
-        let cells = inner_area.layout_vec(&layout);
+        let cells = area.layout_vec(&layout);
 
         for (cell, piece) in iter::zip(cells, &self.pieces) {
             PieceDisplay::new().piece(*piece).render(cell, buf);

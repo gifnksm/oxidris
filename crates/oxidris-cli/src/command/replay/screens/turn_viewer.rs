@@ -13,7 +13,7 @@ use ratatui::{
 
 use crate::{
     schema::record::{RecordedSession, TurnRecord},
-    view::widgets::BoardDisplay,
+    view::widgets::{BoardDisplay, KeyBinding, KeyBindingDisplay},
 };
 
 #[derive(Debug)]
@@ -87,10 +87,17 @@ impl TurnViewerScreen {
                 .merge_borders(MergeStrategy::Exact),
         );
 
-        let help = Paragraph::new(vec![
-            Line::from("j/k or ↓/↑ (1 turn) | h/l or ←/→ (10 turns) | g/Home (First) | G/End (Last) | q/Esc (Quit)").centered(),
-        ]).style(Color::DarkGray)
-        .block(BlockWidget::bordered().merge_borders(MergeStrategy::Exact));
+        let bindings: &[KeyBinding] = &[
+            (&["k", "↑"], "Prev"),
+            (&["j", "↓"], "Next"),
+            (&["h", "←"], "Prev 10"),
+            (&["l", "→"], "Next 10"),
+            (&["g", "Home"], "First"),
+            (&["G", "End"], "Last"),
+            (&["q", "Esc"], "Quit"),
+        ];
+        let help = KeyBindingDisplay::new(bindings)
+            .block(BlockWidget::bordered().merge_borders(MergeStrategy::Exact));
 
         frame.render_widget(stats, top_area);
         frame.render_widget(board_display, mid_area);

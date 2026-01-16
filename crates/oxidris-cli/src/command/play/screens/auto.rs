@@ -14,14 +14,12 @@ use oxidris_evaluator::{
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
-    style::{Color, Style},
-    text::Text,
 };
 
 use crate::{
     record::{RecordingSession, SessionHistory},
     schema::{ai_model::AiModel, record::PlayerInfo},
-    view::widgets::SessionDisplay,
+    view::widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
 };
 
 #[derive(Debug)]
@@ -76,19 +74,20 @@ impl AutoPlayScreen {
 
     pub fn draw(&self, frame: &mut Frame<'_>) {
         let session_display = SessionDisplay::new(&self.session, false).turbo(self.turbo);
-        let turbo_text = if self.turbo {
-            "T (Turbo: ON)"
-        } else {
-            "T (Turbo: OFF)"
+        let bindings: &[KeyBinding] = {
+            let turbo: KeyBinding = if self.turbo {
+                (&["t"], "Toggle Turbo (current:ON) ")
+            } else {
+                (&["t"], "Toggle Turbo (current:OFF)")
+            };
+            let quit: KeyBinding = (&["q", "Esc"], "Quit");
+            match self.session.session_state() {
+                SessionState::Playing => &[turbo, (&["p"], "Pause"), quit],
+                SessionState::Paused => &[(&["p"][..], "Resume"), quit],
+                SessionState::GameOver => &[quit],
+            }
         };
-        let help_text = match self.session.session_state() {
-            SessionState::Playing => format!("Controls: {turbo_text} | p (Pause) | q/Esc (Quit)"),
-            SessionState::Paused => "Controls: p (Resume) | q/Esc (Quit)".to_owned(),
-            SessionState::GameOver => "Controls: q/Esc (Quit)".to_owned(),
-        };
-        let help_text = Text::from(help_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .centered();
+        let help_text = KeyBindingDisplay::new(bindings);
 
         let [main_area, help_area] =
             Layout::vertical([Constraint::Length(25), Constraint::Length(1)])

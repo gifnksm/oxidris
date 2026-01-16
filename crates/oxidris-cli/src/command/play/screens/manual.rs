@@ -3,14 +3,12 @@ use oxidris_engine::SessionState;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
-    style::{Color, Style},
-    text::Text,
 };
 
 use crate::{
     record::{RecordingSession, SessionHistory},
     schema::record::PlayerInfo,
-    view::widgets::SessionDisplay,
+    view::widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
 };
 
 #[derive(Debug)]
@@ -37,16 +35,24 @@ impl ManualPlayScreen {
 
     pub fn draw(&self, frame: &mut Frame<'_>) {
         let session_display = SessionDisplay::new(&self.session, true);
-        let help_text = match self.session.session_state() {
-            SessionState::Playing => {
-                "Controls: ←/→ (Move) | ↓ (Soft Drop) | ↑ (Hard Drop) | z/x (Rotate) | Space (Hold) | p (Pause) | q/Esc (Quit)"
+
+        let bindings: &[KeyBinding] = {
+            let quit: KeyBinding = (&["q", "Esc"], "Quit");
+            match self.session.session_state() {
+                SessionState::Playing => &[
+                    (&["←", "→"], "Move"),
+                    (&["↓"], "Soft Drop"),
+                    (&["↑"], "Hard Drop"),
+                    (&["z", "x"], "Rotate"),
+                    (&["Space"], "Hold"),
+                    (&["p"], "Pause"),
+                    quit,
+                ],
+                SessionState::Paused => &[(&["p"], "Resume"), quit],
+                SessionState::GameOver => &[quit],
             }
-            SessionState::Paused => "Controls: p (Resume) | q/Esc (Quit)",
-            SessionState::GameOver => "Controls: q/Esc (Quit)",
         };
-        let help_text = Text::from(help_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .centered();
+        let help_text = KeyBindingDisplay::new(bindings);
 
         let [main_area, help_area] =
             Layout::vertical([Constraint::Length(25), Constraint::Length(1)])

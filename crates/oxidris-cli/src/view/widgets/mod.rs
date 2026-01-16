@@ -1,12 +1,13 @@
 use ratatui::{layout::Rect, widgets::Block as BlockWidget};
 
 pub use self::{
-    block_display::*, board_display::*, piece_display::*, piece_stack_display::*,
-    session_display::*, session_stats_display::*,
+    block_display::*, board_display::*, key_binding_display::*, piece_display::*,
+    piece_stack_display::*, session_display::*, session_stats_display::*,
 };
 
 mod block_display;
 mod board_display;
+mod key_binding_display;
 mod piece_display;
 mod piece_stack_display;
 mod session_display;
