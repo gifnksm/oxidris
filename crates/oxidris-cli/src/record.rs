@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::Context;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use oxidris_engine::{GameSession, GameStats, HoldError, PieceCollisionError, PieceSeed};
 use rand::Rng as _;
 
@@ -73,9 +73,10 @@ impl RecordingSession {
         self.history
     }
 
-    /// Returns the recorded history.
+    /// Returns the recorded history without consuming the session.
     ///
-    /// This method captures the final game statistics before returning.
+    /// This method captures the current game statistics and returns a snapshot
+    /// of the recording history. Useful for in-game replay without ending the session.
     /// The returned [`SessionHistory`] can be saved to a file using [`SessionHistory::save`].
     pub fn to_history(&self) -> SessionHistory {
         // record current turn
@@ -179,6 +180,26 @@ impl SessionHistory {
         self.final_stats = Some(stats);
     }
 
+    pub fn to_recorded_session(&self) -> RecordedSession {
+        let timestamp = Utc::now();
+        self.to_recorded_session_with_timestamp(timestamp)
+    }
+
+    fn to_recorded_session_with_timestamp(&self, timestamp: DateTime<Utc>) -> RecordedSession {
+        let final_stats = self
+            .final_stats
+            .clone()
+            .expect("final_stats should be set before serialize");
+
+        RecordedSession {
+            recorded_at: timestamp,
+            seed: self.seed,
+            player: self.player.clone(),
+            final_stats,
+            boards: self.buffer.to_vec(),
+        }
+    }
+
     /// Saves the recorded session to a JSON file.
     ///
     /// The filename is automatically generated based on the player type and
@@ -194,11 +215,6 @@ impl SessionHistory {
     /// This should not happen in normal usage since `SessionHistory` is only
     /// accessible through `into_history`.
     pub fn save(&self, record_dir: &Path) -> anyhow::Result<()> {
-        let final_stats = self
-            .final_stats
-            .clone()
-            .expect("final_stats should be set before save");
-
         fs::create_dir_all(record_dir)
             .with_context(|| format!("Failed to create directory {}", record_dir.display()))?;
 
@@ -212,13 +228,7 @@ impl SessionHistory {
         let filename = format!("{prefix}_{}.json", timestamp.format("%Y%m%d_%H%M%S"));
         let filepath = record_dir.join(filename);
 
-        let data = RecordedSession {
-            recorded_at: timestamp,
-            seed: self.seed,
-            player: self.player.clone(),
-            final_stats,
-            boards: self.buffer.to_vec(),
-        };
+        let data = self.to_recorded_session_with_timestamp(timestamp);
 
         let file = File::create(&filepath)
             .with_context(|| format!("Failed to create file: {}", filepath.display()))?;

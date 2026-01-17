@@ -120,7 +120,6 @@ pub enum ScreenTransition {
     ///
     /// Current screen goes to background (`on_inactive` called).
     /// When the new screen is popped, current screen is reactivated (`on_active` called).
-    #[allow(dead_code)] // using expect here causes unfulfilled_lint_expectations warning
     Push(Box<dyn Screen>),
 
     /// Pop the current screen and return to the previous one.

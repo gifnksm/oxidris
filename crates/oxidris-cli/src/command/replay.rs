@@ -21,7 +21,10 @@ pub fn run(arg: &ReplayArg) -> anyhow::Result<()> {
 
     eprintln!("Loaded {:?} boards", session.boards.len());
 
-    let mut app = ScreenStack::new(Box::new(ReplayScreen::new(recording_file.clone(), session)));
+    let mut app = ScreenStack::new(Box::new(ReplayScreen::recording(
+        recording_file.clone(),
+        session,
+    )));
     Tui::new().run(&mut app)?;
 
     Ok(())

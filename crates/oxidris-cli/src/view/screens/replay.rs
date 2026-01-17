@@ -58,17 +58,31 @@ impl Action {
 }
 
 #[derive(Debug)]
+pub enum Mode {
+    Recording(PathBuf),
+    InGame,
+}
+
+#[derive(Debug)]
 pub struct ReplayScreen {
-    path: PathBuf,
+    mode: Mode,
     session: RecordedSession,
     board_index: usize,
     play: bool,
 }
 
 impl ReplayScreen {
-    pub fn new(path: PathBuf, session: RecordedSession) -> Self {
+    pub fn recording(path: PathBuf, session: RecordedSession) -> Self {
+        Self::with_mode(Mode::Recording(path), session)
+    }
+
+    pub fn in_game(session: RecordedSession) -> Self {
+        Self::with_mode(Mode::InGame, session)
+    }
+
+    fn with_mode(mode: Mode, session: RecordedSession) -> Self {
         Self {
-            path,
+            mode,
             session,
             board_index: 0,
             play: false,
@@ -111,8 +125,12 @@ impl Screen for ReplayScreen {
     }
 
     fn draw(&self, frame: &mut Frame) {
+        let title = match &self.mode {
+            Mode::Recording(path) => format!("Replay: {}", path.display()),
+            Mode::InGame => "In-Game Replay".to_owned(),
+        };
         let top_block = BlockWidget::bordered()
-            .title(format!("Replay: {}", self.path.display()))
+            .title(title)
             .title_alignment(HorizontalAlignment::Center)
             .padding(Padding::symmetric(1, 0));
         let viewport = frame
@@ -145,7 +163,7 @@ impl Screen for ReplayScreen {
         let stats = Paragraph::new(vec![
             Line::from(format!(
                 "Index: {:8}/{:8}",
-                self.board_index,
+                self.board_index + 1,
                 self.session.boards.len()
             )),
             Line::from(format!("Turn:  {:8}/{:8}", record.turn, stats.turn())),

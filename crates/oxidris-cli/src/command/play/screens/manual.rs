@@ -11,7 +11,10 @@ use crate::{
     record::{RecordingSession, SessionHistory},
     schema::record::PlayerInfo,
     tui::{RenderMode, Screen, ScreenTransition, Tui},
-    view::widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
+    view::{
+        screens::ReplayScreen,
+        widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,6 +61,7 @@ impl PlayingAction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PausedAction {
+    OpenReplay,
     Resume,
     Quit,
 }
@@ -66,31 +70,38 @@ impl PausedAction {
     fn from_key_event(event: &KeyEvent) -> Option<Self> {
         match event.code {
             KeyCode::Char('p') => Some(Self::Resume),
+            KeyCode::Char('R') => Some(Self::OpenReplay),
             KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
             _ => None,
         }
     }
 
     fn bindings() -> &'static [KeyBinding<'static>] {
-        &[(&["p"], "Resume"), (&["q", "Esc"], "Quit")]
+        &[
+            (&["p"], "Resume"),
+            (&["R"], "Open Replay"),
+            (&["q", "Esc"], "Quit"),
+        ]
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum GameOverAction {
+    OpenReplay,
     Quit,
 }
 
 impl GameOverAction {
     fn from_key_event(event: &KeyEvent) -> Option<Self> {
         match event.code {
+            KeyCode::Char('R') => Some(Self::OpenReplay),
             KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
             _ => None,
         }
     }
 
     fn bindings() -> &'static [KeyBinding<'static>] {
-        &[(&["q", "Esc"], "Quit")]
+        &[(&["R"], "Open Replay"), (&["q", "Esc"], "Quit")]
     }
 }
 
@@ -146,6 +157,12 @@ impl Screen for ManualPlayScreen<'_> {
                 SessionState::Paused => {
                     if let Some(action) = PausedAction::from_key_event(&event) {
                         match action {
+                            PausedAction::OpenReplay => {
+                                let session = self.session.to_history().to_recorded_session();
+                                return ScreenTransition::Push(Box::new(ReplayScreen::in_game(
+                                    session,
+                                )));
+                            }
                             PausedAction::Resume => self.session.toggle_pause(),
                             PausedAction::Quit => return ScreenTransition::Pop,
                         }
@@ -154,6 +171,12 @@ impl Screen for ManualPlayScreen<'_> {
                 SessionState::GameOver => {
                     if let Some(action) = GameOverAction::from_key_event(&event) {
                         match action {
+                            GameOverAction::OpenReplay => {
+                                let session = self.session.to_history().to_recorded_session();
+                                return ScreenTransition::Push(Box::new(ReplayScreen::in_game(
+                                    session,
+                                )));
+                            }
                             GameOverAction::Quit => return ScreenTransition::Pop,
                         }
                     }

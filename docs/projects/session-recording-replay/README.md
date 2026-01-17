@@ -22,9 +22,9 @@ This project adds the ability to record gameplay sessions (both manual and AI pl
 
 **Status**: Implementation Phase
 
-**Current Phase**: Step 4 complete (Replay command with full playback controls)
+**Current Phase**: Step 5 complete (In-Game Replay)
 
-**Next Steps**: Step 5 (In-Game Replay)
+**Next Steps**: Step 6 (Advanced Features - Feature Visualization)
 
 ## Goals
 
@@ -159,7 +159,7 @@ During gameplay:
 - ✅ Can record manual and auto-play sessions (Steps 1-3 complete)
 - ✅ Recordings save correctly with metadata (Steps 1-3 complete)
 - ✅ Can view saved recordings with full playback controls (Step 4 complete)
-- ⬜ Can use in-game replay during pause/game-over (Step 5)
+- ✅ Can use in-game replay during pause/game-over (Step 5 complete)
 - ✅ Memory usage remains bounded (ring buffer works correctly)
 - ✅ Handles invalid files gracefully (serde error messages)
 

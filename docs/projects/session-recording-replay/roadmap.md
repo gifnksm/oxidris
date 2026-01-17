@@ -113,22 +113,25 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Goal**: Allow players to rewind and review history during pause or game over.
 
-**Status**: Not Started
+**Status**: Complete
 
 **Dependencies**: Step 4 complete (reuse playback UI components)
 
 **Tasks:**
 
-- Add in-game replay mode toggle (R key) to pause and game over screens
-- Implement replay navigation: j/k or ↓/↑ (1 turn), h/l or ←/→ (10 turns), g/Home (first), G/End (last), Space (play/pause), Esc (exit)
-- Display "IN-GAME REPLAY" indicator and turn offset
-- Preserve game state when exiting in-game replay mode
+- [x] Add in-game replay mode toggle (R key) to pause and game over screens
+- [x] Reuse `ReplayScreen` with mode distinction (`Mode::InGame` vs `Mode::Recording`)
+- [x] Add `to_history()` method to `RecordingSession` for non-destructive history access
+- [x] Add `to_recorded_session()` method to `SessionHistory` for conversion
+- [x] Implement replay navigation (reuses Step 4's controls)
+- [x] Display "In-Game Replay" title in replay screen
+- [x] Handle both manual and auto-play screens
 
 **Validation:**
 
-- In-game replay mode works in pause and game over screens
-- All navigation controls work correctly
-- Exiting returns to correct state
+- [x] In-game replay mode works in pause and game over screens (both manual and auto)
+- [x] All navigation controls work correctly (inherited from Step 4)
+- [x] Exiting returns to correct state (uses `ScreenTransition::Push/Pop`)
 
 ---
 
@@ -180,13 +183,13 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 ### Current Status
 
-**Overall Progress**: ~57% (Steps 1-4 complete)
+**Overall Progress**: ~71% (Steps 1-5 complete)
 
-**Completed Steps**: Step 1, Step 2, Step 3, Step 4
+**Completed Steps**: Step 1, Step 2, Step 3, Step 4, Step 5
 
-**Current Step**: None (ready for Step 5)
+**Current Step**: None (ready for Step 6)
 
-**Next Milestone**: Step 5 (In-Game Replay)
+**Next Milestone**: Step 6 (Advanced Features - Feature Visualization)
 
 ### Step Status
 
@@ -194,7 +197,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 - [x] **Step 2**: Manual Play Recording
 - [x] **Step 3**: Auto-Play Recording
 - [x] **Step 4**: Replay Command (Basic Playback)
-- [ ] **Step 5**: In-Game Replay
+- [x] **Step 5**: In-Game Replay
 - [ ] **Step 6**: Advanced Features (Feature Visualization)
 - [ ] **Step 7**: Documentation and Polish
 

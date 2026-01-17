@@ -180,12 +180,16 @@ oxidris replay <FILE>
 
 ## UI Design
 
-### Replay Viewer Screen
+Both Recording Replay and In-Game Replay use the same `ReplayScreen` with identical controls.
+
+### Common Layout
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│  Replay: ai_aggro_20260106_153045.json                     │
-│  Turn: 234 / 450                                           │
+│  [Title - see below]                                       │
+├────────────────────────────────────────────────────────────┤
+│  Index: 1 / 450                                            │
+│  Turn:  234 / 450                                          │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │         ┌──────────────────────┐                          │
@@ -198,44 +202,19 @@ oxidris replay <FILE>
 │                                                            │
 ├────────────────────────────────────────────────────────────┤
 │  Space (Play/Pause) | j/k or ↓/↑ (1 turn) | h/l or ←/→ (10 turns)
-│  g/Home (First) | G/End (Last) | q/Esc (Quit)             │
+│  g/Home (First) | G/End (Last) | q/Esc (Quit/Return)      │
 └────────────────────────────────────────────────────────────┘
-
-Note: Lowercase = no Shift needed; Uppercase (e.g., `G`, `H`) = Shift required.
 ```
 
-### In-Game Replay Mode
+### Title Differences
 
-**Entry Points:**
+- **Recording Replay**: `Replay: <filename>` (e.g., `Replay: ai_aggro_20260106_153045.json`)
+- **In-Game Replay**: `In-Game Replay`
 
-- Pause screen: Press `R` to enter in-game replay mode
-- Game Over screen: Press `R` to enter in-game replay mode
+### Entry Points
 
-**UI Indicator:**
-
-```text
-┌────────────────────────────────────────────────────────────┐
-│  [IN-GAME REPLAY] Turn: 234 / 450 (-216 from current)     │
-├────────────────────────────────────────────────────────────┤
-│         ┌──────────────────────┐                          │
-│         │   [Board Display]    │                          │
-│         └──────────────────────┘                          │
-├────────────────────────────────────────────────────────────┤
-│  j/k or ↓/↑ (1 turn) | h/l or ←/→ (10 turns)              │
-│  g/Home (First) | G/End (Last) | Space (Play) | q/Esc (Exit)
-└────────────────────────────────────────────────────────────┘
-
-Note: `G` (last turn) requires Shift. Other keys do not.
-```
-
-**In-Game Replay Mode Controls:**
-
-- `j` / `k` or `↓` / `↑`: Step backward/forward (1 turn)
-- `h` / `l` or `←` / `→`: Jump backward/forward (10 turns)
-- `g` or `Home`: Jump to first turn
-- `G` or `End`: Jump to last turn (Shift+g)
-- `Space`: Toggle auto-playback
-- `q` / `Esc`: Exit in-game replay mode, return to current state
+- **Recording Replay**: `oxidris replay <file>` command
+- **In-Game Replay**: Press `R` during pause or game-over
 
 ## Memory Management Strategy
 

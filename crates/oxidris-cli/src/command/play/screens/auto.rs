@@ -20,9 +20,15 @@ use crate::{
     DEFAULT_FRAME_RATE,
     command::play::TICK_RATE,
     record::{RecordingSession, SessionHistory},
-    schema::{ai_model::AiModel, record::PlayerInfo},
+    schema::{
+        ai_model::AiModel,
+        record::{PlayerInfo, RecordedSession},
+    },
     tui::{RenderMode, Screen, ScreenTransition, Tui},
-    view::widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
+    view::{
+        screens::ReplayScreen,
+        widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +68,7 @@ impl PlayingAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PausedAction {
     Resume,
+    OpenReplay,
     Quit,
 }
 
@@ -69,31 +76,38 @@ impl PausedAction {
     fn from_key_event(event: &KeyEvent) -> Option<Self> {
         match event.code {
             KeyCode::Char('p') => Some(Self::Resume),
+            KeyCode::Char('R') => Some(Self::OpenReplay),
             KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
             _ => None,
         }
     }
 
     fn bindings() -> &'static [KeyBinding<'static>] {
-        &[(&["p"], "Resume"), (&["q", "Esc"], "Quit")]
+        &[
+            (&["p"], "Resume"),
+            (&["R"], "Open Replay"),
+            (&["q", "Esc"], "Quit"),
+        ]
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum GameOverAction {
+    OpenReplay,
     Quit,
 }
 
 impl GameOverAction {
     fn from_key_event(event: &KeyEvent) -> Option<Self> {
         match event.code {
+            KeyCode::Char('R') => Some(Self::OpenReplay),
             KeyCode::Char('q') | KeyCode::Esc => Some(Self::Quit),
             _ => None,
         }
     }
 
     fn bindings() -> &'static [KeyBinding<'static>] {
-        &[(&["q", "Esc"], "Quit")]
+        &[(&["R"], "Open Replay"), (&["q", "Esc"], "Quit")]
     }
 }
 
@@ -172,6 +186,12 @@ impl Screen for AutoPlayScreen<'_> {
                     if let Some(action) = PausedAction::from_key_event(&event) {
                         match action {
                             PausedAction::Resume => self.request_toggle_pause(),
+                            PausedAction::OpenReplay => {
+                                let session = self.request_recorded_session();
+                                return ScreenTransition::Push(Box::new(ReplayScreen::in_game(
+                                    session,
+                                )));
+                            }
                             PausedAction::Quit => return ScreenTransition::Pop,
                         }
                     }
@@ -179,6 +199,12 @@ impl Screen for AutoPlayScreen<'_> {
                 SessionState::GameOver => {
                     if let Some(action) = GameOverAction::from_key_event(&event) {
                         match action {
+                            GameOverAction::OpenReplay => {
+                                let session = self.request_recorded_session();
+                                return ScreenTransition::Push(Box::new(ReplayScreen::in_game(
+                                    session,
+                                )));
+                            }
                             GameOverAction::Quit => return ScreenTransition::Pop,
                         }
                     }
@@ -233,6 +259,11 @@ impl AutoPlayScreen<'_> {
         self.tx_request.send(Request::TogglePause).unwrap();
         self.session = self.rx_session.recv().unwrap();
     }
+
+    fn request_recorded_session(&mut self) -> RecordedSession {
+        self.tx_request.send(Request::SessionHistory).unwrap();
+        self.rx_history.recv().unwrap().to_recorded_session()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -240,6 +271,7 @@ enum Request {
     TogglePause,
     Run,
     TurboRun,
+    SessionHistory,
     SessionHistoryAndExit,
 }
 
@@ -280,6 +312,10 @@ fn ai_thread(
         match req {
             Request::TogglePause => auto_play.session.toggle_pause(),
             Request::Run | Request::TurboRun => auto_play.increment_frame(),
+            Request::SessionHistory => {
+                tx_history.send(auto_play.session.to_history()).unwrap();
+                continue;
+            }
             Request::SessionHistoryAndExit => {
                 tx_history.send(auto_play.session.into_history()).unwrap();
                 return;
