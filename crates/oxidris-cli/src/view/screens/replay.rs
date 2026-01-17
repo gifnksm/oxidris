@@ -12,8 +12,9 @@ use ratatui::{
 };
 
 use crate::{
+    DEFAULT_FRAME_RATE,
     schema::record::{RecordedSession, TurnRecord},
-    tui::Tui,
+    tui::{RenderMode, Screen, ScreenTransition, Tui},
     view::widgets::{BoardDisplay, KeyBinding, KeyBindingDisplay},
 };
 
@@ -57,30 +58,59 @@ impl Action {
 }
 
 #[derive(Debug)]
-pub struct TurnViewerScreen {
+pub struct ReplayScreen {
     path: PathBuf,
     session: RecordedSession,
     board_index: usize,
     play: bool,
-    should_exit: bool,
 }
 
-impl TurnViewerScreen {
+impl ReplayScreen {
     pub fn new(path: PathBuf, session: RecordedSession) -> Self {
         Self {
             path,
             session,
             board_index: 0,
             play: false,
-            should_exit: false,
         }
     }
+}
 
-    pub fn should_exit(&self) -> bool {
-        self.should_exit
+impl Screen for ReplayScreen {
+    fn on_active(&mut self, tui: &mut Tui) {
+        tui.set_render_mode(RenderMode::throttled_from_rate(DEFAULT_FRAME_RATE));
+        self.update_tick_interval(tui);
     }
 
-    pub fn draw(&self, frame: &mut Frame<'_>) {
+    fn on_inactive(&mut self, _tui: &mut Tui) {}
+
+    fn on_close(&mut self, _tui: &mut Tui) {}
+
+    fn handle_event(&mut self, tui: &mut Tui, event: &Event) -> ScreenTransition {
+        if let Some(event) = event.as_key_event()
+            && let Some(action) = Action::from_key_event(&event)
+        {
+            match action {
+                Action::TogglePlay => {
+                    self.play = !self.play;
+                    self.update_tick_interval(tui);
+                }
+                Action::Prev(amount) => self.step_backward(amount),
+                Action::Next(amount) => self.step_forward(amount),
+                Action::First => self.jump_to_first(),
+                Action::Last => self.jump_to_last(),
+                Action::Quit => return ScreenTransition::Pop,
+            }
+        }
+        ScreenTransition::Stay
+    }
+
+    fn update(&mut self, _tui: &mut Tui) {
+        assert!(self.play);
+        self.step_forward(1);
+    }
+
+    fn draw(&self, frame: &mut Frame) {
         let top_block = BlockWidget::bordered()
             .title(format!("Replay: {}", self.path.display()))
             .title_alignment(HorizontalAlignment::Center)
@@ -136,28 +166,12 @@ impl TurnViewerScreen {
         frame.render_widget(board_display, mid_area);
         frame.render_widget(help, bottom_area);
     }
+}
 
-    pub fn handle_event(&mut self, tui: &mut Tui, event: &Event) {
-        if let Some(event) = event.as_key_event()
-            && let Some(action) = Action::from_key_event(&event)
-        {
-            match action {
-                Action::TogglePlay => {
-                    self.play = !self.play;
-                    let interval = self.play.then(|| Duration::from_millis(100));
-                    tui.set_tick_interval(interval);
-                }
-                Action::Prev(amount) => self.step_backward(amount),
-                Action::Next(amount) => self.step_forward(amount),
-                Action::First => self.jump_to_first(),
-                Action::Last => self.jump_to_last(),
-                Action::Quit => self.should_exit = true,
-            }
-        }
-    }
-
-    pub fn update(&mut self) {
-        self.step_forward(1);
+impl ReplayScreen {
+    fn update_tick_interval(&mut self, tui: &mut Tui) {
+        let interval = self.play.then(|| Duration::from_millis(100));
+        tui.set_tick_interval(interval);
     }
 
     fn step_forward(&mut self, amount: usize) {

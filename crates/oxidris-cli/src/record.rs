@@ -73,6 +73,19 @@ impl RecordingSession {
         self.history
     }
 
+    /// Returns the recorded history.
+    ///
+    /// This method captures the final game statistics before returning.
+    /// The returned [`SessionHistory`] can be saved to a file using [`SessionHistory::save`].
+    pub fn to_history(&self) -> SessionHistory {
+        // record current turn
+        let snapshot = self.capture_snapshot();
+        let mut history = self.history.clone();
+        history.record(snapshot);
+        history.set_stats(self.session.stats().clone());
+        history
+    }
+
     fn capture_snapshot(&self) -> TurnRecord {
         let placement = self.session.simulate_drop_position();
         TurnRecord {
@@ -140,7 +153,7 @@ impl RecordingSession {
 ///
 /// This type is created by [`RecordingSession::into_history`] and can be
 /// saved to a file using [`save`](Self::save).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionHistory {
     seed: PieceSeed,
     player: PlayerInfo,
@@ -224,7 +237,7 @@ impl SessionHistory {
 ///
 /// Used to limit memory usage when recording long game sessions.
 /// When the buffer reaches capacity, new entries replace the oldest ones.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct RingBuffer<T> {
     capacity: usize,
     buf: VecDeque<T>,

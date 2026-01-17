@@ -21,8 +21,8 @@ impl Tui {
     }
 
     /// Sets the tick rate (Hz, ticks per second).
-    pub fn set_tick_rate(&mut self, rate: f64) {
-        self.set_tick_interval(Some(Duration::from_secs_f64(1.0 / rate)));
+    pub fn set_tick_rate(&mut self, rate: Option<f64>) {
+        self.set_tick_interval(rate.map(|rate| Duration::from_secs_f64(1.0 / rate)));
     }
 
     /// Sets the tick interval.

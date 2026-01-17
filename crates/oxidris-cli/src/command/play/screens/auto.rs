@@ -17,8 +17,11 @@ use ratatui::{
 };
 
 use crate::{
+    DEFAULT_FRAME_RATE,
+    command::play::TICK_RATE,
     record::{RecordingSession, SessionHistory},
     schema::{ai_model::AiModel, record::PlayerInfo},
+    tui::{RenderMode, Screen, ScreenTransition, Tui},
     view::widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
 };
 
@@ -95,21 +98,22 @@ impl GameOverAction {
 }
 
 #[derive(Debug)]
-pub struct AutoPlayScreen {
+pub struct AutoPlayScreen<'a> {
     session: GameSession,
     turbo: bool,
-    should_exit: bool,
     tx_request: mpsc::Sender<Request>,
     rx_session: mpsc::Receiver<GameSession>,
     rx_history: mpsc::Receiver<SessionHistory>,
+    session_history: &'a mut Option<SessionHistory>,
 }
 
-impl AutoPlayScreen {
+impl<'a> AutoPlayScreen<'a> {
     pub fn new(
         tick_rate: f64,
         model: &AiModel,
         history_size: usize,
         turbo: bool,
+        session_history: &'a mut Option<SessionHistory>,
     ) -> anyhow::Result<Self> {
         let rec_session = RecordingSession::new(
             tick_rate,
@@ -129,22 +133,77 @@ impl AutoPlayScreen {
         Ok(Self {
             session,
             turbo,
-            should_exit: false,
             tx_request,
             rx_session,
             rx_history,
+            session_history,
         })
     }
+}
 
-    pub fn is_playing(&self) -> bool {
-        !self.should_exit && self.session.session_state().is_playing()
+impl Screen for AutoPlayScreen<'_> {
+    fn on_active(&mut self, tui: &mut Tui) {
+        tui.set_render_mode(RenderMode::throttled_from_rate(DEFAULT_FRAME_RATE));
+        self.update_tick_interval(tui);
     }
 
-    pub fn should_exit(&self) -> bool {
-        self.should_exit
+    fn on_inactive(&mut self, _tui: &mut Tui) {}
+
+    fn on_close(&mut self, _tui: &mut Tui) {
+        self.tx_request
+            .send(Request::SessionHistoryAndExit)
+            .unwrap();
+        *self.session_history = Some(self.rx_history.recv().unwrap());
     }
 
-    pub fn draw(&self, frame: &mut Frame<'_>) {
+    fn handle_event(&mut self, tui: &mut Tui, event: &Event) -> ScreenTransition {
+        if let Some(event) = event.as_key_event() {
+            match self.session.session_state() {
+                SessionState::Playing => {
+                    if let Some(action) = PlayingAction::from_key_event(&event) {
+                        match action {
+                            PlayingAction::ToggleTurbo => self.turbo = !self.turbo,
+                            PlayingAction::Pause => self.request_toggle_pause(),
+                            PlayingAction::Quit => return ScreenTransition::Pop,
+                        }
+                    }
+                }
+                SessionState::Paused => {
+                    if let Some(action) = PausedAction::from_key_event(&event) {
+                        match action {
+                            PausedAction::Resume => self.request_toggle_pause(),
+                            PausedAction::Quit => return ScreenTransition::Pop,
+                        }
+                    }
+                }
+                SessionState::GameOver => {
+                    if let Some(action) = GameOverAction::from_key_event(&event) {
+                        match action {
+                            GameOverAction::Quit => return ScreenTransition::Pop,
+                        }
+                    }
+                }
+            }
+        }
+        self.update_tick_interval(tui);
+        ScreenTransition::Stay
+    }
+
+    fn update(&mut self, tui: &mut Tui) {
+        assert!(self.is_playing());
+        let req = {
+            if self.turbo {
+                Request::TurboRun
+            } else {
+                Request::Run
+            }
+        };
+        self.tx_request.send(req).unwrap();
+        self.session = self.rx_session.recv().unwrap();
+        self.update_tick_interval(tui);
+    }
+
+    fn draw(&self, frame: &mut Frame) {
         let session_display = SessionDisplay::new(&self.session, false).turbo(self.turbo);
         let bindings = match self.session.session_state() {
             SessionState::Playing => PlayingAction::bindings(self.turbo),
@@ -159,57 +218,20 @@ impl AutoPlayScreen {
         frame.render_widget(session_display, main_area);
         frame.render_widget(help_text, help_area);
     }
+}
 
-    pub fn handle_event(&mut self, event: &Event) {
-        if let Some(event) = event.as_key_event() {
-            match self.session.session_state() {
-                SessionState::Playing => {
-                    if let Some(action) = PlayingAction::from_key_event(&event) {
-                        match action {
-                            PlayingAction::ToggleTurbo => self.turbo = !self.turbo,
-                            PlayingAction::Pause => self.session.toggle_pause(),
-                            PlayingAction::Quit => self.should_exit = true,
-                        }
-                    }
-                }
-                SessionState::Paused => {
-                    if let Some(action) = PausedAction::from_key_event(&event) {
-                        match action {
-                            PausedAction::Resume => self.session.toggle_pause(),
-                            PausedAction::Quit => self.should_exit = true,
-                        }
-                    }
-                }
-                SessionState::GameOver => {
-                    if let Some(action) = GameOverAction::from_key_event(&event) {
-                        match action {
-                            GameOverAction::Quit => self.should_exit = true,
-                        }
-                    }
-                }
-            }
-        }
+impl AutoPlayScreen<'_> {
+    fn is_playing(&self) -> bool {
+        self.session.session_state().is_playing()
     }
 
-    pub fn update(&mut self) {
-        let req = {
-            if self.session.session_state().is_paused() {
-                Request::TogglePause
-            } else if self.turbo {
-                Request::TurboRun
-            } else {
-                Request::Run
-            }
-        };
-        self.tx_request.send(req).unwrap();
+    fn update_tick_interval(&mut self, tui: &mut Tui) {
+        tui.set_tick_rate(self.is_playing().then_some(TICK_RATE));
+    }
+
+    fn request_toggle_pause(&mut self) {
+        self.tx_request.send(Request::TogglePause).unwrap();
         self.session = self.rx_session.recv().unwrap();
-    }
-
-    pub fn into_history(self) -> SessionHistory {
-        self.tx_request
-            .send(Request::SessionHistoryAndExit)
-            .unwrap();
-        self.rx_history.recv().unwrap()
     }
 }
 
@@ -228,37 +250,21 @@ fn ai_thread(
     rx_request: &mut mpsc::Receiver<Request>,
 ) {
     let mut auto_play = auto_play;
-    let Ok(mut req) = rx_request.recv() else {
-        return;
-    };
-
-    loop {
-        let is_turbo = match req {
-            Request::TogglePause => {
-                auto_play.session.toggle_pause();
-                false
-            }
-            Request::Run => {
-                auto_play.increment_frame();
-                false
-            }
-            Request::TurboRun => {
-                auto_play.increment_frame();
-                true
-            }
-            Request::SessionHistoryAndExit => {
-                tx_history.send(auto_play.session.into_history()).unwrap();
-                return;
-            }
-        };
-        tx_session.send(auto_play.session.clone()).unwrap();
-
-        req = if is_turbo {
+    let mut is_turbo = false;
+    'req: loop {
+        let req = if is_turbo {
             loop {
                 match rx_request.try_recv() {
                     Ok(r) => break r,
                     Err(TryRecvError::Disconnected) => return,
-                    Err(TryRecvError::Empty) => auto_play.increment_frame(),
+                    Err(TryRecvError::Empty) => {
+                        if !auto_play.session.session_state().is_playing() {
+                            // if game state is GameOver, abort turbo run and wait response
+                            is_turbo = false;
+                            continue 'req;
+                        }
+                        auto_play.increment_frame();
+                    }
                 }
             }
         } else {
@@ -266,7 +272,20 @@ fn ai_thread(
                 Ok(r) => r,
                 Err(RecvError) => return,
             }
+        };
+        is_turbo = matches!(req, Request::TurboRun);
+
+        // No status check is performed here.
+        // Methods like `increment_frame` and `toggle_pause` handle state checks internally.
+        match req {
+            Request::TogglePause => auto_play.session.toggle_pause(),
+            Request::Run | Request::TurboRun => auto_play.increment_frame(),
+            Request::SessionHistoryAndExit => {
+                tx_history.send(auto_play.session.into_history()).unwrap();
+                return;
+            }
         }
+        tx_session.send(auto_play.session.clone()).unwrap();
     }
 }
 

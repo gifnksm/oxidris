@@ -1,9 +1,14 @@
 use std::path::PathBuf;
 
-use crate::{command::play::app::PlayApp, tui::Tui, util};
+use crate::{
+    command::play::screens::{AutoPlayScreen, ManualPlayScreen},
+    tui::{ScreenStack, Tui},
+    util,
+};
 
-mod app;
 mod screens;
+
+const TICK_RATE: f64 = 60.0;
 
 #[derive(Default, Debug, Clone, clap::Args)]
 struct RecordingArg {
@@ -45,11 +50,18 @@ pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
             },
     } = arg;
 
-    let mut app = PlayApp::manual(*history_size);
+    let mut session_history = None;
+
+    let mut app = ScreenStack::new(Box::new(ManualPlayScreen::new(
+        TICK_RATE,
+        *history_size,
+        &mut session_history,
+    )));
     Tui::new().run(&mut app)?;
+    drop(app);
 
     if *save_recording {
-        app.into_history().save(record_dir)?;
+        session_history.as_mut().unwrap().save(record_dir)?;
     }
 
     Ok(())
@@ -67,12 +79,21 @@ pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
             },
     } = arg;
 
+    let mut session_history = None;
+
     let model = util::read_ai_model_file(model_path)?;
-    let mut app = PlayApp::auto(&model, *history_size, *turbo)?;
+    let mut app = ScreenStack::new(Box::new(AutoPlayScreen::new(
+        TICK_RATE,
+        &model,
+        *history_size,
+        *turbo,
+        &mut session_history,
+    )?));
     Tui::new().run(&mut app)?;
+    drop(app);
 
     if *save_recording {
-        app.into_history().save(record_dir)?;
+        session_history.as_mut().unwrap().save(record_dir)?;
     }
 
     Ok(())
