@@ -18,9 +18,9 @@ struct RecordingArg {
     /// Directory to save recording files
     #[clap(long, default_value = "./data/recordings/")]
     record_dir: PathBuf,
-    /// Maximum number of turns to keep in memory (oldest are discarded)
+    /// Maximum number of turns to keep for in-game replay (oldest are discarded)
     #[clap(long, default_value_t = 10000)]
-    history_size: usize,
+    max_replay_turns: usize,
 }
 
 #[derive(Default, Debug, Clone, clap::Args)]
@@ -46,7 +46,7 @@ pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
             RecordingArg {
                 save_recording,
                 record_dir,
-                history_size,
+                max_replay_turns,
             },
     } = arg;
 
@@ -54,7 +54,7 @@ pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
 
     let mut app = ScreenStack::new(Box::new(ManualPlayScreen::new(
         TICK_RATE,
-        *history_size,
+        *max_replay_turns,
         &mut session_history,
     )));
     Tui::new().run(&mut app)?;
@@ -75,7 +75,7 @@ pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
             RecordingArg {
                 save_recording,
                 record_dir,
-                history_size,
+                max_replay_turns,
             },
     } = arg;
 
@@ -85,7 +85,7 @@ pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
     let mut app = ScreenStack::new(Box::new(AutoPlayScreen::new(
         TICK_RATE,
         &model,
-        *history_size,
+        *max_replay_turns,
         *turbo,
         &mut session_history,
     )?));

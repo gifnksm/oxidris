@@ -1,4 +1,4 @@
-# Session Recording and Replay - Design Documentation
+# Recording and In-Game Replay - Design Documentation
 
 This document describes the detailed design decisions, data structures, and architecture for the session recording and replay functionality.
 
@@ -106,7 +106,7 @@ Ring buffer for maintaining recent game history in memory. Stores up to a config
 **Design Rationale:**
 
 - **Ring buffer** prevents unbounded memory growth
-- **Fixed capacity** determined by `--history-size` option
+- **Fixed capacity** determined by `--max-replay-turns` option
 - Default capacity: 10,000 entries (~640 KB memory usage)
 
 ## File Format
@@ -148,22 +148,22 @@ Where prefix is:
 
 ```bash
 oxidris play [OPTIONS]
-  --record                    Enable recording
+  --save-recording            Save recording when session ends
   --record-dir <DIR>          Recording output directory (default: data/recordings/)
-  --history-size <N>          Number of recent turns to keep (default: 10000)
+  --max-replay-turns <N>      Maximum turns to keep for in-game replay (default: 10000)
 ```
 
 **Auto-Play:**
 
 ```bash
 oxidris auto-play <MODEL> [OPTIONS]
-  --record                    Enable recording
+  --save-recording            Save recording when session ends
   --record-dir <DIR>          Recording output directory (default: data/recordings/)
-  --history-size <N>          Number of recent turns to keep (default: 10000)
-  --turbo                     Run in turbo mode (works with --record)
+  --max-replay-turns <N>      Maximum turns to keep for in-game replay (default: 10000)
+  --turbo                     Run in turbo mode (works with --save-recording)
 ```
 
-### Replay Command
+### Recording Replay Command
 
 ```bash
 oxidris replay <FILE>
@@ -204,18 +204,18 @@ oxidris replay <FILE>
 Note: Lowercase = no Shift needed; Uppercase (e.g., `G`, `H`) = Shift required.
 ```
 
-### In-Game History Mode
+### In-Game Replay Mode
 
 **Entry Points:**
 
-- Pause screen: Press `H` to enter history mode (Shift+h)
-- Game Over screen: Press `H` to enter history mode (Shift+h)
+- Pause screen: Press `R` to enter in-game replay mode
+- Game Over screen: Press `R` to enter in-game replay mode
 
 **UI Indicator:**
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│  [HISTORY MODE] Turn: 234 / 450 (-216 from current)       │
+│  [IN-GAME REPLAY] Turn: 234 / 450 (-216 from current)     │
 ├────────────────────────────────────────────────────────────┤
 │         ┌──────────────────────┐                          │
 │         │   [Board Display]    │                          │
@@ -225,17 +225,17 @@ Note: Lowercase = no Shift needed; Uppercase (e.g., `G`, `H`) = Shift required.
 │  g/Home (First) | G/End (Last) | Space (Play) | q/Esc (Exit)
 └────────────────────────────────────────────────────────────┘
 
-Note: `H` (entering history) and `G` (last turn) require Shift. `h`/`l` (10-turn jumps within history) do not.
+Note: `G` (last turn) requires Shift. Other keys do not.
 ```
 
-**History Mode Controls:**
+**In-Game Replay Mode Controls:**
 
 - `j` / `k` or `↓` / `↑`: Step backward/forward (1 turn)
 - `h` / `l` or `←` / `→`: Jump backward/forward (10 turns)
 - `g` or `Home`: Jump to first turn
 - `G` or `End`: Jump to last turn (Shift+g)
 - `Space`: Toggle auto-playback
-- `q` / `Esc`: Exit history mode, return to current state
+- `q` / `Esc`: Exit in-game replay mode, return to current state
 
 ## Memory Management Strategy
 
@@ -260,8 +260,8 @@ Note: `H` (entering history) and `G` (last turn) require Shift. `h`/`l` (10-turn
 
 **Very Long Games:**
 
-- If game exceeds `--history-size` turns, only the most recent turns are saved
-- Example: With `--history-size 10000`, a 50,000 turn game saves only turns 40,001-50,000
+- If game exceeds `--max-replay-turns`, only the most recent turns are saved
+- Example: With `--max-replay-turns 10000`, a 50,000 turn game saves only turns 40,001-50,000
 - This is acceptable: focus is on game-over analysis, not full playback
 
 **Game Crashes:**

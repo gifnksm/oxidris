@@ -103,11 +103,11 @@ pub struct ManualPlayScreen<'a> {
 impl<'a> ManualPlayScreen<'a> {
     pub fn new(
         tick_rate: f64,
-        history_size: usize,
+        max_replay_turns: usize,
         session_history: &'a mut Option<SessionHistory>,
     ) -> Self {
         Self {
-            session: RecordingSession::new(tick_rate, PlayerInfo::Manual, history_size),
+            session: RecordingSession::new(tick_rate, PlayerInfo::Manual, max_replay_turns),
             session_history,
         }
     }

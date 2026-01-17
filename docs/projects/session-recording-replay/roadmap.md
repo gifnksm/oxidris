@@ -1,4 +1,4 @@
-# Session Recording and Replay - Implementation Roadmap
+# Recording and In-Game Replay - Implementation Roadmap
 
 This document provides a detailed, step-by-step implementation plan for the session recording and replay functionality.
 
@@ -45,7 +45,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Tasks:**
 
-- [x] Add `--save-recording`, `--recording-dir`, `--history-size` options to `play` command
+- [x] Add `--save-recording`, `--recording-dir`, `--max-replay-turns` options to `play` command
 - [x] Integrate `RecordingSession` into `ManualPlayScreen`
 - [x] Capture board states after each piece placement
 - [x] Save recording to file on game end with filename `manual_YYYYMMDD_HHMMSS.json`
@@ -56,7 +56,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 - [x] `play --save-recording` creates recording file on game end
 - [x] File contains valid JSON and can be loaded
-- [x] `--history-size` option works correctly
+- [x] `--max-replay-turns` option works correctly
 
 ---
 
@@ -70,7 +70,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Tasks:**
 
-- [x] Add `--save-recording`, `--recording-dir`, `--history-size` options to `auto-play` command
+- [x] Add `--save-recording`, `--recording-dir`, `--max-replay-turns` options to `auto-play` command
 - [x] Integrate `RecordingSession` into `AutoPlayScreen`
 - [x] Include full `AiModel` data in `PlayerInfo::Auto` metadata
 - [x] Save recording with filename `ai_{model_name}_YYYYMMDD_HHMMSS.json`
@@ -109,7 +109,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 ---
 
-## Step 5: In-Game Playback (History Browsing)
+## Step 5: In-Game Replay
 
 **Goal**: Allow players to rewind and review history during pause or game over.
 
@@ -119,15 +119,15 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Tasks:**
 
-- Add history mode toggle (H key) to pause and game over screens
-- Implement history navigation: ←/→ (step), Home/End or ^/$ (first/last), Esc (exit)
-- Display "HISTORY MODE" indicator and turn offset
-- Preserve game state when exiting history mode
+- Add in-game replay mode toggle (R key) to pause and game over screens
+- Implement replay navigation: j/k or ↓/↑ (1 turn), h/l or ←/→ (10 turns), g/Home (first), G/End (last), Space (play/pause), Esc (exit)
+- Display "IN-GAME REPLAY" indicator and turn offset
+- Preserve game state when exiting in-game replay mode
 
 **Validation:**
 
-- History mode works in pause and game over screens
-- Navigation works correctly
+- In-game replay mode works in pause and game over screens
+- All navigation controls work correctly
 - Exiting returns to correct state
 
 ---
@@ -186,7 +186,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Current Step**: None (ready for Step 5)
 
-**Next Milestone**: Step 5 (In-Game Playback)
+**Next Milestone**: Step 5 (In-Game Replay)
 
 ### Step Status
 
@@ -194,7 +194,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 - [x] **Step 2**: Manual Play Recording
 - [x] **Step 3**: Auto-Play Recording
 - [x] **Step 4**: Replay Command (Basic Playback)
-- [ ] **Step 5**: In-Game Playback (History Browsing)
+- [ ] **Step 5**: In-Game Replay
 - [ ] **Step 6**: Advanced Features (Feature Visualization)
 - [ ] **Step 7**: Documentation and Polish
 
@@ -242,7 +242,7 @@ Each step includes its own validation criteria. Complete these before moving to 
 **Recording Tests:**
 
 - Record a short game (manual and auto-play)
-- Record a long game exceeding history size
+- Record a long game exceeding replay buffer size
 - Record with turbo mode enabled
 - Verify file format is correct
 
@@ -253,12 +253,12 @@ Each step includes its own validation criteria. Complete these before moving to 
 - Test with corrupted/missing files
 - Test with old file format (after future changes)
 
-**History Tests:**
+**In-Game Replay Tests:**
 
-- Browse history during pause
-- Browse history after game over
+- Use in-game replay during pause
+- Use in-game replay after game over
 - Test boundary conditions (first/last turn)
-- Test exiting and re-entering history mode
+- Test exiting and re-entering in-game replay mode
 
 ---
 
@@ -270,7 +270,7 @@ Each step includes its own validation criteria. Complete these before moving to 
    - Mitigation: Use efficient ring buffer, avoid unnecessary copies
    - Validation: Benchmark turbo mode with/without recording
 
-2. **Memory**: Very large history buffers could consume too much memory
+2. **Memory**: Very large replay buffers could consume too much memory
    - Mitigation: Document reasonable limits, add validation
    - Validation: Test with extreme values (e.g., 1,000,000 turns)
 

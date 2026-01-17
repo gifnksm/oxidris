@@ -111,7 +111,7 @@ impl<'a> AutoPlayScreen<'a> {
     pub fn new(
         tick_rate: f64,
         model: &AiModel,
-        history_size: usize,
+        max_replay_turns: usize,
         turbo: bool,
         session_history: &'a mut Option<SessionHistory>,
     ) -> anyhow::Result<Self> {
@@ -120,7 +120,7 @@ impl<'a> AutoPlayScreen<'a> {
             PlayerInfo::Auto {
                 model: model.clone(),
             },
-            history_size,
+            max_replay_turns,
         );
         let session = (*rec_session).clone();
         let auto_play = AutoPlay::new(rec_session, model)?;
