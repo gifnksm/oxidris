@@ -6,20 +6,28 @@ use crate::tui::event::TuiEvent;
 
 /// Rendering trigger mode.
 #[derive(Debug, Clone, Copy, Default)]
-pub(super) enum RenderMode {
+pub enum RenderMode {
     /// Render at fixed intervals.
     Interval(Duration),
     /// Render after state changes (tick or crossterm event).
     #[default]
     OnDirty,
+    /// Render after state changes, but with minimum interval between renders.
+    ///
+    /// If events occur faster than the interval, they are batched into one render.
+    Throttled(Duration),
 }
 
 impl RenderMode {
-    fn as_interval(&self) -> Option<Duration> {
-        match self {
-            RenderMode::Interval(interval) => Some(*interval),
-            RenderMode::OnDirty => None,
-        }
+    /// Creates `Interval` mode from frame rate (FPS).
+    #[expect(dead_code)]
+    pub fn interval_from_rate(rate: f64) -> Self {
+        Self::Interval(Duration::from_secs_f64(1.0 / rate))
+    }
+
+    /// Creates `Throttled` mode from frame rate (FPS).
+    pub fn throttled_from_rate(rate: f64) -> Self {
+        Self::Throttled(Duration::from_secs_f64(1.0 / rate))
     }
 }
 
@@ -48,11 +56,12 @@ impl EventLoop {
     /// Tick interval is unset, and render mode defaults to `OnDirty`.
     pub fn new() -> Self {
         let now = Instant::now();
+        let past_time = now.checked_sub(Duration::from_secs(86400)).unwrap_or(now);
         Self {
             tick_interval: None,
             render_mode: RenderMode::default(),
-            last_tick: now,
-            last_render: now,
+            last_tick: past_time,
+            last_render: past_time,
             dirty: true, // Initial render is required on startup
         }
     }
@@ -87,6 +96,9 @@ impl EventLoop {
             let do_render = match self.render_mode {
                 RenderMode::Interval(interval) => now.duration_since(self.last_render) >= interval,
                 RenderMode::OnDirty => self.dirty,
+                RenderMode::Throttled(interval) => {
+                    self.dirty && now.duration_since(self.last_render) >= interval
+                }
             };
             if do_render {
                 self.last_render = now;
@@ -107,10 +119,11 @@ impl EventLoop {
 
     fn compute_timeout(&self, now: Instant) -> Option<Duration> {
         let next_tick_at = self.tick_interval.map(|interval| self.last_tick + interval);
-        let next_render_at = self
-            .render_mode
-            .as_interval()
-            .map(|interval| self.last_render + interval);
+        let next_render_at = match self.render_mode {
+            RenderMode::Interval(interval) => Some(self.last_render + interval),
+            RenderMode::OnDirty => self.dirty.then_some(now),
+            RenderMode::Throttled(interval) => self.dirty.then(|| self.last_render + interval),
+        };
         let next_timeout_at = [next_tick_at, next_render_at].into_iter().flatten().min()?;
         Some(next_timeout_at.saturating_duration_since(now))
     }

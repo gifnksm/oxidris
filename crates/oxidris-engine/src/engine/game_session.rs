@@ -43,7 +43,7 @@ pub enum SessionState {
 /// ```
 /// use oxidris_engine::GameSession;
 ///
-/// let mut session = GameSession::new(60); // 60 FPS
+/// let mut session = GameSession::new(60.0); // 60 FPS
 ///
 /// // Handle input
 /// session.try_move_left().ok();
@@ -62,7 +62,7 @@ pub struct GameSession {
     hold_used: bool,
     block_board: BlockBoard,
     session_state: SessionState,
-    fps: u64,
+    tick_rate: f64,
     total_frames: u64,
     drop_frames: u64,
 }
@@ -75,9 +75,14 @@ pub struct GameSession {
 /// - Level 1: 900ms per drop
 /// - ...
 /// - Level 9+: 100ms per drop (fastest)
-fn drop_frames(level: u64, fps: u64) -> u64 {
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss
+)]
+fn drop_frames(level: u64, tick_rate: f64) -> u64 {
     let millis = 100 + u64::saturating_sub(900, level * 100);
-    millis * fps / 1000
+    (millis as f64 * tick_rate / 1000.0).ceil() as u64
 }
 
 impl GameSession {
@@ -87,24 +92,24 @@ impl GameSession {
     ///
     /// # Arguments
     ///
-    /// * `fps` - Frames per second for timing calculations (typically 60)
+    /// * `tick_rate` - Frames per second for timing calculations (typically 60)
     #[must_use]
-    pub fn new(fps: u64) -> Self {
-        Self::with_seed(fps, rand::rng().random())
+    pub fn new(tick_rate: f64) -> Self {
+        Self::with_seed(tick_rate, rand::rng().random())
     }
 
     /// Like [`Self::new`], but with a specific seed for deterministic piece generation.
     #[must_use]
-    pub fn with_seed(fps: u64, seed: PieceSeed) -> Self {
+    pub fn with_seed(tick_rate: f64, seed: PieceSeed) -> Self {
         Self {
             field: GameField::with_seed(seed),
             stats: GameStats::new(),
             hold_used: false,
             block_board: BlockBoard::INITIAL,
             session_state: SessionState::Playing,
-            fps,
+            tick_rate,
             total_frames: 0,
-            drop_frames: drop_frames(0, fps),
+            drop_frames: drop_frames(0, tick_rate),
         }
     }
 
@@ -134,11 +139,9 @@ impl GameSession {
 
     /// Returns the total elapsed time of the session based on frame count.
     #[must_use]
+    #[expect(clippy::cast_precision_loss)]
     pub fn duration(&self) -> Duration {
-        const NANOS_PER_SEC: u64 = 1_000_000_000;
-        let secs = self.total_frames / self.fps;
-        let nanos = (self.total_frames % self.fps) * NANOS_PER_SEC / self.fps;
-        Duration::new(secs, nanos.try_into().unwrap())
+        Duration::from_secs_f64(self.total_frames as f64 / self.tick_rate)
     }
 
     /// Toggles between playing and paused states.
@@ -189,7 +192,7 @@ impl GameSession {
         self.total_frames += 1;
         self.drop_frames = self.drop_frames.saturating_sub(1);
         if self.drop_frames == 0 {
-            self.drop_frames = drop_frames(self.stats().level() as u64, self.fps);
+            self.drop_frames = drop_frames(self.stats().level() as u64, self.tick_rate);
             self.auto_drop_and_complete();
         }
     }

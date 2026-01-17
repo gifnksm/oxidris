@@ -54,9 +54,9 @@ impl RecordingSession {
     /// * `fps` - Frames per second for game timing
     /// * `player` - Player information (manual or AI)
     /// * `history_size` - Maximum number of turns to keep in the ring buffer
-    pub fn new(fps: u64, player: PlayerInfo, history_size: usize) -> Self {
+    pub fn new(tick_rate: f64, player: PlayerInfo, history_size: usize) -> Self {
         let seed = rand::rng().random();
-        let session = GameSession::with_seed(fps, seed);
+        let session = GameSession::with_seed(tick_rate, seed);
         let history = SessionHistory::new(seed, player, history_size);
         Self { session, history }
     }

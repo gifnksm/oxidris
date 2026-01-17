@@ -76,8 +76,8 @@ impl Default for PieceBuffer {
 /// let seed: PieceSeed = rand::rng().random();
 ///
 /// // Create two sessions with the same seed
-/// let session1 = GameSession::with_seed(60, seed);
-/// let session2 = GameSession::with_seed(60, seed);
+/// let session1 = GameSession::with_seed(60.0, seed);
+/// let session2 = GameSession::with_seed(60.0, seed);
 ///
 /// // Both sessions will have the same piece sequence
 /// ```

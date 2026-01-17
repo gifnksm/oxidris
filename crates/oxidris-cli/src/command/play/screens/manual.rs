@@ -98,9 +98,9 @@ pub struct ManualPlayScreen {
 }
 
 impl ManualPlayScreen {
-    pub fn new(fps: u64, history_size: usize) -> Self {
+    pub fn new(tick_rate: f64, history_size: usize) -> Self {
         Self {
-            session: RecordingSession::new(fps, PlayerInfo::Manual, history_size),
+            session: RecordingSession::new(tick_rate, PlayerInfo::Manual, history_size),
             should_exit: false,
         }
     }

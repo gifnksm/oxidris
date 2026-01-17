@@ -17,17 +17,17 @@ pub enum Screen {
 }
 
 impl Screen {
-    pub fn manual(fps: u64, history_size: usize) -> Self {
-        Screen::Manual(ManualPlayScreen::new(fps, history_size))
+    pub fn manual(tick_rate: f64, history_size: usize) -> Self {
+        Screen::Manual(ManualPlayScreen::new(tick_rate, history_size))
     }
 
     pub fn auto(
-        fps: u64,
+        tick_rate: f64,
         model: &AiModel,
         history_size: usize,
         turbo: bool,
     ) -> anyhow::Result<Self> {
-        let screen = AutoPlayScreen::new(fps, model, history_size, turbo)?;
+        let screen = AutoPlayScreen::new(tick_rate, model, history_size, turbo)?;
         Ok(Screen::Auto(screen))
     }
 

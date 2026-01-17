@@ -5,10 +5,11 @@ use crate::{
     command::play::screens::Screen,
     record::SessionHistory,
     schema::ai_model::AiModel,
-    tui::{App, Tui},
+    tui::{App, RenderMode, Tui},
 };
 
-const FPS: u64 = 60;
+const TICK_RATE: f64 = 60.0;
+const FRAME_RATE: f64 = 60.0;
 
 #[derive(Debug)]
 pub struct PlayApp {
@@ -18,13 +19,13 @@ pub struct PlayApp {
 impl PlayApp {
     pub fn manual(history_size: usize) -> Self {
         Self {
-            screen: Screen::manual(FPS, history_size),
+            screen: Screen::manual(TICK_RATE, history_size),
         }
     }
 
     pub fn auto(model: &AiModel, history_size: usize, turbo: bool) -> anyhow::Result<Self> {
         Ok(Self {
-            screen: Screen::auto(FPS, model, history_size, turbo)?,
+            screen: Screen::auto(TICK_RATE, model, history_size, turbo)?,
         })
     }
 
@@ -34,10 +35,9 @@ impl PlayApp {
 }
 
 impl App for PlayApp {
-    #[expect(clippy::cast_precision_loss)]
     fn init(&mut self, tui: &mut Tui) {
-        tui.set_frame_rate(FPS as f64);
-        tui.set_tick_rate(FPS as f64);
+        tui.set_render_mode(RenderMode::throttled_from_rate(FRAME_RATE));
+        tui.set_tick_rate(TICK_RATE);
     }
 
     fn should_exit(&self) -> bool {

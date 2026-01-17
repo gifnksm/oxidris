@@ -20,7 +20,7 @@ impl Tui {
         Self::default()
     }
 
-    /// Sets the tick frequency (Hz, ticks per second).
+    /// Sets the tick rate (Hz, ticks per second).
     pub fn set_tick_rate(&mut self, rate: f64) {
         self.set_tick_interval(Duration::from_secs_f64(1.0 / rate));
     }
@@ -30,14 +30,9 @@ impl Tui {
         self.events.set_tick_interval(Some(interval));
     }
 
-    /// Sets the render frequency (FPS, frames per second).
-    pub fn set_frame_rate(&mut self, rate: f64) {
-        self.set_render_interval(Duration::from_secs_f64(1.0 / rate));
-    }
-
-    /// Sets the render interval.
-    pub fn set_render_interval(&mut self, interval: Duration) {
-        self.events.set_render_mode(RenderMode::Interval(interval));
+    /// Sets the render mode.
+    pub fn set_render_mode(&mut self, mode: RenderMode) {
+        self.events.set_render_mode(mode);
     }
 
     /// Runs the application.

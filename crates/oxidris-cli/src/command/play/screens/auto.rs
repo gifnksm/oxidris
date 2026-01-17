@@ -106,13 +106,13 @@ pub struct AutoPlayScreen {
 
 impl AutoPlayScreen {
     pub fn new(
-        fps: u64,
+        tick_rate: f64,
         model: &AiModel,
         history_size: usize,
         turbo: bool,
     ) -> anyhow::Result<Self> {
         let rec_session = RecordingSession::new(
-            fps,
+            tick_rate,
             PlayerInfo::Auto {
                 model: model.clone(),
             },

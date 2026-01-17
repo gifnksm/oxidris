@@ -68,7 +68,7 @@
 //! ```
 //! use oxidris_engine::GameSession;
 //!
-//! let mut session = GameSession::new(60); // 60 FPS
+//! let mut session = GameSession::new(60.0); // 60 FPS
 //!
 //! // Move and rotate
 //! session.try_move_left().ok();
