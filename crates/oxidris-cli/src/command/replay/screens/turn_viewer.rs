@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use oxidris_engine::{Block, BlockBoard};
@@ -13,11 +13,13 @@ use ratatui::{
 
 use crate::{
     schema::record::{RecordedSession, TurnRecord},
+    tui::Tui,
     view::widgets::{BoardDisplay, KeyBinding, KeyBindingDisplay},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Action {
+    TogglePlay,
     Prev(usize),
     Next(usize),
     First,
@@ -28,6 +30,7 @@ enum Action {
 impl Action {
     fn from_key_event(event: &KeyEvent) -> Option<Self> {
         match event.code {
+            KeyCode::Char(' ') => Some(Self::TogglePlay),
             KeyCode::Char('k') | KeyCode::Up => Some(Self::Prev(1)),
             KeyCode::Char('j') | KeyCode::Down => Some(Self::Next(1)),
             KeyCode::Char('h') | KeyCode::Left => Some(Self::Prev(10)),
@@ -41,6 +44,7 @@ impl Action {
 
     fn bindings() -> &'static [KeyBinding<'static>] {
         &[
+            (&["Space"], "Play/Pause"),
             (&["k", "↑"], "Prev"),
             (&["j", "↓"], "Next"),
             (&["h", "←"], "Prev 10"),
@@ -57,6 +61,7 @@ pub struct TurnViewerScreen {
     path: PathBuf,
     session: RecordedSession,
     board_index: usize,
+    play: bool,
     should_exit: bool,
 }
 
@@ -66,6 +71,7 @@ impl TurnViewerScreen {
             path,
             session,
             board_index: 0,
+            play: false,
             should_exit: false,
         }
     }
@@ -108,7 +114,7 @@ impl TurnViewerScreen {
 
         let stats = Paragraph::new(vec![
             Line::from(format!(
-                "Board: {:8}/{:8}",
+                "Index: {:8}/{:8}",
                 self.board_index,
                 self.session.boards.len()
             )),
@@ -131,11 +137,16 @@ impl TurnViewerScreen {
         frame.render_widget(help, bottom_area);
     }
 
-    pub fn handle_event(&mut self, event: &Event) {
+    pub fn handle_event(&mut self, tui: &mut Tui, event: &Event) {
         if let Some(event) = event.as_key_event()
             && let Some(action) = Action::from_key_event(&event)
         {
             match action {
+                Action::TogglePlay => {
+                    self.play = !self.play;
+                    let interval = self.play.then(|| Duration::from_millis(100));
+                    tui.set_tick_interval(interval);
+                }
                 Action::Prev(amount) => self.step_backward(amount),
                 Action::Next(amount) => self.step_forward(amount),
                 Action::First => self.jump_to_first(),
@@ -143,6 +154,10 @@ impl TurnViewerScreen {
                 Action::Quit => self.should_exit = true,
             }
         }
+    }
+
+    pub fn update(&mut self) {
+        self.step_forward(1);
     }
 
     fn step_forward(&mut self, amount: usize) {

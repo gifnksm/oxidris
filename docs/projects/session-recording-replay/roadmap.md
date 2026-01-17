@@ -87,7 +87,7 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 **Goal**: Create a standalone replay viewer with basic playback controls.
 
-**Status**: In Progress (play/pause deferred)
+**Status**: Complete
 
 **Dependencies**: Step 3 complete (need recording files to test)
 
@@ -96,13 +96,15 @@ The implementation is divided into 7 steps, each building on the previous one. E
 - [x] Create `replay` subcommand with file loading
 - [x] Implement replay screen displaying board state and metadata
 - [x] Add playback controls: j/k or ↓/↑ (1 turn), h/l or ←/→ (10 turns), g/Home (first), G/End (last), q/Esc (quit)
-- [ ] Add play/pause with Space and auto-advance (~60 FPS) - deferred pending event loop refactoring
+- [x] Add play/pause with Space and auto-advance (~60 FPS)
+  - Note: Auto-advance uses 10 FPS (100ms interval) for comfortable viewing
 - [x] Display board only (no hold/next/score as they're not saved per-turn)
 
 **Validation:**
 
 - [x] Can load and replay recordings
 - [x] All navigation controls work correctly
+- [x] Play/pause with auto-advance works correctly
 - [x] Handles invalid files gracefully (serde error messages)
 
 ---
@@ -178,20 +180,20 @@ The implementation is divided into 7 steps, each building on the previous one. E
 
 ### Current Status
 
-**Overall Progress**: ~50% (Steps 1-3 complete, Step 4 in progress)
+**Overall Progress**: ~57% (Steps 1-4 complete)
 
-**Completed Steps**: Step 1, Step 2, Step 3
+**Completed Steps**: Step 1, Step 2, Step 3, Step 4
 
-**Current Step**: Step 4 (In Progress - play/pause deferred)
+**Current Step**: None (ready for Step 5)
 
-**Next Milestone**: Complete Step 4 play/pause, then Step 5
+**Next Milestone**: Step 5 (In-Game Playback)
 
 ### Step Status
 
 - [x] **Step 1**: Data Structures and Memory Management
 - [x] **Step 2**: Manual Play Recording
 - [x] **Step 3**: Auto-Play Recording
-- [ ] **Step 4**: Replay Command (Basic Playback) - in progress, play/pause deferred
+- [x] **Step 4**: Replay Command (Basic Playback)
 - [ ] **Step 5**: In-Game Playback (History Browsing)
 - [ ] **Step 6**: Advanced Features (Feature Visualization)
 - [ ] **Step 7**: Documentation and Polish

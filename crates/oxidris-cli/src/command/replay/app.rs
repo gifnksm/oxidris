@@ -29,13 +29,15 @@ impl App for ReplayApp {
         self.screen.should_exit()
     }
 
-    fn handle_event(&mut self, _tui: &mut Tui, event: Event) {
-        self.screen.handle_event(&event);
+    fn handle_event(&mut self, tui: &mut Tui, event: Event) {
+        self.screen.handle_event(tui, &event);
     }
 
     fn draw(&self, frame: &mut Frame) {
         self.screen.draw(frame);
     }
 
-    fn update(&mut self, _tui: &mut Tui) {}
+    fn update(&mut self, _tui: &mut Tui) {
+        self.screen.update();
+    }
 }

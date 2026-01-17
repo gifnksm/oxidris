@@ -22,12 +22,12 @@ impl Tui {
 
     /// Sets the tick rate (Hz, ticks per second).
     pub fn set_tick_rate(&mut self, rate: f64) {
-        self.set_tick_interval(Duration::from_secs_f64(1.0 / rate));
+        self.set_tick_interval(Some(Duration::from_secs_f64(1.0 / rate)));
     }
 
     /// Sets the tick interval.
-    pub fn set_tick_interval(&mut self, interval: Duration) {
-        self.events.set_tick_interval(Some(interval));
+    pub fn set_tick_interval(&mut self, interval: Option<Duration>) {
+        self.events.set_tick_interval(interval);
     }
 
     /// Sets the render mode.

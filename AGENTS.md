@@ -108,9 +108,8 @@ See [Design Principles in README](README.md#design-principles) for the project p
    - **Scope:** Survival features (holes, height) only. Other improvements are separate future projects.
    - See `docs/projects/km-feature-transform/` for details.
 
-2. **Session Recording & Replay (Step 4)**
-   - ✅ Step 1-3: Data structures, manual/auto play recording (completed)
-   - 🔄 Step 4: Replay command (in progress - navigation done, play/pause deferred)
+2. **Session Recording & Replay (Step 5)**
+   - ✅ Step 1-4: Data structures, recording, and replay command (completed)
    - 📋 Step 5: In-game history browsing (next)
    - **Scope:** Recording, saving, and replaying gameplay sessions with metadata.
    - See `docs/projects/session-recording-replay/` for details.
