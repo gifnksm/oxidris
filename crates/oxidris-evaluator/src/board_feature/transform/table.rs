@@ -23,9 +23,9 @@
 //!
 //! // Suppose holes=0..5 have median survivals [100.0, 80.0, 60.0, 40.0, 20.0]
 //! let param = TableTransformParam::new(
-//!     0,     // feature_min_value (holes start at 0)
-//!     20.0,  // normalize_min (worst survival)
-//!     100.0, // normalize_max (best survival)
+//!     0,                                   // feature_min_value (holes start at 0)
+//!     20.0,                                // normalize_min (worst survival)
+//!     100.0,                               // normalize_max (best survival)
 //!     vec![100.0, 80.0, 60.0, 40.0, 20.0], // median survival for each hole count
 //! );
 //!
@@ -115,8 +115,8 @@ pub struct TableTransform<S> {
 ///
 /// // Map holes 0-4 to survival times [100, 75, 50, 25, 10]
 /// let param = TableTransformParam::new(
-///     0,    // min value (0 holes)
-///     10.0, // normalize min (worst survival)
+///     0,     // min value (0 holes)
+///     10.0,  // normalize min (worst survival)
 ///     100.0, // normalize max (best survival)
 ///     vec![100.0, 75.0, 50.0, 25.0, 10.0],
 /// );

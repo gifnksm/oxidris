@@ -20,9 +20,9 @@
 //! use oxidris_stats::binning::create_adaptive_bins;
 //!
 //! // Skewed distribution: many low values, few high values
-//! let mut values = vec![0; 40];      // 40 zeros
-//! values.extend(vec![1; 30]);        // 30 ones
-//! values.extend(vec![2; 20]);        // 20 twos
+//! let mut values = vec![0; 40]; // 40 zeros
+//! values.extend(vec![1; 30]); // 30 ones
+//! values.extend(vec![2; 20]); // 20 twos
 //! values.extend(vec![100, 101, 102, 103, 104]); // 5 high values
 //!
 //! // Create bins with 30% per bin (95 total samples, target ~28.5, min 30 applies)
@@ -33,7 +33,10 @@
 //! assert_eq!(bin_mapping[&1].representative, 1);
 //!
 //! // High values are grouped together (only 5 samples total)
-//! assert_eq!(bin_mapping[&100].representative, bin_mapping[&104].representative);
+//! assert_eq!(
+//!     bin_mapping[&100].representative,
+//!     bin_mapping[&104].representative
+//! );
 //! ```
 
 use std::collections::BTreeMap;
@@ -122,7 +125,7 @@ impl<K> BinInfo<K> {
 /// use oxidris_stats::binning::create_adaptive_bins;
 ///
 /// // Many samples at value 0, few at others
-/// let mut values = vec![0; 50];  // 50 zeros
+/// let mut values = vec![0; 50]; // 50 zeros
 /// values.extend(vec![1, 2, 3, 4, 5, 100, 101, 102, 103, 104]);
 ///
 /// let bins = create_adaptive_bins(&values, 0.10);

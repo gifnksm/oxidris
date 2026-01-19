@@ -356,14 +356,16 @@ impl<K> SurvivalStatsMap<K> {
     ///         let analysis = PlacementAnalysis::from_board(&board.before_placement, board.placement);
     ///         source.extract_raw(&analysis)
     ///     },
-    ///     0.03 // 3% per bin
+    ///     0.03, // 3% per bin
     /// );
     ///
     /// // Each bin contains ~3% of samples, preserving low-value distinctions
     /// for (bin_value, stats) in &stats.map {
     ///     if let Some(km_median) = stats.median_km {
-    ///         println!("Bin {}: {} samples, KM median = {:.1}",
-    ///                  bin_value, stats.boards_count, km_median);
+    ///         println!(
+    ///             "Bin {}: {} samples, KM median = {:.1}",
+    ///             bin_value, stats.boards_count, km_median
+    ///         );
     ///     }
     /// }
     /// ```
