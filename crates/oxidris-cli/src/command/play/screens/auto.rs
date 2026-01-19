@@ -15,6 +15,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Layout},
 };
+use ratatui_runtime::{RenderMode, Runtime, Screen, ScreenTransition};
 
 use crate::{
     DEFAULT_FRAME_RATE,
@@ -24,7 +25,6 @@ use crate::{
         ai_model::AiModel,
         record::{PlayerInfo, RecordedSession},
     },
-    tui::{RenderMode, Screen, ScreenTransition, Tui},
     view::{
         screens::ReplayScreen,
         widgets::{KeyBinding, KeyBindingDisplay, SessionDisplay},
@@ -156,21 +156,21 @@ impl<'a> AutoPlayScreen<'a> {
 }
 
 impl Screen for AutoPlayScreen<'_> {
-    fn on_active(&mut self, tui: &mut Tui) {
-        tui.set_render_mode(RenderMode::throttled_from_rate(DEFAULT_FRAME_RATE));
-        self.update_tick_interval(tui);
+    fn on_active(&mut self, runtime: &mut Runtime) {
+        runtime.set_render_mode(RenderMode::throttled_from_rate(DEFAULT_FRAME_RATE));
+        self.update_tick_interval(runtime);
     }
 
-    fn on_inactive(&mut self, _tui: &mut Tui) {}
+    fn on_inactive(&mut self, _tui: &mut Runtime) {}
 
-    fn on_close(&mut self, _tui: &mut Tui) {
+    fn on_close(&mut self, _tui: &mut Runtime) {
         self.tx_request
             .send(Request::SessionHistoryAndExit)
             .unwrap();
         *self.session_history = Some(self.rx_history.recv().unwrap());
     }
 
-    fn handle_event(&mut self, tui: &mut Tui, event: &Event) -> ScreenTransition {
+    fn handle_event(&mut self, runtime: &mut Runtime, event: &Event) -> ScreenTransition {
         if let Some(event) = event.as_key_event() {
             match self.session.session_state() {
                 SessionState::Playing => {
@@ -211,11 +211,11 @@ impl Screen for AutoPlayScreen<'_> {
                 }
             }
         }
-        self.update_tick_interval(tui);
+        self.update_tick_interval(runtime);
         ScreenTransition::Stay
     }
 
-    fn update(&mut self, tui: &mut Tui) {
+    fn update(&mut self, runtime: &mut Runtime) {
         assert!(self.is_playing());
         let req = {
             if self.turbo {
@@ -226,7 +226,7 @@ impl Screen for AutoPlayScreen<'_> {
         };
         self.tx_request.send(req).unwrap();
         self.session = self.rx_session.recv().unwrap();
-        self.update_tick_interval(tui);
+        self.update_tick_interval(runtime);
     }
 
     fn draw(&self, frame: &mut Frame) {
@@ -251,8 +251,8 @@ impl AutoPlayScreen<'_> {
         self.session.session_state().is_playing()
     }
 
-    fn update_tick_interval(&mut self, tui: &mut Tui) {
-        tui.set_tick_rate(self.is_playing().then_some(TICK_RATE));
+    fn update_tick_interval(&mut self, runtime: &mut Runtime) {
+        runtime.set_tick_rate(self.is_playing().then_some(TICK_RATE));
     }
 
     fn request_toggle_pause(&mut self) {

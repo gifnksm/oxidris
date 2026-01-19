@@ -880,6 +880,7 @@ dependencies = [
  "oxidris-training",
  "rand 0.9.2",
  "ratatui",
+ "ratatui-runtime",
  "serde",
  "serde_json",
 ]
@@ -1200,6 +1201,15 @@ checksum = "a7f1342a13e83e4bb9d0b793d0ea762be633f9582048c892ae9041ef39c936f4"
 dependencies = [
  "ratatui-core",
  "ratatui-widgets",
+]
+
+[[package]]
+name = "ratatui-runtime"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "derive_more",
+ "ratatui",
 ]
 
 [[package]]

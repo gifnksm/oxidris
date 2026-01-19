@@ -1,8 +1,11 @@
-use std::time::{Duration, Instant};
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
 use crossterm::event;
 
-use crate::tui::event::TuiEvent;
+use crate::event::TuiEvent;
 
 /// Rendering trigger mode.
 #[derive(Debug, Clone, Copy, Default)]
@@ -20,12 +23,13 @@ pub enum RenderMode {
 
 impl RenderMode {
     /// Creates `Interval` mode from frame rate (FPS).
-    #[expect(dead_code)]
+    #[must_use]
     pub fn interval_from_rate(rate: f64) -> Self {
         Self::Interval(Duration::from_secs_f64(1.0 / rate))
     }
 
     /// Creates `Throttled` mode from frame rate (FPS).
+    #[must_use]
     pub fn throttled_from_rate(rate: f64) -> Self {
         Self::Throttled(Duration::from_secs_f64(1.0 / rate))
     }
@@ -82,7 +86,7 @@ impl EventLoop {
     ///
     /// Blocks until a tick/render time is reached or a crossterm event occurs.
     /// If both tick and render are unset, only waits for crossterm events.
-    pub(super) fn next(&mut self) -> anyhow::Result<TuiEvent> {
+    pub(super) fn next(&mut self) -> io::Result<TuiEvent> {
         loop {
             let now = Instant::now();
             if let Some(tick_interval) = self.tick_interval

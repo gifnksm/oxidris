@@ -1,11 +1,8 @@
 use std::path::PathBuf;
 
-use crate::{
-    schema::record::RecordedSession,
-    tui::{ScreenStack, Tui},
-    util,
-    view::screens::ReplayScreen,
-};
+use ratatui_runtime::{Runtime, ScreenStack};
+
+use crate::{schema::record::RecordedSession, util, view::screens::ReplayScreen};
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct ReplayArg {
@@ -25,7 +22,7 @@ pub fn run(arg: &ReplayArg) -> anyhow::Result<()> {
         recording_file.clone(),
         session,
     )));
-    Tui::new().run(&mut app)?;
+    Runtime::new().run(&mut app)?;
 
     Ok(())
 }

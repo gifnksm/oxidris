@@ -10,11 +10,11 @@ use ratatui::{
     text::{Line, Text},
     widgets::{Block as BlockWidget, Padding, Paragraph},
 };
+use ratatui_runtime::{RenderMode, Runtime, Screen, ScreenTransition};
 
 use crate::{
     DEFAULT_FRAME_RATE,
     schema::record::{RecordedSession, TurnRecord},
-    tui::{RenderMode, Screen, ScreenTransition, Tui},
     view::widgets::{BoardDisplay, KeyBinding, KeyBindingDisplay},
 };
 
@@ -91,23 +91,23 @@ impl ReplayScreen {
 }
 
 impl Screen for ReplayScreen {
-    fn on_active(&mut self, tui: &mut Tui) {
-        tui.set_render_mode(RenderMode::throttled_from_rate(DEFAULT_FRAME_RATE));
-        self.update_tick_interval(tui);
+    fn on_active(&mut self, runtime: &mut Runtime) {
+        runtime.set_render_mode(RenderMode::throttled_from_rate(DEFAULT_FRAME_RATE));
+        self.update_tick_interval(runtime);
     }
 
-    fn on_inactive(&mut self, _tui: &mut Tui) {}
+    fn on_inactive(&mut self, _tui: &mut Runtime) {}
 
-    fn on_close(&mut self, _tui: &mut Tui) {}
+    fn on_close(&mut self, _runtime: &mut Runtime) {}
 
-    fn handle_event(&mut self, tui: &mut Tui, event: &Event) -> ScreenTransition {
+    fn handle_event(&mut self, runtime: &mut Runtime, event: &Event) -> ScreenTransition {
         if let Some(event) = event.as_key_event()
             && let Some(action) = Action::from_key_event(&event)
         {
             match action {
                 Action::TogglePlay => {
                     self.play = !self.play;
-                    self.update_tick_interval(tui);
+                    self.update_tick_interval(runtime);
                 }
                 Action::Prev(amount) => self.step_backward(amount),
                 Action::Next(amount) => self.step_forward(amount),
@@ -119,7 +119,7 @@ impl Screen for ReplayScreen {
         ScreenTransition::Stay
     }
 
-    fn update(&mut self, _tui: &mut Tui) {
+    fn update(&mut self, _tui: &mut Runtime) {
         assert!(self.play);
         self.step_forward(1);
     }
@@ -187,9 +187,9 @@ impl Screen for ReplayScreen {
 }
 
 impl ReplayScreen {
-    fn update_tick_interval(&mut self, tui: &mut Tui) {
+    fn update_tick_interval(&mut self, runtime: &mut Runtime) {
         let interval = self.play.then(|| Duration::from_millis(100));
-        tui.set_tick_interval(interval);
+        runtime.set_tick_interval(interval);
     }
 
     fn step_forward(&mut self, amount: usize) {

@@ -3,7 +3,7 @@ use std::fmt;
 use crossterm::event::Event;
 use ratatui::Frame;
 
-use crate::tui::{App, Tui};
+use crate::{App, Runtime};
 
 /// Individual screen in the application.
 ///
@@ -34,17 +34,33 @@ use crate::tui::{App, Tui};
 /// Drop
 /// ```
 ///
-/// # Tui Configuration
+/// # Runtime Configuration
 ///
-/// Screens should configure [`Tui`] settings (tick interval, render mode) in [`on_active`].
+/// Screens should configure [`Runtime`] settings (tick interval, render mode) in [`on_active`].
 /// This ensures the correct settings are applied when the screen becomes active.
 ///
 /// ```rust
+/// use crossterm::event::Event;
+/// use ratatui::Frame;
+/// use ratatui_runtime::{RenderMode, Runtime, Screen, ScreenTransition};
+///
+/// #[derive(Debug)]
+/// struct MyScreen {}
+///
 /// impl Screen for MyScreen {
-///     fn on_active(&mut self, tui: &mut Tui) {
-///         tui.set_tick_rate(60.0);
-///         tui.set_render_mode(RenderMode::throttled_from_rate(60.0));
+///     fn on_active(&mut self, runtime: &mut Runtime) {
+///         runtime.set_tick_rate(Some(60.0));
+///         runtime.set_render_mode(RenderMode::throttled_from_rate(60.0));
 ///     }
+///
+///     fn on_inactive(&mut self, _runtime: &mut Runtime) {}
+///     fn on_close(&mut self, _runtime: &mut Runtime) {}
+///
+///     fn handle_event(&mut self, runtime: &mut Runtime, event: &Event) -> ScreenTransition {
+///         ScreenTransition::Stay
+///     }
+///     fn update(&mut self, _runtime: &mut Runtime) {}
+///     fn draw(&self, frame: &mut Frame) {}
 /// }
 /// ```
 ///
@@ -64,8 +80,8 @@ pub trait Screen: fmt::Debug {
     /// - When this screen is pushed and becomes active
     /// - When popping back to this screen (returning from a child screen)
     ///
-    /// Use this to configure [`Tui`] settings for this screen.
-    fn on_active(&mut self, tui: &mut Tui);
+    /// Use this to configure [`Runtime`] settings for this screen.
+    fn on_active(&mut self, runtime: &mut Runtime);
 
     /// Called when this screen becomes inactive (background).
     ///
@@ -80,7 +96,7 @@ pub trait Screen: fmt::Debug {
     ///
     /// [`on_close`]: Self::on_close
     /// [`on_inactive`]: Self::on_inactive
-    fn on_inactive(&mut self, tui: &mut Tui);
+    fn on_inactive(&mut self, runtime: &mut Runtime);
 
     /// Called when this screen is being closed and removed from the stack.
     ///
@@ -98,13 +114,13 @@ pub trait Screen: fmt::Debug {
     /// such as saving state or releasing resources.
     ///
     /// [`on_inactive`]: Self::on_inactive
-    fn on_close(&mut self, tui: &mut Tui);
+    fn on_close(&mut self, runtime: &mut Runtime);
 
     /// Handles terminal events and returns transition.
-    fn handle_event(&mut self, tui: &mut Tui, event: &Event) -> ScreenTransition;
+    fn handle_event(&mut self, runtime: &mut Runtime, event: &Event) -> ScreenTransition;
 
     /// Updates screen state (called on each tick).
-    fn update(&mut self, tui: &mut Tui);
+    fn update(&mut self, runtime: &mut Runtime);
 
     /// Renders the screen.
     fn draw(&self, frame: &mut Frame);
@@ -132,11 +148,9 @@ pub enum ScreenTransition {
     ///
     /// Current screen's `on_inactive` and `on_close` are called,
     /// then new screen's `on_active` is called.
-    #[allow(dead_code)] // using expect here causes unfulfilled_lint_expectations warning
     Replace(Box<dyn Screen>),
 
     /// Exit the application.
-    #[allow(dead_code)] // using expect here causes unfulfilled_lint_expectations warning
     Exit,
 }
 
@@ -149,6 +163,7 @@ pub struct ScreenStack<'a> {
 
 impl<'a> ScreenStack<'a> {
     /// Creates a new screen stack with an initial screen.
+    #[must_use]
     pub fn new(initial: Box<dyn Screen + 'a>) -> Self {
         Self {
             screens: vec![initial],
@@ -157,42 +172,42 @@ impl<'a> ScreenStack<'a> {
     }
 
     /// Applies a screen transition.
-    fn apply_transition(&mut self, tui: &mut Tui, transition: ScreenTransition) {
+    fn apply_transition(&mut self, runtime: &mut Runtime, transition: ScreenTransition) {
         match transition {
             ScreenTransition::Stay => {}
 
             ScreenTransition::Push(mut new_screen) => {
                 if let Some(current) = self.screens.last_mut() {
-                    current.on_inactive(tui);
+                    current.on_inactive(runtime);
                 }
-                new_screen.on_active(tui);
+                new_screen.on_active(runtime);
                 self.screens.push(new_screen);
             }
 
             ScreenTransition::Pop => {
                 if let Some(mut old_screen) = self.screens.pop() {
-                    old_screen.on_inactive(tui);
-                    old_screen.on_close(tui);
+                    old_screen.on_inactive(runtime);
+                    old_screen.on_close(runtime);
                 }
                 if let Some(prev_screen) = self.screens.last_mut() {
-                    prev_screen.on_active(tui);
+                    prev_screen.on_active(runtime);
                 }
             }
 
             ScreenTransition::Replace(mut new_screen) => {
                 if let Some(mut old_screen) = self.screens.pop() {
-                    old_screen.on_inactive(tui);
-                    old_screen.on_close(tui);
+                    old_screen.on_inactive(runtime);
+                    old_screen.on_close(runtime);
                 }
-                new_screen.on_active(tui);
+                new_screen.on_active(runtime);
                 self.screens.push(new_screen);
             }
 
             ScreenTransition::Exit => {
                 // Clean up all screens
                 while let Some(mut screen) = self.screens.pop() {
-                    screen.on_inactive(tui);
-                    screen.on_close(tui);
+                    screen.on_inactive(runtime);
+                    screen.on_close(runtime);
                 }
                 self.should_exit = true;
             }
@@ -201,9 +216,9 @@ impl<'a> ScreenStack<'a> {
 }
 
 impl App for ScreenStack<'_> {
-    fn init(&mut self, tui: &mut Tui) {
+    fn init(&mut self, runtime: &mut Runtime) {
         if let Some(screen) = self.screens.last_mut() {
-            screen.on_active(tui);
+            screen.on_active(runtime);
         }
     }
 
@@ -211,10 +226,10 @@ impl App for ScreenStack<'_> {
         self.should_exit || self.screens.is_empty()
     }
 
-    fn handle_event(&mut self, tui: &mut Tui, event: Event) {
+    fn handle_event(&mut self, runtime: &mut Runtime, event: Event) {
         if let Some(current) = self.screens.last_mut() {
-            let transition = current.handle_event(tui, &event);
-            self.apply_transition(tui, transition);
+            let transition = current.handle_event(runtime, &event);
+            self.apply_transition(runtime, transition);
         }
     }
 
@@ -224,9 +239,9 @@ impl App for ScreenStack<'_> {
         }
     }
 
-    fn update(&mut self, tui: &mut Tui) {
+    fn update(&mut self, runtime: &mut Runtime) {
         if let Some(current) = self.screens.last_mut() {
-            current.update(tui);
+            current.update(runtime);
         }
     }
 }
@@ -290,24 +305,24 @@ mod tests {
     }
 
     impl Screen for TestScreen {
-        fn on_active(&mut self, _tui: &mut Tui) {
+        fn on_active(&mut self, _tui: &mut Runtime) {
             self.log.log(format!("{}: on_active", self.name));
         }
 
-        fn on_inactive(&mut self, _tui: &mut Tui) {
+        fn on_inactive(&mut self, _tui: &mut Runtime) {
             self.log.log(format!("{}: on_inactive", self.name));
         }
 
-        fn on_close(&mut self, _tui: &mut Tui) {
+        fn on_close(&mut self, _tui: &mut Runtime) {
             self.log.log(format!("{}: on_close", self.name));
         }
 
-        fn handle_event(&mut self, _tui: &mut Tui, _event: &Event) -> ScreenTransition {
+        fn handle_event(&mut self, _tui: &mut Runtime, _event: &Event) -> ScreenTransition {
             self.log.log(format!("{}: handle_event", self.name));
             std::mem::replace(&mut self.transition, ScreenTransition::Stay)
         }
 
-        fn update(&mut self, _tui: &mut Tui) {
+        fn update(&mut self, _tui: &mut Runtime) {
             self.log.log(format!("{}: update", self.name));
         }
 
@@ -325,7 +340,7 @@ mod tests {
         let log = LifecycleLog::new();
         let screen = TestScreen::new("A", log.clone());
         let mut stack = ScreenStack::new(Box::new(screen));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
 
@@ -339,7 +354,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         log.clear();
@@ -363,7 +378,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone()).with_transition(ScreenTransition::Pop);
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         stack.apply_transition(&mut tui, ScreenTransition::Push(Box::new(screen_b)));
@@ -390,7 +405,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         log.clear();
@@ -415,7 +430,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         stack.apply_transition(&mut tui, ScreenTransition::Push(Box::new(screen_b)));
@@ -442,7 +457,7 @@ mod tests {
         let screen = TestScreen::new("A", log.clone()).with_transition(ScreenTransition::Pop);
 
         let mut stack = ScreenStack::new(Box::new(screen));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         assert!(!stack.should_exit());
@@ -460,7 +475,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         stack.apply_transition(&mut tui, ScreenTransition::Push(Box::new(screen_b)));
@@ -479,7 +494,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         stack.apply_transition(&mut tui, ScreenTransition::Push(Box::new(screen_b)));
@@ -499,7 +514,7 @@ mod tests {
         let screen_c = TestScreen::new("C", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         log.clear();
@@ -544,7 +559,7 @@ mod tests {
         let screen = TestScreen::new("A", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         log.clear();
@@ -562,7 +577,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         log.clear();
@@ -587,7 +602,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         stack.apply_transition(&mut tui, ScreenTransition::Push(Box::new(screen_b)));
@@ -614,7 +629,7 @@ mod tests {
         let screen_b = TestScreen::new("B", log.clone());
 
         let mut stack = ScreenStack::new(Box::new(screen_a));
-        let mut tui = Tui::new();
+        let mut tui = Runtime::new();
 
         stack.init(&mut tui);
         log.clear();

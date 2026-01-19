@@ -29,10 +29,10 @@ use std::path::PathBuf;
 use oxidris_analysis::{
     index::BoardIndex, sample::BoardSample, statistics::BoardFeatureStatistics,
 };
+use ratatui_runtime::Runtime;
 
 use crate::{
     command::analyze_board_features::app::AnalyzeBoardApp,
-    tui::Tui,
     util::{self, FeatureSet},
 };
 
@@ -97,7 +97,7 @@ pub fn run(arg: &AnalyzeBoardFeaturesArg) -> anyhow::Result<()> {
     eprintln!("Board index built");
 
     let mut app = AnalyzeBoardApp::new(features, board_samples, statistics, board_index);
-    Tui::new().run(&mut app)?;
+    Runtime::new().run(&mut app)?;
 
     Ok(())
 }

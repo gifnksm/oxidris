@@ -4,11 +4,9 @@ use oxidris_analysis::{
 };
 use oxidris_evaluator::board_feature::BoxedBoardFeature;
 use ratatui::Frame;
+use ratatui_runtime::{App, Runtime};
 
-use crate::{
-    command::analyze_board_features::screens::Screen,
-    tui::{App, Tui},
-};
+use crate::command::analyze_board_features::screens::Screen;
 
 #[derive(Debug)]
 pub struct AnalyzeBoardApp {
@@ -42,13 +40,13 @@ impl AnalyzeBoardApp {
 }
 
 impl App for AnalyzeBoardApp {
-    fn init(&mut self, _tui: &mut Tui) {}
+    fn init(&mut self, _tui: &mut Runtime) {}
 
     fn should_exit(&self) -> bool {
         self.screen.should_exit()
     }
 
-    fn handle_event(&mut self, _tui: &mut Tui, event: Event) {
+    fn handle_event(&mut self, _tui: &mut Runtime, event: Event) {
         self.screen.handle_event(&event);
     }
 
@@ -56,5 +54,5 @@ impl App for AnalyzeBoardApp {
         self.screen.draw(frame);
     }
 
-    fn update(&mut self, _tui: &mut Tui) {}
+    fn update(&mut self, _tui: &mut Runtime) {}
 }

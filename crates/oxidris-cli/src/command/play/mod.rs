@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
+use ratatui_runtime::{Runtime, ScreenStack};
+
 use crate::{
     command::play::screens::{AutoPlayScreen, ManualPlayScreen},
-    tui::{ScreenStack, Tui},
     util,
 };
 
@@ -57,7 +58,7 @@ pub(crate) fn run_manual(arg: &ManualPlayArg) -> anyhow::Result<()> {
         *max_replay_turns,
         &mut session_history,
     )));
-    Tui::new().run(&mut app)?;
+    Runtime::new().run(&mut app)?;
     drop(app);
 
     if *save_recording {
@@ -89,7 +90,7 @@ pub(crate) fn run_auto(arg: &AutoPlayArg) -> anyhow::Result<()> {
         *turbo,
         &mut session_history,
     )?));
-    Tui::new().run(&mut app)?;
+    Runtime::new().run(&mut app)?;
     drop(app);
 
     if *save_recording {

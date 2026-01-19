@@ -1,12 +1,12 @@
-mod app;
-mod event;
-mod event_loop;
-mod runner;
-mod screen;
-
 pub use self::{
     app::App,
     event_loop::RenderMode,
-    runner::Tui,
+    runtime::Runtime,
     screen::{Screen, ScreenStack, ScreenTransition},
 };
+
+mod app;
+mod event;
+mod event_loop;
+mod runtime;
+mod screen;

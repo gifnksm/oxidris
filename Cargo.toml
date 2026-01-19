@@ -23,6 +23,7 @@ oxidris-engine = { path = "crates/oxidris-engine" }
 oxidris-evaluator = { path = "crates/oxidris-evaluator" }
 oxidris-training = { path = "crates/oxidris-training" }
 oxidris-stats = { path = "crates/oxidris-stats" }
+ratatui-runtime = { path = "crates/ratatui-runtime" }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }

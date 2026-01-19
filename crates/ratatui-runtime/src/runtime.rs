@@ -1,6 +1,6 @@
-use std::time::Duration;
+use std::{io, time::Duration};
 
-use crate::tui::{
+use crate::{
     App,
     event::TuiEvent,
     event_loop::{EventLoop, RenderMode},
@@ -10,12 +10,13 @@ use crate::tui::{
 ///
 /// Manages the event loop and executes applications that implement the `App` trait.
 #[derive(Default, Debug)]
-pub struct Tui {
+pub struct Runtime {
     events: EventLoop,
 }
 
-impl Tui {
-    /// Creates a new Tui.
+impl Runtime {
+    /// Creates a new Runtime.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -42,7 +43,7 @@ impl Tui {
     ///    - `Event::Tick`: calls `app.update()`
     ///    - `Event::Render`: calls `app.draw()`
     ///    - `Event::Crossterm`: calls `app.handle_event()`
-    pub fn run<A>(mut self, app: &mut A) -> anyhow::Result<()>
+    pub fn run<A>(mut self, app: &mut A) -> io::Result<()>
     where
         A: App,
     {

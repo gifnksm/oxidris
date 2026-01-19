@@ -1,0 +1,12 @@
+[package]
+name = "ratatui-runtime"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossterm.workspace = true
+derive_more = { workspace = true, features = ["from", "is_variant"] }
+ratatui.workspace = true
+
+[lints]
+workspace = true
