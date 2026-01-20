@@ -111,14 +111,13 @@
 
 use std::thread;
 
-use oxidris_stats::descriptive::DescriptiveStats;
-use rand::{Rng, seq::IndexedRandom};
-
 use oxidris_engine::GameField;
 use oxidris_evaluator::{
     board_feature::BoxedBoardFeature, placement_evaluator::FeatureBasedPlacementEvaluator,
     session_evaluator::SessionEvaluator, turn_evaluator::TurnEvaluator,
 };
+use oxidris_stats::descriptive::DescriptiveStats;
+use rand::{Rng, seq::IndexedRandom};
 
 use crate::weights;
 

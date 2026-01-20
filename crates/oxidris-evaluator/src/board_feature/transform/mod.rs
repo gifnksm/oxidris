@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::board_feature::{BoardFeatureSource, BoxedBoardFeature, FeatureSignal};
-
 pub use self::{raw::*, specialized::*, table::*};
+use crate::board_feature::{BoardFeatureSource, BoxedBoardFeature, FeatureSignal};
 
 mod raw;
 mod specialized;

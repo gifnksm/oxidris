@@ -2,12 +2,11 @@ use std::{fmt::Write, ops::Range};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::core::piece::Piece;
-
 use super::{
     PLAYABLE_HEIGHT, PLAYABLE_WIDTH, SENTINEL_MARGIN_LEFT, SENTINEL_MARGIN_TOP, TOTAL_HEIGHT,
     TOTAL_WIDTH,
 };
+use crate::core::piece::Piece;
 
 pub(super) const PIECE_SPAWN_X: usize = 5;
 pub(super) const PIECE_SPAWN_Y: usize = 0;

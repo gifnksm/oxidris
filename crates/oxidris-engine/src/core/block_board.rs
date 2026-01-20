@@ -1,7 +1,7 @@
-use super::piece::{Piece, PieceKind};
 use super::{
     PLAYABLE_HEIGHT, PLAYABLE_WIDTH, SENTINEL_MARGIN_BOTTOM, SENTINEL_MARGIN_LEFT,
     SENTINEL_MARGIN_RIGHT, SENTINEL_MARGIN_TOP, TOTAL_HEIGHT, TOTAL_WIDTH,
+    piece::{Piece, PieceKind},
 };
 
 /// A single cell in the block board representation.

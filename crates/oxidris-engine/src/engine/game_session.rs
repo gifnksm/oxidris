@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use rand::Rng as _;
 
+use super::{GameStats, game_field::GameField};
 use crate::{
     HoldError, PieceCollisionError, PieceSeed,
     core::{
@@ -9,8 +10,6 @@ use crate::{
         piece::{Piece, PieceKind},
     },
 };
-
-use super::{GameStats, game_field::GameField};
 
 /// Current state of a game session.
 ///

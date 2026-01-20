@@ -9,9 +9,8 @@ use anyhow::Context;
 use oxidris_analysis::survival::SurvivalStatsMap;
 use oxidris_evaluator::board_feature::BoxedBoardFeatureSource;
 
-use crate::command::analyze_censoring::table::SurvivalTableRow;
-
 use super::table;
+use crate::command::analyze_censoring::table::SurvivalTableRow;
 
 /// Display feature statistics with representative percentile values
 ///

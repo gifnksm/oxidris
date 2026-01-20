@@ -248,8 +248,7 @@ impl App for ScreenStack<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::{cell::RefCell, rc::Rc};
 
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

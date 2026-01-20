@@ -2,11 +2,12 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::board_feature::{
-    BoardFeature, BoardFeatureSource, BoxedBoardFeature, FeatureProcessing, FeatureSignal,
+use crate::{
+    board_feature::{
+        BoardFeature, BoardFeatureSource, BoxedBoardFeature, FeatureProcessing, FeatureSignal,
+    },
+    placement_analysis::PlacementAnalysis,
 };
-
-use crate::placement_analysis::PlacementAnalysis;
 
 /// Linear normalized feature with percentile-based normalization.
 ///
@@ -51,12 +52,13 @@ use crate::placement_analysis::PlacementAnalysis;
 /// # Example
 ///
 /// ```rust,no_run
+/// use std::borrow::Cow;
+///
 /// use oxidris_evaluator::board_feature::{
 ///     FeatureSignal,
 ///     source::NumHoles,
 ///     transform::{RawTransform, RawTransformParam},
 /// };
-/// use std::borrow::Cow;
 ///
 /// // Create a penalty feature for holes with P05-P95 normalization
 /// let param = RawTransformParam::new(

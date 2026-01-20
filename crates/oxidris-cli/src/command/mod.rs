@@ -1,13 +1,12 @@
 use clap::{Parser, Subcommand};
 
-use crate::command::{
-    play::{AutoPlayArg, ManualPlayArg},
-    replay::ReplayArg,
-};
-
 use self::{
     analyze_board_features::AnalyzeBoardFeaturesArg, analyze_censoring::AnalyzeCensoringArg,
     generate_boards::GenerateBoardsArg, train_ai::TrainAiArg,
+};
+use crate::command::{
+    play::{AutoPlayArg, ManualPlayArg},
+    replay::ReplayArg,
 };
 
 mod analyze_board_features;

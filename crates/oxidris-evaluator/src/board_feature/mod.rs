@@ -57,9 +57,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{board_feature::transform::FeatureProcessing, placement_analysis::PlacementAnalysis};
-
 pub use self::source::{BoardFeatureSource, BoxedBoardFeatureSource};
+use crate::{board_feature::transform::FeatureProcessing, placement_analysis::PlacementAnalysis};
 
 pub mod source;
 pub mod transform;

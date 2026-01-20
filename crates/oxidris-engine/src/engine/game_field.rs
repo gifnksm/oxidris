@@ -1,5 +1,6 @@
 use rand::Rng as _;
 
+use super::piece_buffer::PieceBuffer;
 use crate::{
     CompletePieceDropError, PieceCollisionError, PieceSeed,
     core::{
@@ -7,8 +8,6 @@ use crate::{
         piece::{Piece, PieceKind},
     },
 };
-
-use super::piece_buffer::PieceBuffer;
 
 /// Single-turn game state for Tetris.
 ///
