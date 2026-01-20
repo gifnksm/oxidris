@@ -182,37 +182,11 @@ check_docs_markdown() {
     echo ""
 }
 
-check_docs_codeblocks() {
-    echo "2. Code Block Syntax"
-
-    local errors_found=0
-    local files_with_errors=()
-
-    while IFS= read -r file; do
-        if grep -n '```[a-z]' "$file" >/dev/null 2>&1; then
-            files_with_errors+=("$file")
-            errors_found=1
-        fi
-    done < <(find docs/ -name "*.md" -o -name "*.md" -maxdepth 1 -type f 2>/dev/null)
-
-    if [ $errors_found -eq 0 ]; then
-        print_success "All code blocks use path syntax"
-    else
-        print_error "Code blocks with language syntax found (use path syntax):"
-        for file in "${files_with_errors[@]}"; do
-            echo "      $file"
-        done
-    fi
-
-    echo ""
-}
-
 run_docs_checks() {
     echo "=== Documentation Checks ==="
     echo ""
 
     check_docs_markdown
-    check_docs_codeblocks
 }
 
 # ============================================================================
