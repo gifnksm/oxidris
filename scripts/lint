@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unified Linter
+# Unified Linter - Declarative Configuration
 # Checks and optionally auto-fixes code and documentation issues
 #
 # Usage:
@@ -9,11 +9,126 @@
 #   ./scripts/lint docs --fix     # Check docs and auto-fix
 #   ./scripts/lint rust           # Check Rust only (no auto-fix)
 #   ./scripts/lint rust --fix     # Check Rust and auto-fix
+#   ./scripts/lint shell          # Check shell scripts only (no auto-fix)
+#   ./scripts/lint shell --fix    # Check shell scripts and auto-fix
 
 set -e
 
 # ============================================================================
-# Colors
+# Configuration: Lint Definitions
+# ============================================================================
+
+# Lint definition format (associative array per lint):
+#   [name]              - Display name for the lint
+#   [category]          - Category: common, docs, rust, or shell
+#   [check_cmd]         - Command to check (exit 0 = pass)
+#   [fix_cmd]           - Command to fix (empty = cannot auto-fix)
+#   [check_installed]   - Command to check if tool is installed (optional)
+#   [install_hint]      - Installation hint for missing tool
+#   [show_diff]         - Whether to show diff after fix (default: true)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_TYPOS=(
+    [name]="Typos Check (all files)"
+    [category]="common"
+    [check_cmd]="typos --color=always"
+    [fix_cmd]="typos --color=always --write-changes"
+    [check_installed]="command -v typos"
+    [install_hint]="cargo install typos-cli"
+    [show_diff]="true"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_MARKDOWN=(
+    [name]="Markdown Lint"
+    [category]="docs"
+    [check_cmd]="markdownlint --ignore node_modules --ignore target docs/ -- *.md"
+    [fix_cmd]="markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md"
+    [check_installed]="command -v markdownlint"
+    [install_hint]="npm install -g markdownlint-cli"
+    [show_diff]="true"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_CLIPPY=(
+    [name]="Clippy Check"
+    [category]="rust"
+    [check_cmd]="cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings"
+    [fix_cmd]="cargo --color=always clippy --color=always --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings"
+    [check_installed]="command -v cargo"
+    [install_hint]="https://rustup.rs"
+    [show_diff]="true"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_RUSTFMT=(
+    [name]="Format Check"
+    [category]="rust"
+    [check_cmd]="cargo --color=always fmt --check"
+    [fix_cmd]="cargo fmt"
+    [check_installed]="command -v cargo"
+    [install_hint]="https://rustup.rs"
+    [show_diff]="true"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_TESTS=(
+    [name]="Test Check"
+    [category]="rust"
+    [check_cmd]="cargo --color=always test --color=always --all-features"
+    [fix_cmd]=""
+    [check_installed]="command -v cargo"
+    [install_hint]="https://rustup.rs"
+    [show_diff]="false"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_RUSTDOC=(
+    [name]="Rustdoc Check"
+    [category]="rust"
+    [check_cmd]="RUSTDOCFLAGS='-D warnings' cargo --color=always doc --color=always --no-deps --all-features"
+    [fix_cmd]=""
+    [check_installed]="command -v cargo"
+    [install_hint]="https://rustup.rs"
+    [show_diff]="false"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_SHELLCHECK=(
+    [name]="Shellcheck"
+    [category]="shell"
+    [check_cmd]="find_shell_scripts | xargs shellcheck --color=always"
+    [fix_cmd]=""
+    [check_installed]="command -v shellcheck"
+    [install_hint]="apt/brew install shellcheck"
+    [show_diff]="false"
+)
+
+# shellcheck disable=SC2034  # Used via nameref in run_lint
+declare -A LINT_SHFMT=(
+    [name]="Shell Format (shfmt)"
+    [category]="shell"
+    [check_cmd]="find_shell_scripts | xargs shfmt -d"
+    [fix_cmd]="find_shell_scripts | xargs shfmt -w"
+    [check_installed]="command -v shfmt"
+    [install_hint]="go install mvdan.cc/sh/v3/cmd/shfmt@latest"
+    [show_diff]="true"
+)
+
+# Registry: All lints in execution order
+LINT_REGISTRY=(
+    LINT_TYPOS
+    LINT_MARKDOWN
+    LINT_CLIPPY
+    LINT_RUSTFMT
+    LINT_TESTS
+    LINT_RUSTDOC
+    LINT_SHELLCHECK
+    LINT_SHFMT
+)
+
+# ============================================================================
+# Colors and State
 # ============================================================================
 
 RED='\033[0;31m'
@@ -22,15 +137,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# ============================================================================
-# State
-# ============================================================================
-
 ERRORS=0
 WARNINGS=0
-TEMP_DIR=$(mktemp -d -t oxidris-lint-XXXXXX)
-MODE="check" # Default mode: check (no auto-fix)
-TARGET=""    # Empty = all targets
+MODE="check" # check or fix
+TARGET=""    # empty = all, or: docs, rust, shell
+INITIAL_SNAPSHOT=""
 
 # ============================================================================
 # Helper Functions
@@ -57,261 +168,22 @@ print_info() {
 take_snapshot() {
     # Create a git stash snapshot without modifying worktree
     # Returns the stash hash (or empty if no changes to snapshot)
-    # The created object is not added to stash list and will be
-    # cleaned up by git gc eventually.
     git stash create 2>/dev/null || true
 }
 
-show_step_changes_if_updated() {
-    # Show what changed since the snapshot, only if there are actual changes
-    # Args:
-    #   $1: step name (e.g., "typos", "markdownlint")
-    #   $2: snapshot hash from take_snapshot
-    # Returns:
-    #   0 if no changes, 1 if changes were made
-    local step_name="$1"
-    local snapshot_hash="$2"
+has_changes_since() {
+    local snapshot="$1"
+    [ -n "$snapshot" ] && ! git diff --quiet "$snapshot" 2>/dev/null
+}
 
-    # No snapshot means nothing was staged/changed before the step
-    [ -z "$snapshot_hash" ] && return 1
-
-    # Check if anything changed since snapshot
-    if git diff --quiet "$snapshot_hash" 2>/dev/null; then
-        return 0
-    fi
-
-    # Show the changes
+show_diff_since() {
+    local snapshot="$1"
+    local step_name="$2"
     echo -e "  ${BLUE}Changed by $step_name:${NC}"
-    git --no-pager diff "$snapshot_hash" --color=always | sed 's/^/    /'
-    return 1
+    git --no-pager diff "$snapshot" --color=always | sed 's/^/    /'
 }
 
-cleanup_temp() {
-    rm -rf "$TEMP_DIR"
-}
-
-# ============================================================================
-# Common Checks (run for all targets)
-# ============================================================================
-
-run_common_checks() {
-    echo "=== Common Checks ==="
-    echo ""
-
-    check_typos
-    echo ""
-}
-
-check_typos() {
-    echo "Typos Check (all files)"
-
-    if ! command -v typos &>/dev/null; then
-        print_warning "typos not installed (install with: cargo install typos-cli)"
-        return
-    fi
-
-    local output
-    if [ "$MODE" = "fix" ]; then
-        local snapshot
-        snapshot=$(take_snapshot)
-
-        if typos --color=always --write-changes >/dev/null 2>&1; then
-            if show_step_changes_if_updated "typos" "$snapshot"; then
-                print_success "No typos found"
-            else
-                print_warning "Typos fixed automatically"
-            fi
-        else
-            if show_step_changes_if_updated "typos" "$snapshot"; then
-                print_error "Typos check failed"
-            else
-                print_error "Typos check failed (some fixes applied)"
-            fi
-        fi
-    else
-        if output=$(typos --color=always 2>&1); then
-            print_success "No typos found"
-        else
-            print_error "Typos found (run with --fix to auto-fix)"
-            echo "$output"
-        fi
-    fi
-
-    echo ""
-}
-
-# ============================================================================
-# Documentation Checks
-# ============================================================================
-
-check_docs_markdown() {
-    echo "1. Markdown Lint"
-
-    if ! command -v markdownlint &>/dev/null; then
-        print_warning "markdownlint not installed (install with: npm install -g markdownlint-cli)"
-        return
-    fi
-
-    local output
-    if [ "$MODE" = "fix" ]; then
-        local snapshot
-        snapshot=$(take_snapshot)
-
-        if markdownlint --fix --ignore node_modules --ignore target docs/ -- *.md >/dev/null 2>&1; then
-            if show_step_changes_if_updated "markdownlint" "$snapshot"; then
-                print_success "No markdown issues found"
-            else
-                print_warning "Markdown issues fixed automatically"
-            fi
-        else
-            if show_step_changes_if_updated "markdownlint" "$snapshot"; then
-                print_error "Markdown check failed"
-            else
-                print_error "Markdown check failed (some fixes applied)"
-            fi
-        fi
-    else
-        if output=$(markdownlint --ignore node_modules --ignore target docs/ -- *.md 2>&1); then
-            print_success "No markdown issues found"
-        else
-            print_error "Markdown issues found (run with --fix to auto-fix)"
-            echo "$output"
-        fi
-    fi
-
-    echo ""
-}
-
-run_docs_checks() {
-    echo "=== Documentation Checks ==="
-    echo ""
-
-    check_docs_markdown
-}
-
-# ============================================================================
-# Rust Code Checks
-# ============================================================================
-
-check_rust_clippy() {
-    echo "1. Clippy Check"
-
-    local output
-    if [ "$MODE" = "fix" ]; then
-        local snapshot
-        snapshot=$(take_snapshot)
-
-        # Try to auto-fix what's possible (ignore output and exit code)
-        cargo --color=always clippy --color=always --fix --allow-dirty --allow-staged --all-targets --all-features -- -D warnings >/dev/null 2>&1 || true
-
-        # Check final state without --fix to see what remains
-        # Note: `cargo clippy --fix` doesn't show all warnings in its output.
-        # Some non-fixable warnings (like type-complexity) aren't displayed during the --fix run,
-        # even when they cause compilation to succeed (they're treated as warnings, not errors).
-        # Run check mode (without --fix) to ensure all warnings are visible to the user.
-        if output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
-            if show_step_changes_if_updated "clippy" "$snapshot"; then
-                print_success "No clippy warnings"
-            else
-                print_warning "Clippy issues fixed automatically"
-            fi
-        else
-            if show_step_changes_if_updated "clippy" "$snapshot"; then
-                print_error "Clippy warnings remain:"
-            else
-                print_error "Clippy auto-fixed some issues, but warnings remain:"
-            fi
-            echo "$output"
-        fi
-    else
-        # Check only, no auto-fix (fast, uses cache)
-        if output=$(cargo --color=always clippy --color=always --all-targets --all-features -- -D warnings 2>&1); then
-            print_success "No clippy warnings"
-        else
-            print_error "Clippy warnings found (run with --fix to attempt auto-fix)"
-            echo "$output"
-        fi
-    fi
-
-    echo ""
-}
-
-check_rust_fmt() {
-    echo "2. Format Check"
-
-    local output
-    if [ "$MODE" = "fix" ]; then
-        local snapshot
-        snapshot=$(take_snapshot)
-
-        if cargo fmt >/dev/null 2>&1; then
-            if show_step_changes_if_updated "cargo fmt" "$snapshot"; then
-                print_success "Code properly formatted"
-            else
-                print_warning "Code formatting issues fixed automatically"
-            fi
-        else
-            if show_step_changes_if_updated "cargo fmt" "$snapshot"; then
-                print_error "Code formatting failed"
-            else
-                print_error "Code formatting failed (some fixes applied)"
-            fi
-        fi
-    else
-        if output=$(cargo --color=always fmt --check 2>&1); then
-            print_success "Code properly formatted"
-        else
-            print_error "Code formatting issues found (run with --fix to auto-fix)"
-            echo "$output"
-        fi
-    fi
-
-    echo ""
-}
-
-check_rust_tests() {
-    echo "3. Test Check"
-
-    local output
-    if output=$(cargo --color=always test --color=always --all-features 2>&1); then
-        print_success "All tests pass"
-    else
-        print_error "Test failures found"
-        echo "$output"
-    fi
-
-    echo ""
-}
-
-check_rust_doc() {
-    echo "4. Rustdoc Check"
-
-    # Check rustdoc warnings (can't be auto-fixed, so run in both modes)
-    local output
-    if output=$(RUSTDOCFLAGS="-D warnings" cargo --color=always doc --color=always --no-deps --all-features 2>&1); then
-        print_success "No rustdoc warnings"
-    else
-        print_error "Rustdoc warnings found (fix manually)"
-        echo "$output"
-    fi
-
-    echo ""
-}
-
-run_rust_checks() {
-    echo "=== Rust Code Checks ==="
-    echo ""
-
-    check_rust_clippy
-    check_rust_fmt
-    check_rust_tests
-    check_rust_doc
-}
-
-# ============================================================================
-# Shell Script Checks
-# ============================================================================
-
+# shellcheck disable=SC2329  # Invoked via eval in LINT_SHELLCHECK and LINT_SHFMT
 find_shell_scripts() {
     {
         # Tracked files
@@ -337,102 +209,138 @@ find_shell_scripts() {
     done
 }
 
-check_shell_shellcheck() {
-    echo "1. Shellcheck"
+# ============================================================================
+# Core Lint Execution Engine
+# ============================================================================
 
-    local files
-    files=$(find_shell_scripts)
+run_lint() {
+    local lint_var="$1"
+    local -n lint_def=$lint_var
+    local lint_name="${lint_def[name]}"
 
-    if [ -z "$files" ]; then
-        print_warning "No shell scripts found"
-        return
+    echo "${lint_name}"
+
+    # Check if tool is installed
+    if [ -n "${lint_def[check_installed]}" ]; then
+        if ! eval "${lint_def[check_installed]}" &>/dev/null; then
+            print_warning "Tool not installed (install with: ${lint_def[install_hint]})"
+            return
+        fi
     fi
 
-    if ! command -v shellcheck &>/dev/null; then
-        print_warning "shellcheck not installed (install with: apt/brew install shellcheck)"
-        return
-    fi
+    local check_cmd="${lint_def[check_cmd]}"
+    local fix_cmd="${lint_def[fix_cmd]}"
+    local show_diff="${lint_def[show_diff]:-true}"
 
-    # Shellcheck cannot auto-fix, runs in both modes
-    local output
-    if output=$(echo "$files" | xargs shellcheck --color=always 2>&1); then
-        print_success "No shellcheck issues"
+    # Execute lint
+    if [ "$MODE" = "fix" ] && [ -n "$fix_cmd" ]; then
+        run_lint_with_fix "$lint_name" "$check_cmd" "$fix_cmd" "$show_diff"
     else
-        print_error "Shellcheck issues found (cannot auto-fix, fix manually)"
+        run_lint_check_only "$lint_name" "$check_cmd" "$fix_cmd"
+    fi
+
+    echo ""
+}
+
+run_lint_check_only() {
+    local lint_name="$1"
+    local check_cmd="$2"
+    local fix_cmd="$3"
+
+    local output
+    if output=$(eval "$check_cmd" 2>&1); then
+        print_success "No issues found"
+    else
+        if [ -z "$fix_cmd" ]; then
+            print_error "Issues found (cannot auto-fix, fix manually)"
+        else
+            print_error "Issues found (run with --fix to auto-fix)"
+        fi
         echo "$output"
     fi
-
-    echo ""
 }
 
-check_shell_shfmt() {
-    echo "2. Shell Format (shfmt)"
+run_lint_with_fix() {
+    local lint_name="$1"
+    local check_cmd="$2"
+    local fix_cmd="$3"
+    local show_diff="$4"
 
-    local files
-    files=$(find_shell_scripts)
+    local snapshot
+    snapshot=$(take_snapshot)
 
-    if [ -z "$files" ]; then
-        print_warning "No shell scripts found"
-        return
+    # Run fix command (ignore output/exit code)
+    eval "$fix_cmd" >/dev/null 2>&1 || true
+
+    # Determine if fix made changes
+    local fix_made_changes=false
+    if has_changes_since "$snapshot"; then
+        fix_made_changes=true
     fi
 
-    if ! command -v shfmt &>/dev/null; then
-        print_warning "shfmt not installed (install with: go install mvdan.cc/sh/v3/cmd/shfmt@latest)"
-        return
+    # Always recheck after fix to verify final state
+    local final_check_passed=true
+    local final_output=""
+    if ! final_output=$(eval "$check_cmd" 2>&1); then
+        final_check_passed=false
     fi
 
-    local output
-    if [ "$MODE" = "fix" ]; then
-        local snapshot
-        snapshot=$(take_snapshot)
-
-        # Apply formatting (shfmt reads .editorconfig automatically)
-        if echo "$files" | xargs shfmt -w >/dev/null 2>&1; then
-            if show_step_changes_if_updated "shfmt" "$snapshot"; then
-                print_success "Shell scripts properly formatted"
-            else
-                print_warning "Shell formatting issues fixed automatically"
-            fi
+    # Report results
+    if [ "$fix_made_changes" = true ]; then
+        if [ "$final_check_passed" = false ]; then
+            print_error "Auto-fixed some issues, but problems remain:"
+            echo "$final_output"
         else
-            if show_step_changes_if_updated "shfmt" "$snapshot"; then
-                print_error "Shell formatting failed"
-            else
-                print_error "Shell formatting failed (some fixes applied)"
-            fi
+            print_warning "Issues fixed automatically"
+        fi
+        if [ "$show_diff" = "true" ]; then
+            show_diff_since "$snapshot" "$lint_name"
         fi
     else
-        # Check differences
-        if output=$(echo "$files" | xargs shfmt -d 2>&1); then
-            print_success "Shell scripts properly formatted"
+        if [ "$final_check_passed" = false ]; then
+            print_error "Issues found (cannot auto-fix):"
+            echo "$final_output"
         else
-            print_error "Shell formatting issues found (run with --fix to auto-fix)"
-            echo "$output"
+            print_success "No issues found"
         fi
     fi
-
-    echo ""
-}
-
-run_shell_checks() {
-    echo "=== Shell Script Checks ==="
-    echo ""
-
-    check_shell_shellcheck
-    check_shell_shfmt
 }
 
 # ============================================================================
-# Summary and Exit
+# Lint Execution by Category
 # ============================================================================
 
-check_script_changes() {
+run_lints_for_category() {
+    local category="$1"
+    local display_name="$2"
+
+    echo "=== $display_name ==="
+    echo ""
+
+    local count=0
+    for lint_var in "${LINT_REGISTRY[@]}"; do
+        local -n lint=$lint_var
+        if [ "${lint[category]}" = "$category" ]; then
+            count=$((count + 1))
+            if [ "$count" -gt 1 ] || [ "$category" != "common" ]; then
+                echo -n "$count. "
+            fi
+            run_lint "$lint_var"
+        fi
+    done
+}
+
+# ============================================================================
+# Summary Functions
+# ============================================================================
+
+show_changes_summary() {
     echo "=== Changes Summary ==="
     echo ""
 
-    # Check if anything changed since the initial snapshot
     if [ -z "$INITIAL_SNAPSHOT" ]; then
         print_success "No changes made by linter"
-    elif git diff --quiet "$INITIAL_SNAPSHOT" 2>/dev/null; then
+    elif ! has_changes_since "$INITIAL_SNAPSHOT"; then
         print_success "No changes made by linter"
     else
         echo -e "   ${BLUE}ℹ${NC} Linter made changes to the following files:"
@@ -447,56 +355,29 @@ check_script_changes() {
     echo ""
 }
 
-print_summary() {
+print_final_summary() {
     echo "==================================="
 
     if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
-        if [ "$MODE" = "fix" ] && [ -n "$INITIAL_SNAPSHOT" ] && ! git diff --quiet "$INITIAL_SNAPSHOT" 2>/dev/null; then
+        if [ "$MODE" = "fix" ] && [ -n "$INITIAL_SNAPSHOT" ] && has_changes_since "$INITIAL_SNAPSHOT"; then
             echo -e "${GREEN}✓ All checks passed (with auto-fixes applied)${NC}"
             echo -e "   Review changes with: ${GREEN}git diff${NC}"
         else
             echo -e "${GREEN}✓ All checks passed${NC}"
         fi
-        cleanup_temp
         exit 0
     elif [ "$ERRORS" -eq 0 ]; then
         echo -e "${YELLOW}⚠ $WARNINGS warning(s)${NC}"
-        cleanup_temp
         exit 0
     else
         echo -e "${RED}✗ $ERRORS error(s), $WARNINGS warning(s)${NC}"
-        cleanup_temp
         exit 1
     fi
 }
 
 # ============================================================================
-# Main
+# Argument Parsing
 # ============================================================================
-
-show_usage() {
-    echo "Usage: ./scripts/lint [TARGET] [--fix]"
-    echo ""
-    echo "Targets:"
-    echo "  (none)    Run all checks"
-    echo "  docs      Check documentation only"
-    echo "  rust      Check Rust code only"
-    echo "  shell     Check shell scripts only"
-    echo ""
-    echo "Options:"
-    echo "  --fix     Auto-fix issues (default: check only)"
-    echo ""
-    echo "Examples:"
-    echo "  ./scripts/lint              # Check all (no auto-fix)"
-    echo "  ./scripts/lint --fix        # Check and fix all"
-    echo "  ./scripts/lint docs         # Check docs only (no auto-fix)"
-    echo "  ./scripts/lint docs --fix   # Check and fix docs"
-    echo "  ./scripts/lint rust         # Check Rust only (no auto-fix, fast)"
-    echo "  ./scripts/lint rust --fix   # Check and fix Rust code"
-    echo "  ./scripts/lint shell        # Check shell scripts only (no auto-fix)"
-    echo "  ./scripts/lint shell --fix  # Check and fix shell scripts"
-    exit 0
-}
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -526,6 +407,36 @@ parse_args() {
     done
 }
 
+show_usage() {
+    cat <<'EOF'
+Usage: ./scripts/lint [TARGET] [--fix]
+
+Targets:
+  (none)    Run all checks
+  docs      Check documentation only
+  rust      Check Rust code only
+  shell     Check shell scripts only
+
+Options:
+  --fix     Auto-fix issues (default: check only)
+
+Examples:
+  ./scripts/lint              # Check all (no auto-fix)
+  ./scripts/lint --fix        # Check and fix all
+  ./scripts/lint docs         # Check docs only (no auto-fix)
+  ./scripts/lint docs --fix   # Check and fix docs
+  ./scripts/lint rust         # Check Rust only (no auto-fix, fast)
+  ./scripts/lint rust --fix   # Check and fix Rust code
+  ./scripts/lint shell        # Check shell scripts only (no auto-fix)
+  ./scripts/lint shell --fix  # Check and fix shell scripts
+EOF
+    exit 0
+}
+
+# ============================================================================
+# Main Execution
+# ============================================================================
+
 main() {
     parse_args "$@"
 
@@ -534,48 +445,45 @@ main() {
         print_info "Mode: check only (no auto-fix)"
     else
         print_info "Mode: fix (auto-fix enabled)"
+        INITIAL_SNAPSHOT=$(take_snapshot)
     fi
     echo ""
 
-    # Take initial snapshot before making any changes (for fix mode summary)
-    INITIAL_SNAPSHOT=""
-    if [ "$MODE" = "fix" ]; then
-        INITIAL_SNAPSHOT=$(take_snapshot)
-    fi
-
-    # Run common checks first (always)
-    run_common_checks
-
-    # Run target-specific checks
+    # Run lints by target
     case "$TARGET" in
     docs)
-        run_docs_checks
+        run_lints_for_category "common" "Common Checks"
+        echo ""
+        run_lints_for_category "docs" "Documentation Checks"
         ;;
     rust)
-        run_rust_checks
+        run_lints_for_category "common" "Common Checks"
+        echo ""
+        run_lints_for_category "rust" "Rust Code Checks"
         ;;
     shell)
-        run_shell_checks
+        run_lints_for_category "common" "Common Checks"
+        echo ""
+        run_lints_for_category "shell" "Shell Script Checks"
         ;;
     *)
         # Run all checks
-        run_docs_checks
+        run_lints_for_category "common" "Common Checks"
         echo ""
-        run_rust_checks
+        run_lints_for_category "docs" "Documentation Checks"
         echo ""
-        run_shell_checks
+        run_lints_for_category "rust" "Rust Code Checks"
+        echo ""
+        run_lints_for_category "shell" "Shell Script Checks"
         ;;
     esac
 
     # Show changes summary (only if in fix mode)
     if [ "$MODE" = "fix" ]; then
-        check_script_changes
+        show_changes_summary
     fi
 
-    print_summary
+    print_final_summary
 }
-
-# Trap to ensure cleanup happens even on errors
-trap cleanup_temp EXIT INT TERM
 
 main "$@"
